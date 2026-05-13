@@ -165,20 +165,13 @@ export default function EquipamentosPage() {
         const extensao = arquivoImagem.name.split('.').pop()
         const nomeArquivo = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`
 
-        const { error: uploadError } = await supabase.storage
-          .from('equipamentos')
-          .upload(nomeArquivo, arquivoImagem)
-
+        const { error: uploadError } = await supabase.storage.from('equipamentos').upload(nomeArquivo, arquivoImagem)
         if (uploadError) throw uploadError
 
-        const { data: publicUrlData } = supabase.storage
-          .from('equipamentos')
-          .getPublicUrl(nomeArquivo)
-
+        const { data: publicUrlData } = supabase.storage.from('equipamentos').getPublicUrl(nomeArquivo)
         urlImagemFinal = publicUrlData.publicUrl
       }
 
-      // Prepara os dados pro banco (Trata datas vazias para evitar erro no banco)
       const payload = { ...formData, imagem_url: urlImagemFinal }
       if (view === 'novo') delete payload.id
       if (!payload.data_ultima_calibracao) payload.data_ultima_calibracao = null
@@ -190,47 +183,65 @@ export default function EquipamentosPage() {
       if (view === 'novo') {
         const { data: novoEq, error: dbError } = await supabase.from('equipamentos').insert([payload]).select().single()
         if (dbError) throw dbError
-        equipamentoId = novoEq.id // Pega o ID que acabou de ser criado
+        equipamentoId = novoEq.id
       } else {
         const { error: dbError } = await supabase.from('equipamentos').update(payload).eq('id', formData.id)
         if (dbError) throw dbError
       }
 
-      // 2. AUTOMAÇÃO: Dispara a OS para a Agenda se houver Próxima Calibração
-      if (payload.data_proxima_calibracao) {
-        // Verifica se já não criamos isso antes para não duplicar OS sem querer
-        const { data: chamadoExistente } = await supabase
-          .from('chamados')
-          .select('id')
-          .eq('equipamento_id', equipamentoId)
-          .eq('tipo_intervencao', 'Calibração')
-          .eq('data_prevista', payload.data_proxima_calibracao)
-          .maybeSingle()
+      // --- AUTOMAÇÃO DE AGENDA (DUPLO REGISTRO: PASSADO E FUTURO) ---
+      
+      const { data: authData } = await supabase.auth.getUser()
+      let perfilId = null;
+      if (authData?.user?.id) {
+         const { data: perfilData } = await supabase.from('perfis').select('id').eq('user_id', authData.user.id).maybeSingle()
+         if (perfilData) perfilId = perfilData.id;
+      }
 
-        if (!chamadoExistente) {
-          // Busca os IDs dinâmicos de Status(Aberto) e Usuário Atual para vincular certinho
-          const { data: statusAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
-          const { data: authData } = await supabase.auth.getUser()
+      // A. REGISTRAR A QUE JÁ FOI FEITA (Histórico na Agenda)
+      if (payload.data_ultima_calibracao) {
+        const { data: existePassada } = await supabase.from('chamados')
+          .select('id').eq('equipamento_id', equipamentoId)
+          .eq('data_prevista', payload.data_ultima_calibracao).maybeSingle()
+
+        if (!existePassada) {
+          const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
           
-          let perfilId = null;
-          if (authData?.user?.id) {
-             const { data: perfilData } = await supabase.from('perfis').select('id').eq('user_id', authData.user.id).maybeSingle()
-             if (perfilData) perfilId = perfilData.id;
-          }
-
-          // Cria a OS no banco!
           await supabase.from('chamados').insert([{
             equipamento_id: equipamentoId,
-            tipo_intervencao: 'Calibração',
+            tipo_intervencao: 'Calibração', 
+            data_abertura: payload.data_ultima_calibracao,
+            data_prevista: payload.data_ultima_calibracao,
+            data_conclusao: payload.data_ultima_calibracao,
+            descricao: `Registro de calibração realizada anteriormente. (Lançamento automático)`,
+            status_id: stConcluido?.id,
+            aberto_por_id: perfilId
+          }]);
+        }
+      }
+
+      // B. REGISTRAR A PRÓXIMA (Agendamento na Agenda)
+      if (payload.data_proxima_calibracao) {
+        const { data: existeFutura } = await supabase.from('chamados')
+          .select('id').eq('equipamento_id', equipamentoId)
+          .eq('data_prevista', payload.data_proxima_calibracao).maybeSingle()
+
+        if (!existeFutura) {
+          const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
+
+          await supabase.from('chamados').insert([{
+            equipamento_id: equipamentoId,
+            tipo_intervencao: 'Calibração', 
+            data_abertura: new Date().toISOString(),
             data_prevista: payload.data_proxima_calibracao,
-            descricao: `Calibração preventiva programada automaticamente a partir do cadastro do equipamento. \nModelo: ${payload.modelo} \nSérie: ${payload.numero_serie}`,
-            status_id: statusAberto ? statusAberto.id : null,
+            descricao: `Manutenção/Calibração preventiva programada.`,
+            status_id: stAberto?.id,
             aberto_por_id: perfilId
           }]);
         }
       }
       
-      mostrarToast(view === 'novo' ? 'Equipamento cadastrado com sucesso!' : 'Equipamento atualizado!')
+      mostrarToast(view === 'novo' ? 'Equipamento e Agenda atualizados!' : 'Alterações salvas com sucesso!')
       resetarFormulario()
       buscarEquipamentos()
 
