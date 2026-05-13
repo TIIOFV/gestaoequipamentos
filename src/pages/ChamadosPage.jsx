@@ -221,7 +221,7 @@ export default function ChamadosPage() {
               <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
                 <Ticket className="text-blue-600" /> Chamados e OS
               </h1>
-              <p className="text-sm md:text-base text-slate-500 mt-1">Gerencie as corretivas, preventivas e calibrações.</p>
+              <p className="text-sm md:text-base text-slate-500 mt-1">Gerencie as corretivas, preventivas, calibrações e qualificações.</p>
             </div>
             <button 
               onClick={() => setView('novo')}
@@ -254,6 +254,7 @@ export default function ChamadosPage() {
                     <span className={`text-[10px] md:text-xs font-bold px-2 py-0.5 md:px-2.5 md:py-1 rounded-md border ${
                       ch.tipo_intervencao === 'Preventiva' ? 'bg-green-50 text-green-700 border-green-200' :
                       ch.tipo_intervencao === 'Calibração' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                      ch.tipo_intervencao === 'Qualificação' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                       'bg-red-50 text-red-700 border-red-200'
                     }`}>
                       {ch.tipo_intervencao || 'Corretiva'}
@@ -301,6 +302,7 @@ export default function ChamadosPage() {
                 <span className={`px-2.5 py-1 rounded-md text-[10px] md:text-sm font-bold border ${
                   chamadoSelecionado.tipo_intervencao === 'Preventiva' ? 'bg-green-100 text-green-800 border-green-200' :
                   chamadoSelecionado.tipo_intervencao === 'Calibração' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                  chamadoSelecionado.tipo_intervencao === 'Qualificação' ? 'bg-purple-100 text-purple-800 border-purple-200' :
                   'bg-red-100 text-red-800 border-red-200'
                 }`}>
                   {chamadoSelecionado.tipo_intervencao || 'Corretiva'}
@@ -415,6 +417,7 @@ export default function ChamadosPage() {
                     <option value="Corretiva">Corretiva</option>
                     <option value="Preventiva">Preventiva</option>
                     <option value="Calibração">Calibração</option>
+                    <option value="Qualificação">Qualificação</option>
                   </select>
                 </div>
                 <div>

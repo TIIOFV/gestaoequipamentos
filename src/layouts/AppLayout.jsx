@@ -82,7 +82,7 @@ export default function AppLayout() {
       let query = supabase
         .from('chamados')
         .select('id, tipo_intervencao, data_prevista, equipamento:equipamento_id(nome)')
-        .in('tipo_intervencao', ['Calibração', 'Preventiva'])
+        .in('tipo_intervencao', ['Calibração', 'Preventiva', 'Qualificação'])
         .lte('data_prevista', hoje) // Data menor ou igual a hoje
 
       if (statusConcluido) {

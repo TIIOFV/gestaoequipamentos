@@ -237,6 +237,7 @@ export default function RelatoriosPage() {
                         <div className={`inline-block px-1.5 md:px-2 py-0.5 rounded text-[9px] md:text-[10px] font-bold uppercase tracking-wider border ${
                           os.tipo_intervencao === 'Preventiva' ? 'bg-green-50 text-green-700 border-green-200' :
                           os.tipo_intervencao === 'Calibração' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          os.tipo_intervencao === 'Qualificação' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                           'bg-red-50 text-red-700 border-red-200'
                         }`}>
                           {os.tipo_intervencao}
