@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { 
   Plus, Search, ArrowLeft, Image as ImageIcon, 
-  CheckCircle2, AlertCircle, X, Edit, FileText, Wrench, Calendar, Clock, User, Trash2, Upload, Copy
+  CheckCircle2, AlertCircle, X, Edit, FileText, Wrench, Calendar, Clock, User, Trash2, Upload, Copy,
+  Images // Ícone novo para a galeria
 } from 'lucide-react'
 
 export default function EquipamentosPage() {
@@ -25,17 +26,18 @@ export default function EquipamentosPage() {
   const [historicoManutencoes, setHistoricoManutencoes] = useState([])
   const [osDetalheSelecionada, setOsDetalheSelecionada] = useState(null)
 
-  // ESTADOS PARA O UPLOAD DA IMAGEM
+  // ESTADOS PARA O UPLOAD DA IMAGEM PRINCIPAL
   const [arquivoImagem, setArquivoImagem] = useState(null)
   const [previewImagem, setPreviewImagem] = useState(null)
 
-  // NOVO: Adicionados campos booleanos e de data
+  // ESTADOS DO FORMULÁRIO (Incluindo fotos adicionais)
   const estadoInicialForm = {
     id: null, nome: '', numero_serie: '', patrimonio: '', modelo: '',
     fabricante_id: '', prestador_id: '', unidade_id: '', setor_id: '', 
     status_id: '', observacoes: '', imagem_url: '',
     possui_etiqueta: false, possui_manual: false, sem_numero_serie: false,
-    sem_patrimonio: false, data_ultima_calibracao: '', data_proxima_calibracao: ''
+    sem_patrimonio: false, data_ultima_calibracao: '', data_proxima_calibracao: '',
+    fotos_adicionais: [] // NOVA COLUNA PARA A GALERIA
   }
   const [formData, setFormData] = useState(estadoInicialForm)
 
@@ -100,6 +102,56 @@ export default function EquipamentosPage() {
     }
   }
 
+  // --- NOVA FUNÇÃO: UPLOAD DE MÚLTIPLAS FOTOS ADICIONAIS ---
+  const handleUploadFotosAdicionais = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
+    setLoading(true);
+    mostrarToast('Enviando fotos para a galeria...', 'success');
+
+    try {
+      const novasUrls = [];
+      
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `galeria_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`; 
+
+        const { error: uploadError } = await supabase.storage
+          .from('equipamentos') 
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('equipamentos')
+          .getPublicUrl(filePath);
+
+        novasUrls.push(publicUrl);
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        fotos_adicionais: [...(prev.fotos_adicionais || []), ...novasUrls]
+      }));
+      
+      mostrarToast(`${files.length} foto(s) adicionada(s) à galeria!`);
+    } catch (error) {
+      console.error('Erro no upload da galeria:', error);
+      mostrarToast('Erro ao enviar as fotos.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removerFotoAdicional = (urlRemover) => {
+    setFormData(prev => ({
+      ...prev,
+      fotos_adicionais: prev.fotos_adicionais.filter(url => url !== urlRemover)
+    }));
+  };
+
   // --- FUNÇÃO SALVAR COM AUTOMAÇÃO DE AGENDA ---
   const handleSalvar = async (e) => {
     e.preventDefault()
@@ -109,7 +161,7 @@ export default function EquipamentosPage() {
       let urlImagemFinal = formData.imagem_url
 
       if (arquivoImagem) {
-        mostrarToast('Fazendo upload da imagem...', 'success')
+        mostrarToast('Fazendo upload da imagem principal...', 'success')
         const extensao = arquivoImagem.name.split('.').pop()
         const nomeArquivo = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`
 
@@ -218,17 +270,17 @@ export default function EquipamentosPage() {
       sem_numero_serie: eq.sem_numero_serie || false,
       sem_patrimonio: eq.sem_patrimonio || false,
       data_ultima_calibracao: eq.data_ultima_calibracao ? eq.data_ultima_calibracao.split('T')[0] : '',
-      data_proxima_calibracao: eq.data_proxima_calibracao ? eq.data_proxima_calibracao.split('T')[0] : ''
+      data_proxima_calibracao: eq.data_proxima_calibracao ? eq.data_proxima_calibracao.split('T')[0] : '',
+      fotos_adicionais: eq.fotos_adicionais || []
     })
     setArquivoImagem(null)
     setPreviewImagem(eq.imagem_url || null)
     setView('editar')
   }
 
-  // --- NOVA FUNÇÃO: DUPLICAR EQUIPAMENTO ---
   const duplicarEquipamento = (eq) => {
     setFormData({
-      ...estadoInicialForm, // Reseta tudo
+      ...estadoInicialForm, 
       nome: eq.nome || '',
       modelo: eq.modelo || '',
       fabricante_id: eq.fabricante_id || '',
@@ -239,7 +291,6 @@ export default function EquipamentosPage() {
       observacoes: eq.observacoes || '',
       possui_etiqueta: eq.possui_etiqueta || false,
       possui_manual: eq.possui_manual || false,
-      // Propósito: Deixar Patrimônio, Nº Série e Datas em branco para o novo
     })
     setArquivoImagem(null)
     setPreviewImagem(null)
@@ -343,7 +394,6 @@ export default function EquipamentosPage() {
                     <div>
                       <h3 className="text-xl font-bold text-slate-800">{eq.nome}</h3>
                       
-                      {/* BADGES PARA VISUALIZAÇÃO RÁPIDA */}
                     <div className="flex flex-wrap gap-2 mt-2">
                       {eq.possui_etiqueta ? (
                         <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold border border-indigo-100 uppercase">🏷️ Etiquetado</span>
@@ -353,6 +403,13 @@ export default function EquipamentosPage() {
                       
                       {eq.possui_manual && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-100 uppercase">📖 Manual</span>}
                       {eq.sem_numero_serie && <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200 uppercase">Sem N/S</span>}
+                      
+                      {/* Badge indicando que tem fotos na galeria */}
+                      {eq.fotos_adicionais && eq.fotos_adicionais.length > 0 && (
+                        <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold border border-blue-100 uppercase flex items-center gap-1">
+                          <Images size={10} /> +{eq.fotos_adicionais.length} Fotos
+                        </span>
+                      )}
                     </div>
 
                     </div>
@@ -473,6 +530,33 @@ export default function EquipamentosPage() {
                 {equipSelecionado.observacoes || 'Nenhuma observação registrada para este equipamento.'}
               </p>
             </div>
+
+            {/* GALERIA DE FOTOS ADICIONAIS NA TELA DE DETALHES */}
+            {equipSelecionado.fotos_adicionais && equipSelecionado.fotos_adicionais.length > 0 && (
+              <div className="mt-8 pt-6 border-t border-slate-100">
+                <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2">
+                  <Images className="text-blue-600" size={18} /> Galeria de Fotos ({equipSelecionado.fotos_adicionais.length})
+                </h3>
+                
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4">
+                  {equipSelecionado.fotos_adicionais.map((foto, index) => (
+                    <a 
+                      key={index} 
+                      href={foto} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="block aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm hover:shadow-md hover:opacity-90 transition-all cursor-zoom-in"
+                    >
+                      <img 
+                        src={foto} 
+                        alt={`Foto detalhe ${index + 1}`} 
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" 
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
@@ -502,6 +586,7 @@ export default function EquipamentosPage() {
                           <span className={`px-2.5 py-1 rounded-md text-xs font-bold border ${
                             manutencao.tipo_intervencao === 'Preventiva' ? 'bg-green-100 text-green-800 border-green-200' :
                             manutencao.tipo_intervencao === 'Calibração' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                            manutencao.tipo_intervencao === 'Qualificação' ? 'bg-purple-100 text-purple-800 border-purple-200' :
                             'bg-red-100 text-red-800 border-red-200'
                           }`}>
                             {manutencao.tipo_intervencao || 'Corretiva'}
@@ -549,6 +634,7 @@ export default function EquipamentosPage() {
                <span className={`px-3 py-1.5 rounded-md text-sm font-bold border ${
                 osDetalheSelecionada.tipo_intervencao === 'Preventiva' ? 'bg-green-100 text-green-800 border-green-200' :
                 osDetalheSelecionada.tipo_intervencao === 'Calibração' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                osDetalheSelecionada.tipo_intervencao === 'Qualificação' ? 'bg-purple-100 text-purple-800 border-purple-200' :
                 'bg-red-100 text-red-800 border-red-200'
               }`}>
                 {osDetalheSelecionada.tipo_intervencao || 'Corretiva'}
@@ -601,7 +687,7 @@ export default function EquipamentosPage() {
           <form onSubmit={handleSalvar} className="space-y-6">
             <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
               
-              <div className="flex flex-col md:flex-row gap-6 items-center p-5 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="flex flex-col md:flex-row gap-6 items-start p-5 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center border border-slate-200 shrink-0 overflow-hidden shadow-sm relative group">
                   {previewImagem ? (
                     <img src={previewImagem} alt="Preview" className="w-full h-full object-cover" />
@@ -614,16 +700,54 @@ export default function EquipamentosPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex-1 w-full">
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Foto do Equipamento</label>
-                  <label className="flex items-center justify-center w-full px-4 py-8 border-2 border-dashed border-blue-300 rounded-xl hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer group">
-                    <div className="flex flex-col items-center gap-2 text-blue-600">
-                      <Upload size={24} className="group-hover:-translate-y-1 transition-transform" />
-                      <span className="font-bold text-sm">Clique para escolher o arquivo</span>
-                      <span className="text-xs text-slate-500 font-medium">PNG, JPG ou JPEG (Máx. 5MB)</span>
-                    </div>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleSelecionarArquivo} />
-                  </label>
+                <div className="flex-1 w-full space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Foto de Capa do Equipamento</label>
+                    <label className="flex items-center justify-center w-full px-4 py-4 border-2 border-dashed border-blue-300 rounded-xl hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer group">
+                      <div className="flex flex-col items-center gap-1 text-blue-600">
+                        <Upload size={20} className="group-hover:-translate-y-1 transition-transform" />
+                        <span className="font-bold text-sm">Escolher foto principal</span>
+                      </div>
+                      <input type="file" accept="image/*" className="hidden" onChange={handleSelecionarArquivo} />
+                    </label>
+                  </div>
+                  
+                  {/* UPLOAD DA GALERIA ADICIONAL */}
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Galeria de Fotos Adicionais</label>
+                    <input 
+                      type="file" 
+                      multiple 
+                      accept="image/*" 
+                      onChange={handleUploadFotosAdicionais}
+                      disabled={loading}
+                      className="block w-full text-sm text-slate-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-lg file:border-0
+                        file:text-xs file:font-bold
+                        file:bg-indigo-50 file:text-indigo-700
+                        hover:file:bg-indigo-100 cursor-pointer"
+                    />
+                    
+                    {/* MINIATURAS DA GALERIA */}
+                    {formData.fotos_adicionais && formData.fotos_adicionais.length > 0 && (
+                      <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
+                        {formData.fotos_adicionais.map((foto, index) => (
+                          <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 shadow-sm">
+                            <img src={foto} alt={`Miniatura ${index}`} className="w-full h-full object-cover" />
+                            <button 
+                              type="button"
+                              onClick={() => removerFotoAdicional(foto)}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-80 hover:opacity-100 transition-opacity"
+                              title="Remover foto"
+                            >
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
