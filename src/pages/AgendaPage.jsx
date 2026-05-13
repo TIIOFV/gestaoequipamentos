@@ -55,10 +55,12 @@ export default function AgendaPage() {
     diasDoCalendario.push({ dia: i, dataCompleta: strDate })
   }
 
+  // ATUALIZADO: Inclui a Qualificação com a cor roxa (purple)
   const getCorEvento = (tipo, statusNome) => {
     const isConcluido = statusNome === 'Concluído'
     if (tipo === 'Preventiva') return !isConcluido ? 'bg-[#009e49] text-white' : 'bg-[#bcf0cf] text-[#006b31]'
     if (tipo === 'Calibração') return !isConcluido ? 'bg-[#1a5ce5] text-white' : 'bg-[#b8d1ff] text-[#103a94]'
+    if (tipo === 'Qualificação') return !isConcluido ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-800'
     if (tipo === 'Corretiva')  return !isConcluido ? 'bg-[#d82128] text-white' : 'bg-[#ffc2c4] text-[#8c1216]'
     return 'bg-slate-500 text-white'
   }
@@ -70,7 +72,8 @@ export default function AgendaPage() {
     .filter(ch => filtroResponsavel === 'Todos' || ch.aberto_por_id === filtroResponsavel)
     .map(ch => ({
       ...ch,
-      dataPlotagem: ch.data_prevista ? ch.data_prevista : ch.data_abertura.split('T')[0],
+      // O SEGREDO ESTÁ AQUI: o .split('T')[0] arranca a hora e compara apenas as datas!
+      dataPlotagem: ch.data_prevista ? ch.data_prevista.split('T')[0] : (ch.data_abertura ? ch.data_abertura.split('T')[0] : ''),
       statusExibicao: ch.status?.nome === 'Concluído' ? 'Realizada' : 'Agendada'
     }))
 
@@ -113,13 +116,17 @@ export default function AgendaPage() {
           </select>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 md:gap-3 w-full">
-          <span className="px-2 md:px-4 py-2 bg-[#009e49] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Preventiva Agendada</span>
-          <span className="px-2 md:px-4 py-2 bg-[#1a5ce5] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Calibração Agendada</span>
-          <span className="px-2 md:px-4 py-2 bg-[#d82128] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Corretiva Agendada</span>
-          <span className="px-2 md:px-4 py-2 bg-[#bcf0cf] text-[#006b31] text-[10px] md:text-xs font-bold rounded-lg text-center border border-[#009e49]/20">Preventiva Realizada</span>
-          <span className="px-2 md:px-4 py-2 bg-[#b8d1ff] text-[#103a94] text-[10px] md:text-xs font-bold rounded-lg text-center border border-[#1a5ce5]/20">Calibração Realizada</span>
-          <span className="px-2 md:px-4 py-2 bg-[#ffc2c4] text-[#8c1216] text-[10px] md:text-xs font-bold rounded-lg text-center border border-[#d82128]/20">Corretiva Realizada</span>
+        {/* ATUALIZADO: Grade de 4 colunas (lg:grid-cols-4) para acomodar a Qualificação sem quebrar o layout */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 w-full">
+          <span className="px-2 md:px-3 py-2 bg-[#009e49] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Prev. Agendada</span>
+          <span className="px-2 md:px-3 py-2 bg-[#1a5ce5] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Calib. Agendada</span>
+          <span className="px-2 md:px-3 py-2 bg-purple-600 text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Quali. Agendada</span>
+          <span className="px-2 md:px-3 py-2 bg-[#d82128] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Corr. Agendada</span>
+          
+          <span className="px-2 md:px-3 py-2 bg-[#bcf0cf] text-[#006b31] text-[10px] md:text-xs font-bold rounded-lg text-center border border-[#009e49]/20">Prev. Realizada</span>
+          <span className="px-2 md:px-3 py-2 bg-[#b8d1ff] text-[#103a94] text-[10px] md:text-xs font-bold rounded-lg text-center border border-[#1a5ce5]/20">Calib. Realizada</span>
+          <span className="px-2 md:px-3 py-2 bg-purple-100 text-purple-800 text-[10px] md:text-xs font-bold rounded-lg text-center border border-purple-600/20">Quali. Realizada</span>
+          <span className="px-2 md:px-3 py-2 bg-[#ffc2c4] text-[#8c1216] text-[10px] md:text-xs font-bold rounded-lg text-center border border-[#d82128]/20">Corr. Realizada</span>
         </div>
       </div>
 
