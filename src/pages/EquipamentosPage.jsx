@@ -343,11 +343,16 @@ export default function EquipamentosPage() {
                       <h3 className="text-xl font-bold text-slate-800">{eq.nome}</h3>
                       
                       {/* BADGES PARA VISUALIZAÇÃO RÁPIDA */}
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {eq.possui_etiqueta && <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold border border-indigo-100 uppercase">🏷️ Etiquetado</span>}
-                        {eq.possui_manual && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-100 uppercase">📖 Manual</span>}
-                        {eq.sem_numero_serie && <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200 uppercase">Sem N/S</span>}
-                      </div>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {eq.possui_etiqueta ? (
+                        <span className="bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold border border-indigo-100 uppercase">🏷️ Etiquetado</span>
+                      ) : (
+                        <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded text-[10px] font-bold border border-red-100 uppercase">⚠️ Sem Etiqueta</span>
+                      )}
+                      
+                      {eq.possui_manual && <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-100 uppercase">📖 Manual</span>}
+                      {eq.sem_numero_serie && <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-200 uppercase">Sem N/S</span>}
+                    </div>
 
                     </div>
                     <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-lg text-xs font-bold border border-blue-100 whitespace-nowrap">

@@ -111,53 +111,53 @@ export default function DashboardPage() {
     <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
       
       {/* CABEÇALHO */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-800 flex items-center gap-3">
-          <Activity className="text-blue-600" size={32} /> Visão Geral
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
+          <Activity className="text-blue-600" size={28} /> Visão Geral
         </h1>
-        <p className="text-slate-500 mt-1">Indicadores e métricas da Engenharia Clínica.</p>
+        <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores e métricas da Engenharia Clínica.</p>
       </div>
 
       {/* KPIs (GRID DE 4 CARTÕES) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
         
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-            <MonitorPlay size={28} />
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 md:gap-5">
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <MonitorPlay size={24} />
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Inventário</p>
-            <h3 className="text-3xl font-black text-slate-800">{kpis.totalEquipamentos}</h3>
+            <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider">Inventário</p>
+            <h3 className="text-2xl md:text-3xl font-black text-slate-800">{kpis.totalEquipamentos}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-            <AlertTriangle size={28} />
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 md:gap-5">
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+            <AlertTriangle size={24} />
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Inoperantes</p>
-            <h3 className="text-3xl font-black text-slate-800">{kpis.equipamentosParados}</h3>
+            <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider">Inoperantes</p>
+            <h3 className="text-2xl md:text-3xl font-black text-slate-800">{kpis.equipamentosParados}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-            <Wrench size={28} />
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 md:gap-5">
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+            <Wrench size={24} />
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">OS Abertas</p>
-            <h3 className="text-3xl font-black text-slate-800">{kpis.chamadosAbertos}</h3>
+            <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider">OS Abertas</p>
+            <h3 className="text-2xl md:text-3xl font-black text-slate-800">{kpis.chamadosAbertos}</h3>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-            <CheckCircle size={28} />
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 md:gap-5">
+          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+            <CheckCircle size={24} />
           </div>
           <div>
-            <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Atividades no Mês</p>
-            <h3 className="text-3xl font-black text-slate-800">{kpis.manutencoesMes}</h3>
+            <p className="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-wider">Mês Atual</p>
+            <h3 className="text-2xl md:text-3xl font-black text-slate-800">{kpis.manutencoesMes}</h3>
           </div>
         </div>
 
@@ -167,20 +167,20 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* GRÁFICO 1: DISPONIBILIDADE DO PARQUE (PIZZA) */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">Status do Parque</h3>
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1 min-w-0">
+          <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6">Status do Parque</h3>
           {dadosGraficoStatus.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">Sem dados de equipamentos</div>
+            <div className="h-56 md:h-64 flex items-center justify-center text-slate-400 text-sm">Sem dados</div>
           ) : (
-            <div className="h-64">
+            <div className="h-56 md:h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={dadosGraficoStatus}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={window.innerWidth < 768 ? 50 : 60}
+                    outerRadius={window.innerWidth < 768 ? 70 : 80}
                     paddingAngle={5}
                     dataKey="value"
                   >
@@ -189,7 +189,7 @@ export default function DashboardPage() {
                     ))}
                   </Pie>
                   <Tooltip formatter={(value) => [`${value} Equip.`, 'Quantidade']} />
-                  <Legend verticalAlign="bottom" height={36}/>
+                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '12px' }}/>
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -197,16 +197,16 @@ export default function DashboardPage() {
         </div>
 
         {/* GRÁFICO 2: TIPOS DE MANUTENÇÃO (BARRAS) */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1">
-          <h3 className="text-lg font-bold text-slate-800 mb-6">OS por Tipo</h3>
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1 min-w-0">
+          <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6">OS por Tipo</h3>
           {dadosGraficoChamados.length === 0 ? (
-            <div className="h-64 flex items-center justify-center text-slate-400 text-sm">Sem dados de OS</div>
+            <div className="h-56 md:h-64 flex items-center justify-center text-slate-400 text-sm">Sem dados de OS</div>
           ) : (
-            <div className="h-64">
+            <div className="h-56 md:h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dadosGraficoChamados} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <XAxis dataKey="name" tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                  <YAxis tick={{fontSize: 12, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="name" tick={{fontSize: 11, fill: '#64748b'}} axisLine={false} tickLine={false} />
+                  <YAxis tick={{fontSize: 11, fill: '#64748b'}} axisLine={false} tickLine={false} />
                   <Tooltip cursor={{fill: '#f1f5f9'}} borderRadius={10}/>
                   <Bar dataKey="Quantidade" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -216,32 +216,35 @@ export default function DashboardPage() {
         </div>
 
         {/* LISTA RÁPIDA: OS RECENTES EM ABERTO */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1 flex flex-col">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-slate-800">Atenção Necessária</h3>
-            <button onClick={() => navigate('/chamados')} className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-1 transition-colors">
+        {/* Altura fixa no mobile (h-[350px]) para ativar o scroll interno e não alargar a página */}
+        <div className="bg-white p-5 md:p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1 flex flex-col h-[350px] md:h-[350px] lg:h-auto">
+          <div className="flex justify-between items-center mb-4 md:mb-6 shrink-0">
+            <h3 className="text-base md:text-lg font-bold text-slate-800">Atenção Necessária</h3>
+            <button onClick={() => navigate('/chamados')} className="text-blue-600 hover:text-blue-800 text-xs md:text-sm font-bold flex items-center gap-1 transition-colors">
               Ver todas <ArrowRight size={14} />
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+          <div className="flex-1 overflow-y-auto pr-1 md:pr-2 space-y-3 custom-scrollbar">
             {chamadosRecentes.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm text-center py-10">
+              <div className="h-full flex flex-col items-center justify-center text-slate-400 text-sm text-center py-4">
                 <CheckCircle size={32} className="text-green-300 mb-2"/>
                 Nenhuma OS pendente!
               </div>
             ) : (
               chamadosRecentes.map(ch => (
-                <div key={ch.id} onClick={() => navigate('/chamados')} className="p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-blue-50 hover:border-blue-100 transition-colors cursor-pointer group">
-                  <div className="flex justify-between items-start mb-1">
-                    <span className="font-bold text-slate-800 group-hover:text-blue-800 line-clamp-1">{ch.equipamento?.nome}</span>
-                    <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full ${
+                <div key={ch.id} onClick={() => navigate('/chamados')} className="p-3 md:p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-blue-50 hover:border-blue-100 transition-colors cursor-pointer group">
+                  <div className="flex justify-between items-start mb-1.5 gap-2">
+                    <span className="font-bold text-sm text-slate-800 group-hover:text-blue-800 line-clamp-1 leading-tight">
+                      {ch.equipamento?.nome}
+                    </span>
+                    <span className={`text-[9px] md:text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
                       ch.tipo_intervencao === 'Corretiva' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
                     }`}>
                       {ch.tipo_intervencao}
                     </span>
                   </div>
-                  <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
+                  <div className="flex items-center gap-1 text-[11px] md:text-xs font-medium text-slate-500">
                     <Clock size={12} /> Aberto: {new Date(ch.data_abertura).toLocaleDateString('pt-BR')}
                   </div>
                 </div>
