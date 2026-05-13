@@ -52,6 +52,23 @@ export default function AppLayout() {
         })
       }
 
+      // 1.5 Busca Equipamentos SEM PATRIMÔNIO (O "Radar")
+      const { data: semPatrimonio } = await supabase
+        .from('equipamentos')
+        .select('id, nome')
+        .eq('sem_patrimonio', true)
+
+      if (semPatrimonio) {
+        semPatrimonio.forEach(eq => {
+          novosAlertas.push({
+            id: `pat-${eq.id}`,
+            tipo: 'patrimonio',
+            texto: `URGENTE: ${eq.nome} aguardando colagem de patrimônio.`,
+            link: '/equipamentos'
+          })
+        })
+      }
+
       // 2. Busca Calibrações/Preventivas Atrasadas ou de Hoje
       const hoje = new Date().toISOString().split('T')[0] // Pega YYYY-MM-DD
       
@@ -185,13 +202,15 @@ export default function AppLayout() {
                       key={al.id} 
                       onClick={handleMenuClick}
                       className={`block text-xs p-2.5 rounded-lg border transition-all ${
-                        al.tipo === 'etiqueta' 
-                          ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' 
-                          : 'bg-red-50 text-red-900 border-red-200 hover:bg-red-100'
+                        al.tipo === 'etiqueta' ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' :
+                        al.tipo === 'patrimonio' ? 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100' :
+                        'bg-red-50 text-red-900 border-red-200 hover:bg-red-100'
                       }`}
                     >
                       <span className="font-bold block mb-0.5">
-                        {al.tipo === 'etiqueta' ? '🏷️ Falta Etiqueta' : '⚠️ OS Atrasada/Hoje'}
+                        {al.tipo === 'etiqueta' ? '🏷️ Falta Etiqueta' : 
+                         al.tipo === 'patrimonio' ? '🚨 Sem Patrimônio' : 
+                         '⚠️ OS Atrasada/Hoje'}
                       </span>
                       {al.texto}
                     </Link>

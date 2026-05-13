@@ -35,7 +35,7 @@ export default function EquipamentosPage() {
     fabricante_id: '', prestador_id: '', unidade_id: '', setor_id: '', 
     status_id: '', observacoes: '', imagem_url: '',
     possui_etiqueta: false, possui_manual: false, sem_numero_serie: false,
-    data_ultima_calibracao: '', data_proxima_calibracao: ''
+    sem_patrimonio: false, data_ultima_calibracao: '', data_proxima_calibracao: ''
   }
   const [formData, setFormData] = useState(estadoInicialForm)
 
@@ -216,6 +216,7 @@ export default function EquipamentosPage() {
       possui_etiqueta: eq.possui_etiqueta || false,
       possui_manual: eq.possui_manual || false,
       sem_numero_serie: eq.sem_numero_serie || false,
+      sem_patrimonio: eq.sem_patrimonio || false,
       data_ultima_calibracao: eq.data_ultima_calibracao ? eq.data_ultima_calibracao.split('T')[0] : '',
       data_proxima_calibracao: eq.data_proxima_calibracao ? eq.data_proxima_calibracao.split('T')[0] : ''
     })
@@ -652,7 +653,27 @@ export default function EquipamentosPage() {
                   <input required disabled={formData.sem_numero_serie} value={formData.numero_serie} onChange={e => setFormData({...formData, numero_serie: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
                 </div>
 
-                <div><label className="block text-sm font-bold text-slate-700 mb-2">Patrimônio</label><input value={formData.patrimonio} onChange={e => setFormData({...formData, patrimonio: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
+                <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-sm font-bold text-slate-700">Patrimônio</label>
+                  <label className="flex items-center gap-1 text-xs cursor-pointer font-bold text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 rounded border border-red-100">
+                      <input 
+                        type="checkbox" 
+                        checked={formData.sem_patrimonio} 
+                        onChange={e => setFormData({...formData, sem_patrimonio: e.target.checked, patrimonio: e.target.checked ? 'PENDENTE' : ''})} 
+                      />
+                      Falta Patrimônio
+                  </label>
+                </div>
+                <input 
+                  required={!formData.sem_patrimonio}
+                  disabled={formData.sem_patrimonio} 
+                  value={formData.patrimonio} 
+                  onChange={e => setFormData({...formData, patrimonio: e.target.value})} 
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-red-50/30 disabled:text-red-600 disabled:font-bold" 
+                />
+              </div>
+              
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Modelo</label><input value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Fabricante</label><select value={formData.fabricante_id} onChange={e => setFormData({...formData, fabricante_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.fabricantes.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></div>
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Prestador</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.prestadores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></div>
