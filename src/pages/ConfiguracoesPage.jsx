@@ -80,22 +80,33 @@ const alternarCargo = async (id, novoCargo) => {
     e.preventDefault()
     setLoading(true)
     
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    // 1. Criar na Autenticação usando o Admin (Ignora limites de e-mail e confirma na hora)
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: novoUsuario.email,
       password: novoUsuario.senha,
+      email_confirm: true 
     })
 
     if (authError) {
       alert('Erro ao criar conta: ' + authError.message)
     } else {
-      await supabase.from('perfis').update({ 
-        nome: novoUsuario.nome, 
-        perfil: novoUsuario.perfil 
-      }).eq('user_id', authData.user.id)
+      // 2. Vincular à tabela 'perfis' usando o EMAIL como chave de busca
+      const { error: profileError } = await supabase
+        .from('perfis')
+        .update({ 
+          user_id: authData.user.id, // Aqui salvamos o vínculo real
+          nome: novoUsuario.nome, 
+          perfil: novoUsuario.perfil 
+        })
+        .eq('email', novoUsuario.email) 
 
-      alert('Usuário cadastrado com sucesso!')
-      setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
-      buscarUsuarios()
+      if (profileError) {
+        alert('Erro ao preencher dados do perfil: ' + profileError.message)
+      } else {
+        alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
+        setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
+        buscarUsuarios()
+      }
     }
     setLoading(false)
   }
@@ -238,10 +249,11 @@ const alternarCargo = async (id, novoCargo) => {
                   <select 
                     value={novoUsuario.perfil || 'analista'} 
                     onChange={e => setNovoUsuario({...novoUsuario, perfil: e.target.value})}
-                    className="flex-1 px-4 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                    className="..."
                   >
                     <option value="analista">Analista</option>
                     <option value="administrador">Administrador</option>
+                    <option value="visualizador">Visualizador (Apenas Agenda)</option> {/* Nova opção */}
                   </select>
                   <button disabled={loading} className="bg-slate-800 text-white px-6 py-2 rounded-lg font-medium hover:bg-slate-900 transition-colors disabled:opacity-50 whitespace-nowrap">
                     Criar
