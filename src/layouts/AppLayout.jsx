@@ -24,8 +24,8 @@ export default function AppLayout() {
       navigate('/agenda')
     }
 
-    // Sempre que mudar de tela, busca novas pendências no banco
-    if (profile && profile.perfil !== 'visualizador') {
+    // Agora todos os perfis buscam pendências
+    if (profile) {
       buscarAlertas()
     }
   }, [profile, location, navigate])
@@ -52,7 +52,7 @@ export default function AppLayout() {
         })
       }
 
-      // 1.5 Busca Equipamentos SEM PATRIMÔNIO (O "Radar")
+      // 1.5 Busca Equipamentos SEM PATRIMÔNIO
       const { data: semPatrimonio } = await supabase
         .from('equipamentos')
         .select('id, nome')
@@ -70,9 +70,8 @@ export default function AppLayout() {
       }
 
       // 2. Busca Calibrações/Preventivas Atrasadas ou de Hoje
-      const hoje = new Date().toISOString().split('T')[0] // Pega YYYY-MM-DD
+      const hoje = new Date().toISOString().split('T')[0]
       
-      // Primeiro, descobre qual é o ID do status 'Concluído' para ignorá-lo
       const { data: statusConcluido } = await supabase
         .from('status_chamado')
         .select('id')
@@ -83,10 +82,10 @@ export default function AppLayout() {
         .from('chamados')
         .select('id, tipo_intervencao, data_prevista, equipamento:equipamento_id(nome)')
         .in('tipo_intervencao', ['Calibração', 'Preventiva', 'Qualificação'])
-        .lte('data_prevista', hoje) // Data menor ou igual a hoje
+        .lte('data_prevista', hoje)
 
       if (statusConcluido) {
-        query = query.neq('status_id', statusConcluido.id) // Ignora os já resolvidos
+        query = query.neq('status_id', statusConcluido.id)
       }
 
       const { data: chamadosAtrasados } = await query
@@ -115,7 +114,6 @@ export default function AppLayout() {
 
   const isActive = (path) => location.pathname.includes(path)
   
-  // Fecha o menu mobile ao clicar num link
   const handleMenuClick = () => setIsMobileMenuOpen(false)
 
   const menuItems = [
@@ -129,7 +127,6 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       
-      {/* OVERLAY ESCURO PARA MOBILE (Quando o menu abre) */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity"
@@ -145,7 +142,6 @@ export default function AppLayout() {
         md:relative md:translate-x-0
       `}>
         
-        {/* CABEÇALHO DO MENU */}
         <div className="h-16 md:h-20 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center">
             <div className="w-10 h-10 md:w-11 md:h-10 bg-blue-800 text-white rounded-lg flex items-center justify-center font-bold text-lg mr-2 shadow-sm">
@@ -156,13 +152,11 @@ export default function AppLayout() {
               <p className="text-[10px] md:text-xs text-slate-500">Gestão de Equipamentos</p>
             </div>
           </div>
-          {/* Botão de Fechar no Mobile */}
           <button className="md:hidden text-slate-500 hover:text-slate-800" onClick={() => setIsMobileMenuOpen(false)}>
             <X size={24} />
           </button>
         </div>
 
-        {/* PERFIL DO USUÁRIO */}
         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
           <p className="font-semibold text-slate-800 truncate">{profile?.nome || 'Carregando...'}</p>
           <span className="inline-flex items-center px-2 py-1 mt-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800 capitalize">
@@ -170,58 +164,54 @@ export default function AppLayout() {
           </span>
         </div>
 
-        {/* CENTRAL DE NOTIFICAÇÕES (Oculta para visualizadores) */}
-        {profile?.perfil !== 'visualizador' && (
-          <div className="px-4 py-3 border-b border-slate-100 shrink-0">
-            <button 
-              onClick={() => setShowNotif(!showNotif)} 
-              className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-slate-50 transition-colors group"
-            >
-              <div className="flex items-center text-sm font-bold text-slate-700 group-hover:text-blue-700">
-                <Bell className={`w-4 h-4 mr-2 ${alertas.length > 0 ? 'text-red-500' : 'text-slate-400'}`} />
-                Pendências
-              </div>
-              {alertas.length > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
-                  {alertas.length}
-                </span>
-              )}
-            </button>
-
-            {/* LISTA DE ALERTAS EXPANSÍVEL */}
-            {showNotif && (
-              <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar animate-in slide-in-from-top-2">
-                {alertas.length === 0 ? (
-                  <div className="p-3 text-center bg-emerald-50 border border-emerald-100 rounded-lg">
-                    <p className="text-xs font-bold text-emerald-700">Tudo em dia! 🎉</p>
-                  </div>
-                ) : (
-                  alertas.map(al => (
-                    <Link 
-                      to={al.link} 
-                      key={al.id} 
-                      onClick={handleMenuClick}
-                      className={`block text-xs p-2.5 rounded-lg border transition-all ${
-                        al.tipo === 'etiqueta' ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' :
-                        al.tipo === 'patrimonio' ? 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100' :
-                        'bg-red-50 text-red-900 border-red-200 hover:bg-red-100'
-                      }`}
-                    >
-                      <span className="font-bold block mb-0.5">
-                        {al.tipo === 'etiqueta' ? '🏷️ Falta Etiqueta' : 
-                         al.tipo === 'patrimonio' ? '🚨 Sem Patrimônio' : 
-                         '⚠️ OS Atrasada/Hoje'}
-                      </span>
-                      {al.texto}
-                    </Link>
-                  ))
-                )}
-              </div>
+        {/* CENTRAL DE NOTIFICAÇÕES (Habilitada para todos) */}
+        <div className="px-4 py-3 border-b border-slate-100 shrink-0">
+          <button 
+            onClick={() => setShowNotif(!showNotif)} 
+            className="flex items-center justify-between w-full p-2 rounded-lg hover:bg-slate-50 transition-colors group"
+          >
+            <div className="flex items-center text-sm font-bold text-slate-700 group-hover:text-blue-700">
+              <Bell className={`w-4 h-4 mr-2 ${alertas.length > 0 ? 'text-red-500' : 'text-slate-400'}`} />
+              Pendências
+            </div>
+            {alertas.length > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm animate-pulse">
+                {alertas.length}
+              </span>
             )}
-          </div>
-        )}
+          </button>
 
-        {/* NAVEGAÇÃO PRINCIPAL */}
+          {showNotif && (
+            <div className="mt-2 space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar animate-in slide-in-from-top-2">
+              {alertas.length === 0 ? (
+                <div className="p-3 text-center bg-emerald-50 border border-emerald-100 rounded-lg">
+                  <p className="text-xs font-bold text-emerald-700">Tudo em dia! 🎉</p>
+                </div>
+              ) : (
+                alertas.map(al => (
+                  <Link 
+                    to={profile?.perfil === 'visualizador' ? '/agenda' : al.link} 
+                    key={al.id} 
+                    onClick={handleMenuClick}
+                    className={`block text-xs p-2.5 rounded-lg border transition-all ${
+                      al.tipo === 'etiqueta' ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' :
+                      al.tipo === 'patrimonio' ? 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100' :
+                      'bg-red-50 text-red-900 border-red-200 hover:bg-red-100'
+                    }`}
+                  >
+                    <span className="font-bold block mb-0.5">
+                      {al.tipo === 'etiqueta' ? '🏷️ Falta Etiqueta' : 
+                       al.tipo === 'patrimonio' ? '🚨 Sem Patrimônio' : 
+                       '⚠️ OS Atrasada/Hoje'}
+                    </span>
+                    {al.texto}
+                  </Link>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1.5 custom-scrollbar">
           {menuItems
             .filter(item => item.roles.includes(profile?.perfil)) 
@@ -263,7 +253,6 @@ export default function AppLayout() {
           )}
         </nav>
 
-        {/* BOTÃO SAIR */}
         <div className="p-4 border-t border-slate-100 shrink-0">
           <button
             onClick={handleLogout}
@@ -275,10 +264,7 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      {/* ÁREA DE CONTEÚDO PRINCIPAL (COM HEADER MOBILE) */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        
-        {/* HEADER EXCLUSIVO PARA MOBILE */}
         <header className="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm">
           <div className="flex items-center">
             <div className="w-8 h-8 bg-blue-800 text-white rounded md flex items-center justify-center font-bold text-xs mr-2">
@@ -288,15 +274,13 @@ export default function AppLayout() {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Sino simplificado no header mobile */}
-            {profile?.perfil !== 'visualizador' && alertas.length > 0 && (
+            {alertas.length > 0 && (
               <div className="relative">
                 <Bell className="w-5 h-5 text-red-500 animate-pulse" />
                 <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-600 border border-white rounded-full"></span>
               </div>
             )}
             
-            {/* Botão de Menu Hambúrguer */}
             <button 
               onClick={() => setIsMobileMenuOpen(true)}
               className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -306,7 +290,6 @@ export default function AppLayout() {
           </div>
         </header>
 
-        {/* ONDE AS PÁGINAS SÃO RENDERIZADAS */}
         <main className="flex-1 overflow-auto bg-slate-50/50">
           <div className="p-4 md:p-8 max-w-7xl mx-auto h-full">
             <Outlet />
