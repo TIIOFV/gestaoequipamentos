@@ -111,13 +111,28 @@ export default function AppLayout() {
   }
 
   const isActive = (path) => location.pathname.includes(path)
-  
-  // LOGICA: Clicar no menu fecha o menu mobile E reseta a tela se já estiver nela
-  const handleMenuClick = (e, path) => {
+
+  // =======================================================
+  // CLIQUE DO SININHO: FORÇA A NAVEGAÇÃO MESMO NA MESMA ABA
+  // =======================================================
+  const handleNotifClick = (e, path, targetId) => {
+    e.preventDefault()
+    setIsMobileMenuOpen(false)
+    
+    const targetPath = !hasFullAccess ? '/agenda' : path
+    
+    // O pulo do gato: adicionamos Date.now() para o React Router achar que é um clique inédito
+    const statePayload = targetId ? { openDetailsId: targetId, _t: Date.now() } : { _t: Date.now() }
+    
+    navigate(targetPath, { state: statePayload })
+  }
+
+  // Apenas para o Menu Lateral Principal: Faz o reset da tela se clicar no item atual
+  const handleMainMenuClick = (e, path) => {
     setIsMobileMenuOpen(false)
     if (location.pathname === path) {
       e.preventDefault(); 
-      window.location.href = path; // Força recarregar a rota atual para resetar os estados (ex: voltar pra lista)
+      window.location.href = path; 
     }
   }
 
@@ -186,18 +201,17 @@ export default function AppLayout() {
                 <div className="p-3 text-center bg-emerald-50 border border-emerald-100 rounded-lg"><p className="text-xs font-bold text-emerald-700">Tudo em dia! 🎉</p></div>
               ) : (
                 alertas.map(al => (
-                  <Link 
-                    to={!hasFullAccess ? '/agenda' : al.link} 
-                    state={al.targetId ? { openDetailsId: al.targetId } : {}}
-                    key={al.id} onClick={(e) => handleMenuClick(e, !hasFullAccess ? '/agenda' : al.link)}
-                    className={`block text-xs p-2.5 rounded-lg border transition-all ${
+                  <div 
+                    key={al.id} 
+                    onClick={(e) => handleNotifClick(e, al.link, al.targetId)}
+                    className={`cursor-pointer block text-xs p-2.5 rounded-lg border transition-all ${
                       al.tipo === 'etiqueta' ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' :
                       al.tipo === 'patrimonio' ? 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100' : 'bg-red-50 text-red-900 border-red-200 hover:bg-red-100'
                     }`}
                   >
                     <span className="font-bold block mb-0.5">{al.tipo === 'etiqueta' ? '🏷️ Falta Etiqueta' : al.tipo === 'patrimonio' ? '🚨 Sem Patrimônio' : '⚠️ OS Atrasada/Hoje'}</span>
                     {al.texto}
-                  </Link>
+                  </div>
                 ))
               )}
             </div>
@@ -215,7 +229,7 @@ export default function AppLayout() {
               <Link 
                 key={item.path} 
                 to={item.path} 
-                onClick={(e) => handleMenuClick(e, item.path)} 
+                onClick={(e) => handleMainMenuClick(e, item.path)} 
                 className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
               >
                 <Icon className={`w-5 h-5 mr-3 ${active ? 'text-blue-600' : 'text-slate-400'}`} /> {item.name}
@@ -225,7 +239,7 @@ export default function AppLayout() {
 
           {hasFullAccess && (
             <div className="pt-4 mt-4 border-t border-slate-100">
-              <Link to="/configuracoes" onClick={(e) => handleMenuClick(e, '/configuracoes')} className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/configuracoes') ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+              <Link to="/configuracoes" onClick={(e) => handleMainMenuClick(e, '/configuracoes')} className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/configuracoes') ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
                 <Settings className="w-5 h-5 mr-3 text-slate-400" /> Configurações
               </Link>
             </div>

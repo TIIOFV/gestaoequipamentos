@@ -406,13 +406,25 @@ export default function AgendaPage() {
                         </div>
                       </div>
 
-                      <div className="md:col-span-2 pt-3 md:pt-4 border-t border-slate-100">
-                        <span className="block text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 md:mb-2 flex items-center gap-1">
-                          <Wrench size={12} /> Descrição da Manutenção / Relato
-                        </span>
-                        <p className="text-slate-600 text-xs md:text-sm whitespace-pre-wrap bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-200">
-                          {evento.descricao || 'Nenhuma descrição registrada para esta atividade.'}
-                        </p>
+                      <div className="md:col-span-2 pt-3 md:pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex-1 w-full">
+                          <span className="block text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 md:mb-2 flex items-center gap-1">
+                            <Wrench size={12} /> Descrição da Manutenção / Relato
+                          </span>
+                          <p className="text-slate-600 text-xs md:text-sm whitespace-pre-wrap bg-slate-50 p-3 md:p-4 rounded-xl border border-slate-200">
+                            {evento.descricao || 'Nenhuma descrição registrada para esta atividade.'}
+                          </p>
+                        </div>
+                        
+                        {/* AQUI ESTÁ A CORREÇÃO: ENVIANDO O ID DO CHAMADO */}
+                        {canEdit && (
+                          <button 
+                            onClick={() => navigate('/chamados', { state: { openDetailsId: evento.id } })}
+                            className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md w-full md:w-auto shrink-0"
+                          >
+                            Ir para OS completa <ArrowRight size={14} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -482,10 +494,10 @@ export default function AgendaPage() {
                       </div>
                     </div>
                     
-                    {/* CONTROLE RIGOROSO DO BOTÃO 'IR PARA OS' */}
+                    {/* AQUI ESTÁ A CORREÇÃO: ENVIANDO O ID DO CHAMADO */}
                     {canEdit && (
                       <button 
-                        onClick={() => navigate('/chamados')}
+                        onClick={() => navigate('/chamados', { state: { openDetailsId: os.id } })}
                         className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition-all flex items-center justify-center gap-1 w-full sm:w-auto shrink-0"
                       >
                         Ir para OS <ArrowRight size={12} />
