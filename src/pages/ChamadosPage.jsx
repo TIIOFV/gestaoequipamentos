@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { 
   Plus, Search, ArrowLeft, CheckCircle2, AlertCircle, 
   X, Ticket, Clock, User, Edit, FileText, Calendar, Trash2,
-  Upload, Paperclip, Image as ImageIcon
+  Upload, Paperclip, Image as ImageIcon, Filter, Wrench
 } from 'lucide-react'
 
 export default function ChamadosPage() {
@@ -13,7 +13,13 @@ export default function ChamadosPage() {
   const [view, setView] = useState('lista')
   const [chamados, setChamados] = useState([])
   const [chamadoSelecionado, setChamadoSelecionado] = useState(null)
+  
+  // FILTROS AVANÇADOS
   const [busca, setBusca] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState('')
+  const [filtroPrestador, setFiltroPrestador] = useState('')
+
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
 
@@ -36,7 +42,7 @@ export default function ChamadosPage() {
     status_id: '', prestador_id: '', protocolo_externo: '',
     descricao: '', data_abertura: getDataHoraAtual(), data_prevista: '',
     aberto_por_id: '',
-    anexos: [] // COLUNA NOVA PARA FOTOS E LAUDOS EM PDF
+    anexos: [] 
   }
   
   const [formData, setFormData] = useState(estadoInicialForm)
@@ -190,11 +196,30 @@ export default function ChamadosPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000)
   }
 
-  const chamadosFiltrados = chamados.filter(ch => 
-    ch.equipamento?.nome.toLowerCase().includes(busca.toLowerCase()) || ch.protocolo_externo?.includes(busca) || ch.descricao?.toLowerCase().includes(busca.toLowerCase())
-  )
+  // --- LÓGICA DO FILTRO MULTIPLO (À PROVA DE FALHAS/NULL) ---
+  const chamadosFiltrados = chamados.filter(ch => {
+    const term = busca.toLowerCase()
+    
+    const nomeEq = ch.equipamento?.nome || ''
+    const protExt = ch.protocolo_externo || ''
+    const desc = ch.descricao || ''
 
-  const isPDF = (url) => url.toLowerCase().includes('.pdf')
+    const matchBusca = 
+      nomeEq.toLowerCase().includes(term) || 
+      protExt.toLowerCase().includes(term) || 
+      desc.toLowerCase().includes(term)
+
+    const matchTipo = filtroTipo === '' || ch.tipo_intervencao === filtroTipo
+    const matchStatus = filtroStatus === '' || ch.status_id === filtroStatus
+    const matchPrestador = filtroPrestador === '' || ch.prestador_id === filtroPrestador
+    
+    return matchBusca && matchTipo && matchStatus && matchPrestador
+  })
+
+  const isPDF = (url) => {
+    if (!url) return false;
+    return url.toLowerCase().includes('.pdf')
+  }
 
   return (
     <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
@@ -221,17 +246,46 @@ export default function ChamadosPage() {
             </button>
           </div>
 
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-            <input type="text" placeholder="Buscar por equipamento, protocolo ou descrição..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-11 md:pl-12 pr-4 py-3 md:py-3.5 text-sm md:text-base bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm" />
+          <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div className="relative w-full">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+              <input type="text" placeholder="Buscar por equipamento, protocolo externo ou descrição do chamado..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-11 md:pl-12 pr-4 py-3 md:py-3.5 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+            </div>
+
+            <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+              <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1 shrink-0"><Filter size={14}/> Filtros:</span>
+              
+              <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} className="w-auto min-w-[140px] shrink-0 px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700">
+                <option value="">Tipo de Serviço</option>
+                <option value="Corretiva">Corretiva</option>
+                <option value="Preventiva">Preventiva</option>
+                <option value="Calibração">Calibração</option>
+                <option value="Qualificação">Qualificação</option>
+              </select>
+
+              <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="w-auto min-w-[140px] shrink-0 px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700">
+                <option value="">Status da OS</option>
+                {auxiliares.status.map(st => <option key={st.id} value={st.id}>{st.nome}</option>)}
+              </select>
+
+              <select value={filtroPrestador} onChange={(e) => setFiltroPrestador(e.target.value)} className="w-auto min-w-[140px] shrink-0 px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700">
+                <option value="">Empresa/Prestador</option>
+                <option value="Interno">Manutenção Interna</option>
+                {auxiliares.prestadores.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}
+              </select>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             {loading ? (
               <div className="text-center py-10 text-slate-500 font-medium">Carregando chamados...</div>
             ) : chamadosFiltrados.length === 0 ? (
-              <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum chamado encontrado.</div>
-            ) : chamadosFiltrados.map((ch) => (
+              <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum chamado encontrado com esses filtros.</div>
+            ) : chamadosFiltrados.map((ch) => {
+              
+              const temPDF = ch.anexos && ch.anexos.some(a => isPDF(a));
+              
+              return (
               <div key={ch.id} className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-4 items-start md:items-center justify-between group">
                 <div className="flex-1 w-full">
                   <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
@@ -243,9 +297,9 @@ export default function ChamadosPage() {
                     }`}>
                       {ch.tipo_intervencao || 'Corretiva'}
                     </span>
-                    <span className="font-bold text-slate-800 text-base md:text-lg">{ch.equipamento?.nome}</span>
+                    <span className="font-bold text-slate-800 text-base md:text-lg">{ch.equipamento?.nome || 'Equipamento Excluído'}</span>
                     <span className="bg-slate-100 text-slate-600 text-[10px] md:text-xs px-1.5 md:px-2 py-0.5 md:py-1 rounded font-mono border border-slate-200">
-                      #{ch.equipamento?.patrimonio}
+                      #{ch.equipamento?.patrimonio || 'S/N'}
                     </span>
                     <span className={`text-[10px] md:text-xs font-bold px-2.5 py-0.5 md:py-1 rounded-full border ${
                       ch.status?.nome === 'Concluído' ? 'bg-green-50 text-green-700 border-green-200' :
@@ -256,8 +310,8 @@ export default function ChamadosPage() {
                     </span>
                     
                     {ch.anexos && ch.anexos.length > 0 && (
-                      <span className="text-slate-400 flex items-center gap-1 text-xs" title="Possui anexos">
-                        <Paperclip size={14} /> {ch.anexos.length}
+                      <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border shadow-sm ${temPDF ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`} title={temPDF ? 'Possui Laudo PDF' : 'Possui Fotos'}>
+                        {temPDF ? <FileText size={12} /> : <Paperclip size={12} />} {ch.anexos.length}
                       </span>
                     )}
                   </div>
@@ -267,14 +321,14 @@ export default function ChamadosPage() {
                     {ch.data_prevista && (
                       <div className="flex items-center gap-1 text-blue-600"><Calendar size={12} className="md:w-3.5 md:h-3.5" /> Agendado: {new Date(ch.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>
                     )}
-                    <div className="flex items-center gap-1"><User size={12} className="md:w-3.5 md:h-3.5" /> {ch.aberto_por?.nome}</div>
+                    <div className="flex items-center gap-1"><Wrench size={12} className="md:w-3.5 md:h-3.5" /> {ch.prestador?.nome || 'Interno'}</div>
                   </div>
                 </div>
                 <button onClick={() => { setChamadoSelecionado(ch); setView('detalhes'); }} className="w-full md:w-auto mt-2 md:mt-0 px-5 py-2 md:py-2.5 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl transition-colors flex justify-center items-center whitespace-nowrap">
                   Ver detalhes
                 </button>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
@@ -308,7 +362,7 @@ export default function ChamadosPage() {
             <h3 className="text-base md:text-lg font-bold text-slate-800 mb-4 md:mb-6 flex items-center gap-2"><FileText className="text-blue-600" size={18} md:size={20} /> Informações principais</h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 md:gap-y-5 gap-x-6 md:gap-x-10 text-xs md:text-sm">
-              <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-0.5 md:mb-1">Equipamento</span><span className="font-medium text-slate-800">{chamadoSelecionado.equipamento?.nome || '-'}</span></div>
+              <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-0.5 md:mb-1">Equipamento</span><span className="font-medium text-slate-800">{chamadoSelecionado.equipamento?.nome || 'Excluído'}</span></div>
               <div className="flex flex-col border-b border-slate-50 pb-2">
                 <span className="text-slate-500 font-semibold mb-0.5 md:mb-1">Status atual</span>
                 <span className="font-medium text-slate-800">
@@ -323,7 +377,7 @@ export default function ChamadosPage() {
               </div>
               <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-0.5 md:mb-1">Data e hora de abertura</span><span className="font-medium text-slate-800">{chamadoSelecionado.data_abertura ? new Date(chamadoSelecionado.data_abertura).toLocaleString('pt-BR') : '-'}</span></div>
               <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-0.5 md:mb-1 flex items-center gap-1"><Calendar size={12}/> Data Prevista (Agenda)</span><span className="font-medium text-slate-800">{chamadoSelecionado.data_prevista ? new Date(chamadoSelecionado.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não agendado'}</span></div>
-              <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-0.5 md:mb-1">Fornecedor / Prestador</span><span className="font-medium text-slate-800">{chamadoSelecionado.prestador?.nome || '-'}</span></div>
+              <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-0.5 md:mb-1">Fornecedor / Prestador</span><span className="font-medium text-slate-800">{chamadoSelecionado.prestador?.nome || 'Interno'}</span></div>
               <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-0.5 md:mb-1">Protocolo Externo (OS)</span><span className="font-medium text-slate-800">{chamadoSelecionado.protocolo_externo || '-'}</span></div>
             </div>
 
@@ -387,12 +441,13 @@ export default function ChamadosPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Fornecedor / prestador</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.prestadores.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}</select></div>
+                <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Fornecedor / prestador</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Interno (Equipe IOFV)</option>{auxiliares.prestadores.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}</select></div>
                 <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Protocolo externo (OS)</label><input value={formData.protocolo_externo} onChange={e => setFormData({...formData, protocolo_externo: e.target.value})} placeholder="Nº da OS do prestador" className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
               </div>
 
               <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Descrição da Manutenção</label><textarea required rows="4" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none" placeholder="Descreva o problema relatado ou os procedimentos realizados..."></textarea></div>
 
+              {/* UPLOAD DE ANEXOS E LAUDOS NA OS */}
               <div className="bg-slate-50 border border-slate-200 p-4 md:p-5 rounded-xl">
                 <label className="block text-xs md:text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Paperclip size={16} className="text-slate-400" /> Anexos (Fotos ou PDF do Laudo/OS)</label>
                 <input type="file" multiple accept="image/*,application/pdf" onChange={handleUploadAnexos} disabled={loading} className="block w-full text-xs md:text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />

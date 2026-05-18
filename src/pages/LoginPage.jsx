@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { LogIn, ShieldCheck, Mail, Lock, Loader2 } from 'lucide-react'
+import { LogIn, ShieldCheck, Mail, Lock, Loader2, AlertTriangle } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -15,10 +15,35 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    // 1. Tenta fazer o login no cofre de senhas
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password })
     
-    if (error) setError('E-mail ou senha incorretos.')
-    else navigate('/dashboard')
+    if (authError) {
+      setError('E-mail ou senha incorretos.')
+      setLoading(false)
+      return
+    }
+
+    // 2. Se a senha está certa, verifica se a conta está bloqueada
+    if (authData?.user) {
+      const { data: perfilData, error: perfilError } = await supabase
+        .from('perfis')
+        .select('esta_bloqueado')
+        .eq('user_id', authData.user.id)
+        .single()
+
+      if (perfilError) {
+        setError('Erro ao validar permissões da conta.')
+        await supabase.auth.signOut()
+      } else if (perfilData?.esta_bloqueado) {
+        // Bloqueio ativado! Desloga imediatamente e avisa
+        setError('ACESSO BLOQUEADO: Contate o administrador do sistema.')
+        await supabase.auth.signOut()
+      } else {
+        // Tudo certo e liberado!
+        navigate('/dashboard')
+      }
+    }
     
     setLoading(false)
   }
@@ -30,7 +55,6 @@ export default function LoginPage() {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-400/10 blur-[100px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/10 blur-[100px] rounded-full pointer-events-none"></div>
 
-      {/* AQUI ESTAVA O ERRO: Adicionado overflow-hidden novamente para cortar as bordas da linha azul */}
       <div className="max-w-md w-full bg-white/80 backdrop-blur-xl rounded-3xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/40 p-8 md:p-10 relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-700 to-blue-400"></div>
 
@@ -75,7 +99,8 @@ export default function LoginPage() {
 
           {error && (
             <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-xs font-bold text-center animate-in shake duration-300 flex items-center justify-center gap-2">
-              <ShieldCheck size={16} /> {error}
+              {error.includes('BLOQUEADO') ? <AlertTriangle size={16} /> : <ShieldCheck size={16} />} 
+              {error}
             </div>
           )}
 

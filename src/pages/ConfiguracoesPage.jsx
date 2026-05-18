@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase, supabaseAdmin } from '../lib/supabase'
 import { 
   Settings, Plus, Trash2, Edit2, 
-  Check, X, KeyRound 
+  Check, X, KeyRound, UserX, UserCheck 
 } from 'lucide-react'
 
 export default function ConfiguracoesPage() {
@@ -79,6 +79,7 @@ export default function ConfiguracoesPage() {
     e.preventDefault()
     setLoading(true)
     
+    // 1. Cria a conta no cofre do Supabase (Auth)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: novoUsuario.email,
       password: novoUsuario.senha,
@@ -88,22 +89,74 @@ export default function ConfiguracoesPage() {
     if (authError) {
       alert('Erro ao criar conta: ' + authError.message)
     } else {
+      // 2. INSERE (não atualiza) o perfil na tabela pública
       const { error: profileError } = await supabase
         .from('perfis')
-        .update({ 
+        .insert([{ 
           user_id: authData.user.id, 
+          email: novoUsuario.email,
           nome: novoUsuario.nome, 
-          perfil: novoUsuario.perfil 
-        })
-        .eq('email', novoUsuario.email) 
+          perfil: novoUsuario.perfil,
+          cargo: 'Analista',
+          esta_bloqueado: false
+        }])
 
       if (profileError) {
-        alert('Erro ao preencher dados do perfil: ' + profileError.message)
+        await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
+        alert('Erro ao criar perfil. A conta foi cancelada: ' + profileError.message)
       } else {
         alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
         setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
         buscarUsuarios()
       }
+    }
+    setLoading(false)
+  }
+
+  // NOVA FUNÇÃO: Bloquear / Desbloquear Acesso de forma segura (Preserva histórico)
+  const toggleBloqueio = async (id, statusAtual, nome) => {
+    if (!window.confirm(`Deseja realmente ${statusAtual ? 'DESBLOQUEAR' : 'BLOQUEAR'} o acesso de ${nome}?`)) return
+    
+    setLoading(true)
+    const { error } = await supabase
+      .from('perfis')
+      .update({ esta_bloqueado: !statusAtual })
+      .eq('id', id)
+
+    if (error) {
+      alert('Erro ao alterar status de acesso: ' + error.message)
+    } else {
+      setUsuarios(usuarios.map(u => u.id === id ? { ...u, esta_bloqueado: !statusAtual } : u))
+      alert(`Acesso de ${nome} modificado com sucesso!`)
+    }
+    setLoading(false)
+  }
+
+  // NOVA FUNÇÃO: Exclusão total definitiva (Perfil + Auth)
+  const handleExcluirUsuario = async (profileId, authUserId, nome) => {
+    if (!window.confirm(`ATENÇÃO CRÍTICA: Tem certeza que deseja EXCLUIR permanentemente ${nome}?`)) return
+    
+    setLoading(true)
+    
+    // Tenta remover da tabela pública de perfis primeiro (isso remove ele da lista na tela)
+    const { error: profileError } = await supabase
+      .from('perfis')
+      .delete()
+      .eq('id', profileId)
+
+    if (profileError) {
+      alert('Erro ao remover perfil. Verifique se ele possui vínculos não resolvidos: ' + profileError.message)
+    } else {
+      // Se apagou da tela, tenta apagar do cofre de senhas (Auth) em segundo plano
+      if (authUserId) {
+        try {
+           await supabaseAdmin.auth.admin.deleteUser(authUserId)
+        } catch (e) {
+           console.warn('O perfil sumiu da tela, mas a credencial Auth precisa ser apagada manualmente no painel do Supabase (Authentication > Users) por questões de segurança de API.', e)
+        }
+      }
+      alert('Usuário excluído permanentemente do sistema!')
+      buscarUsuarios()
     }
     setLoading(false)
   }
@@ -127,7 +180,7 @@ export default function ConfiguracoesPage() {
       alert(`Senha do usuário ${modalSenha.email} alterada com sucesso!`);
       setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' });
     }
-    setLoading(false);
+    loading(false);
   }
 
   // --- FUNÇÕES DAS OUTRAS ABAS ---
@@ -145,7 +198,7 @@ export default function ConfiguracoesPage() {
     }
     const { data, error } = await query
     if (!error) setDados(data || [])
-    setLoading(false)
+    loading(false)
   }
 
   const handleCadastrarItem = async (e) => {
@@ -202,7 +255,7 @@ export default function ConfiguracoesPage() {
         <p className="text-sm md:text-base text-slate-500 mt-1">Gerencie os cadastros auxiliares e permissões de acesso.</p>
       </div>
 
-      {/* Navegação de Abas (Com Scroll no Mobile) */}
+      {/* Navegação de Abas */}
       <div className="flex space-x-2 border-b border-slate-200 overflow-x-auto pb-px custom-scrollbar w-full">
         {abas.map((aba) => (
           <button
@@ -223,7 +276,7 @@ export default function ConfiguracoesPage() {
         
         {abaAtiva === 'usuarios' ? (
           <div className="space-y-6 md:space-y-8">
-            {/* Formulário de Criação de Usuários pelo TI */}
+            {/* Formulário de Criação de Usuários */}
             <div className="bg-slate-50 p-4 md:p-6 rounded-xl border border-slate-100">
               <h3 className="text-xs md:text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">Novo Colaborador</h3>
               <form onSubmit={handleCriarUsuario} className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
@@ -265,16 +318,27 @@ export default function ConfiguracoesPage() {
                 <div className="p-6 text-center text-slate-500 text-sm">Carregando usuários...</div>
               ) : usuarios.map((user) => (
                 <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-slate-50 transition-colors gap-3 md:gap-4">
-                  <div className="overflow-hidden">
-                    <span className="font-medium text-slate-700 block truncate text-sm md:text-base">{user.nome || 'Sem Nome'}</span>
-                    <span className="text-xs text-slate-500 break-all">{user.email}</span>
+                  <div className="overflow-hidden flex items-center gap-3">
+                    <div>
+                      <span className={`font-medium block truncate text-sm md:text-base ${user.esta_bloqueado ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                        {user.nome || 'Sem Nome'}
+                      </span>
+                      <span className="text-xs text-slate-500 break-all">{user.email}</span>
+                    </div>
+                    {user.esta_bloqueado && (
+                      <span className="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded border border-red-200 uppercase tracking-wider animate-pulse">
+                        Bloqueado
+                      </span>
+                    )}
                   </div>
                   
                   <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 md:gap-3 w-full sm:w-auto mt-1 sm:mt-0">
                     <select 
                       value={user.perfil || 'analista'} 
+                      disabled={user.esta_bloqueado}
                       onChange={(e) => alternarCargo(user.id, e.target.value)}
                       className={`flex-1 sm:flex-none px-3 py-2 md:py-1.5 rounded-lg text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500 border ${
+                        user.esta_bloqueado ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' :
                         user.perfil === 'administrador' ? 'bg-purple-50 text-purple-800 border-purple-100' : 
                         user.perfil === 'visualizador' ? 'bg-orange-50 text-orange-800 border-orange-100' :
                         'bg-slate-50 text-slate-700 border-slate-200'
@@ -289,7 +353,30 @@ export default function ConfiguracoesPage() {
                       onClick={() => setModalSenha({ aberto: true, userId: user.user_id, email: user.email, novaSenha: '' })}
                       className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
                     >
-                      <KeyRound className="w-3.5 h-3.5 md:w-3 md:h-3" /> Alterar Senha
+                      <KeyRound className="w-3.5 h-3.5" /> Senha
+                    </button>
+
+                    {/* BOTÃO DE BLOQUEIO / DESBLOQUEIO INTEGRADO */}
+                    <button 
+                      onClick={() => toggleBloqueio(user.id, user.esta_bloqueado, user.nome)}
+                      className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap ${
+                        user.esta_bloqueado 
+                          ? 'text-emerald-700 bg-emerald-50 border-emerald-200 hover:bg-emerald-100' 
+                          : 'text-orange-700 bg-orange-50 border-orange-200 hover:bg-orange-100'
+                      }`}
+                      title={user.esta_bloqueado ? 'Liberar Acesso' : 'Bloquear Acesso'}
+                    >
+                      {user.esta_bloqueado ? <UserCheck className="w-3.5 h-3.5" /> : <UserX className="w-3.5 h-3.5" />}
+                      {user.esta_bloqueado ? 'Desbloquear' : 'Bloquear'}
+                    </button>
+
+                    {/* BOTÃO DE EXCLUSÃO DEFINITIVA */}
+                    <button 
+                      onClick={() => handleExcluirUsuario(user.id, user.user_id, user.nome)}
+                      className="p-2 text-slate-400 hover:text-red-600 bg-white border border-slate-200 hover:border-red-200 rounded-lg transition-colors"
+                      title="Excluir Usuário Permanentemente"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -298,7 +385,7 @@ export default function ConfiguracoesPage() {
           </div>
         ) : (
           
-          /* LÓGICA DAS OUTRAS ABAS (CADASTROS + EDIÇÃO INLINE) */
+          /* LÓGICA DAS OUTRAS ABAS */
           <>
             <form onSubmit={handleCadastrarItem} className="flex flex-col sm:flex-row gap-3 mb-6">
               <input
@@ -328,7 +415,6 @@ export default function ConfiguracoesPage() {
               </button>
             </form>
 
-            {/* LISTA COM EDIÇÃO INLINE */}
             <div className="border border-slate-100 rounded-lg divide-y divide-slate-100">
               {loading && dados.length === 0 ? (
                 <div className="p-6 text-center text-slate-500 text-sm">Carregando dados...</div>
@@ -369,19 +455,19 @@ export default function ConfiguracoesPage() {
                       {editandoId === item.id ? (
                         <>
                           <button onClick={() => salvarEdicao(item.id)} className="p-2 md:p-1.5 text-green-600 hover:bg-green-100 bg-white border border-green-200 rounded-lg transition-colors" title="Salvar">
-                            <Check className="w-4 h-4 md:w-4 md:h-4" />
+                            <Check className="w-4 h-4" />
                           </button>
                           <button onClick={() => setEditandoId(null)} className="p-2 md:p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 bg-white border border-slate-200 rounded-lg transition-colors" title="Cancelar">
-                            <X className="w-4 h-4 md:w-4 md:h-4" />
+                            <X className="w-4 h-4" />
                           </button>
                         </>
                       ) : (
                         <>
                           <button onClick={() => { setEditandoId(item.id); setTextoEdicao(item.nome); if(abaAtiva === 'setores') setUnidadeEdicao(item.unidade_id); }} className="p-2 md:p-1.5 text-slate-400 hover:text-blue-600 bg-white border border-slate-200 hover:border-blue-200 rounded-lg transition-colors">
-                            <Edit2 className="w-4 h-4 md:w-4 md:h-4" />
+                            <Edit2 className="w-4 h-4" />
                           </button>
                           <button onClick={() => handleExcluir(item.id)} className="p-2 md:p-1.5 text-slate-400 hover:text-red-600 bg-white border border-slate-200 hover:border-red-200 rounded-lg transition-colors">
-                            <Trash2 className="w-4 h-4 md:w-4 md:h-4" />
+                            <Trash2 className="w-4 h-4" />
                           </button>
                         </>
                       )}

@@ -18,31 +18,34 @@ export default function AppLayout() {
   const [isVerifying, setIsVerifying] = useState(true)
 
   // ==========================================
-  // TRAVA DE SEGURANÇA BLINDADA (DEFAULT DENY)
+  // TRAVA DE SEGURANÇA BLINDADA E BLOQUEIO
   // ==========================================
   const hasFullAccess = profile?.perfil === 'administrador' || profile?.perfil === 'analista'
   const isAgendaRoute = location.pathname.startsWith('/agenda')
 
   useEffect(() => {
-    // Se o perfil carregou com sucesso, para a verificação
+    // 1. EXPULSA USUÁRIO BLOQUEADO
+    if (profile?.esta_bloqueado) {
+      alert("Seu acesso foi suspenso temporariamente pelo Administrador.");
+      handleLogout();
+      return;
+    }
+
     if (profile !== undefined && profile !== null) {
       setIsVerifying(false)
     }
-    // Timeout de segurança: Se o Supabase der erro 403 e o perfil não vier, 
-    // assumimos que falhou após 1 segundo e tratamos como Visualizador.
     const timer = setTimeout(() => setIsVerifying(false), 1000)
     return () => clearTimeout(timer)
   }, [profile])
 
   useEffect(() => {
-    // Se terminou de verificar, não tem acesso total e está tentando ver outra tela, JOGA PRA AGENDA.
     if (!isVerifying && !hasFullAccess && !isAgendaRoute) {
       navigate('/agenda', { replace: true })
     }
   }, [isVerifying, hasFullAccess, isAgendaRoute, navigate])
 
   useEffect(() => {
-    if (profile) buscarAlertas()
+    if (profile && !profile.esta_bloqueado) buscarAlertas()
 
     const canalNotificacoes = supabase
       .channel('fluxo-alertas')
@@ -104,11 +107,19 @@ export default function AppLayout() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    navigate('/login')
+    navigate('/login', { replace: true })
   }
 
   const isActive = (path) => location.pathname.includes(path)
-  const handleMenuClick = () => setIsMobileMenuOpen(false)
+  
+  // LOGICA: Clicar no menu fecha o menu mobile E reseta a tela se já estiver nela
+  const handleMenuClick = (e, path) => {
+    setIsMobileMenuOpen(false)
+    if (location.pathname === path) {
+      e.preventDefault(); 
+      window.location.href = path; // Força recarregar a rota atual para resetar os estados (ex: voltar pra lista)
+    }
+  }
 
   const menuItems = [
     { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['administrador', 'analista'] },
@@ -178,7 +189,7 @@ export default function AppLayout() {
                   <Link 
                     to={!hasFullAccess ? '/agenda' : al.link} 
                     state={al.targetId ? { openDetailsId: al.targetId } : {}}
-                    key={al.id} onClick={handleMenuClick}
+                    key={al.id} onClick={(e) => handleMenuClick(e, !hasFullAccess ? '/agenda' : al.link)}
                     className={`block text-xs p-2.5 rounded-lg border transition-all ${
                       al.tipo === 'etiqueta' ? 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100' :
                       al.tipo === 'patrimonio' ? 'bg-rose-50 text-rose-900 border-rose-200 hover:bg-rose-100' : 'bg-red-50 text-red-900 border-red-200 hover:bg-red-100'
@@ -195,14 +206,18 @@ export default function AppLayout() {
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1.5 custom-scrollbar">
           {menuItems.filter(item => {
-            // Se der erro 403, ou for visualizador, OBRIGA a ver só a Agenda
             if (!hasFullAccess) return item.path === '/agenda';
             return item.roles.includes(profile?.perfil);
           }).map((item) => {
             const Icon = item.icon
             const active = isActive(item.path)
             return (
-              <Link key={item.path} to={item.path} onClick={handleMenuClick} className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+              <Link 
+                key={item.path} 
+                to={item.path} 
+                onClick={(e) => handleMenuClick(e, item.path)} 
+                className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${active ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+              >
                 <Icon className={`w-5 h-5 mr-3 ${active ? 'text-blue-600' : 'text-slate-400'}`} /> {item.name}
               </Link>
             )
@@ -210,7 +225,7 @@ export default function AppLayout() {
 
           {hasFullAccess && (
             <div className="pt-4 mt-4 border-t border-slate-100">
-              <Link to="/configuracoes" onClick={handleMenuClick} className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/configuracoes') ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+              <Link to="/configuracoes" onClick={(e) => handleMenuClick(e, '/configuracoes')} className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/configuracoes') ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
                 <Settings className="w-5 h-5 mr-3 text-slate-400" /> Configurações
               </Link>
             </div>
