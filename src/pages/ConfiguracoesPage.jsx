@@ -79,7 +79,7 @@ export default function ConfiguracoesPage() {
     e.preventDefault()
     setLoading(true)
     
-    // 1. Cria a conta no cofre do Supabase (Auth)
+    // 1. Cria a conta no cofre de autenticação (Auth)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: novoUsuario.email,
       password: novoUsuario.senha,
@@ -87,10 +87,10 @@ export default function ConfiguracoesPage() {
     })
 
     if (authError) {
-      alert('Erro ao criar conta: ' + authError.message)
+      alert('Erro ao criar conta no Auth: ' + authError.message)
     } else {
-      // 2. INSERE (não atualiza) o perfil na tabela pública
-      const { error: profileError } = await supabase
+      // 2. INSERE o perfil usando supabaseAdmin para ignorar as restrições de RLS no banco
+      const { error: profileError } = await supabaseAdmin // <-- A MÁGICA ESTÁ AQUI (Trocado de supabase para supabaseAdmin)
         .from('perfis')
         .insert([{ 
           user_id: authData.user.id, 
@@ -102,8 +102,9 @@ export default function ConfiguracoesPage() {
         }])
 
       if (profileError) {
+        // Se falhar o perfil, remove o usuário do Auth para não gerar lixo eletrônico
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-        alert('Erro ao criar perfil. A conta foi cancelada: ' + profileError.message)
+        alert('Erro ao criar perfil na tabela pública: ' + profileError.message)
       } else {
         alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
         setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
