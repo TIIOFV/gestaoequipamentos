@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { ChevronLeft, ChevronRight, X, Plus, Calendar as CalendarIcon, Filter, MapPin, Wrench, Clock } from 'lucide-react'
-import { useAuth } from '../contexts/AuthContext' // Importação do contexto de autenticação
+import { 
+  ChevronLeft, ChevronRight, X, Plus, Calendar as CalendarIcon, 
+  Filter, MapPin, Wrench, Clock, CheckCircle2, AlertTriangle, Target, ArrowRight 
+} from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function AgendaPage() {
   const navigate = useNavigate()
-  const { profile } = useAuth() // Acessando o perfil do usuário logado
+  const { profile } = useAuth()
   
   const [dataAtual, setDataAtual] = useState(new Date())
   const [chamadosAgenda, setChamadosAgenda] = useState([])
@@ -14,10 +17,23 @@ export default function AgendaPage() {
   const [filtroResponsavel, setFiltroResponsavel] = useState('Todos')
   
   const [diaSelecionado, setDiaSelecionado] = useState(null)
+  
+  // NOVO: Estado para as listas detalhadas do ano e controle do Modal
+  const [estatisticasAno, setEstatisticasAno] = useState({
+    total: { count: 0, lista: [] }, 
+    realizados: { count: 0, lista: [] }, 
+    aFazer: { count: 0, lista: [] }, 
+    atrasados: { count: 0, lista: [] }
+  })
+  const [modalListaAnual, setModalListaAnual] = useState({ aberto: false, titulo: '', cor: '', lista: [] })
 
   useEffect(() => {
     carregarDados()
   }, [])
+
+  useEffect(() => {
+    calcularEstatisticasAnuais(dataAtual.getFullYear())
+  }, [dataAtual, chamadosAgenda, filtroResponsavel])
 
   const carregarDados = async () => {
     const { data: perfis } = await supabase.from('perfis').select('id, nome').order('nome')
@@ -42,7 +58,56 @@ export default function AgendaPage() {
     if (chamados) setChamadosAgenda(chamados)
   }
 
+  const calcularEstatisticasAnuais = (anoFoco) => {
+    const hoje = new Date()
+    hoje.setHours(0,0,0,0)
+
+    const listasTemp = { total: [], realizados: [], aFazer: [], atrasados: [] }
+
+    chamadosAgenda.forEach(ch => {
+      if (filtroResponsavel !== 'Todos' && ch.aberto_por_id !== filtroResponsavel) return
+
+      const dataRef = ch.data_prevista ? new Date(ch.data_prevista) : (ch.data_abertura ? new Date(ch.data_abertura) : null)
+      if (!dataRef) return
+      
+      const anoChamado = dataRef.getFullYear()
+
+      if (anoChamado === anoFoco) {
+        listasTemp.total.push(ch)
+        
+        if (ch.status?.nome === 'Concluído') {
+          listasTemp.realizados.push(ch)
+        } else {
+          const dataComparacao = new Date(dataRef.getTime() + dataRef.getTimezoneOffset() * 60000)
+          dataComparacao.setHours(0,0,0,0)
+
+          if (dataComparacao < hoje) {
+            listasTemp.atrasados.push(ch)
+          } else {
+            listasTemp.aFazer.push(ch)
+          }
+        }
+      }
+    })
+
+    // Ordenar as listas por data
+    const ordenarPorData = (a, b) => new Date(a.data_prevista || a.data_abertura) - new Date(b.data_prevista || b.data_abertura);
+
+    setEstatisticasAno({ 
+      total: { count: listasTemp.total.length, lista: listasTemp.total.sort(ordenarPorData) }, 
+      realizados: { count: listasTemp.realizados.length, lista: listasTemp.realizados.sort(ordenarPorData) }, 
+      aFazer: { count: listasTemp.aFazer.length, lista: listasTemp.aFazer.sort(ordenarPorData) }, 
+      atrasados: { count: listasTemp.atrasados.length, lista: listasTemp.atrasados.sort(ordenarPorData) }
+    })
+  }
+
+  const abrirModalLista = (titulo, cor, lista) => {
+    if (lista.length === 0) return; // Não abre se não tiver nada
+    setModalListaAnual({ aberto: true, titulo, cor, lista })
+  }
+
   const mudarMes = (direcao) => setDataAtual(new Date(dataAtual.getFullYear(), dataAtual.getMonth() + direcao, 1))
+  const mudarAno = (direcao) => setDataAtual(new Date(dataAtual.getFullYear() + direcao, dataAtual.getMonth(), 1))
   const irParaHoje = () => setDataAtual(new Date())
 
   const ano = dataAtual.getFullYear()
@@ -90,10 +155,9 @@ export default function AgendaPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] flex items-center gap-3">
             <CalendarIcon className="text-blue-600" /> Agenda Técnica
           </h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Acompanhamento do cronograma de manutenções.</p>
+          <p className="text-sm md:text-base text-slate-500 mt-1">Acompanhamento e planejamento do cronograma.</p>
         </div>
 
-        {/* BOTÃO CONDICIONAL: Apenas Administradores e Analistas podem agendar */}
         {profile?.perfil !== 'visualizador' && (
           <button 
             onClick={() => navigate('/chamados', { state: { action: 'novo' } })}
@@ -104,22 +168,79 @@ export default function AgendaPage() {
         )}
       </div>
 
-      {/* PAINEL DE CONTROLE (FILTRO + LEGENDAS) */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 md:mb-8 flex flex-col xl:flex-row gap-6 md:gap-8 items-start xl:items-center justify-between">
-        <div className="w-full xl:w-72 shrink-0">
-          <label className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-            <Filter size={16} /> Filtrar por responsável
-          </label>
-          <select 
-            value={filtroResponsavel}
-            onChange={(e) => setFiltroResponsavel(e.target.value)}
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 text-slate-700 font-medium"
-          >
-            <option value="Todos">Todos os responsáveis</option>
-            {responsaveis.map(resp => <option key={resp.id} value={resp.id}>{resp.nome}</option>)}
-          </select>
+      {/* PAINEL DE ESTATÍSTICAS ANUAIS */}
+      <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col xl:flex-row gap-6 justify-between items-center">
+        
+        {/* Controle Rápido de Ano e Filtro */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto shrink-0">
+          <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+            <button onClick={() => mudarAno(-1)} className="p-1 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={20}/></button>
+            <span className="font-black text-xl text-slate-800 tracking-wider min-w-[60px] text-center">{ano}</span>
+            <button onClick={() => mudarAno(1)} className="p-1 hover:bg-white rounded-lg transition-colors"><ChevronRight size={20}/></button>
+          </div>
+          
+          <div className="w-full sm:w-48 relative">
+            <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <select 
+              value={filtroResponsavel}
+              onChange={(e) => setFiltroResponsavel(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white text-sm font-bold text-slate-700"
+            >
+              <option value="Todos">Todos os técnicos</option>
+              {responsaveis.map(resp => <option key={resp.id} value={resp.id}>{resp.nome}</option>)}
+            </select>
+          </div>
         </div>
 
+        {/* CAIXAS DE MÉTRICAS INTERATIVAS */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
+          
+          {/* Total Agendado */}
+          <div 
+            onClick={() => abrirModalLista(`Planejamento Total - ${ano}`, 'blue', estatisticasAno.total.lista)}
+            className={`p-3 rounded-xl border flex flex-col items-center justify-center relative group transition-all ${estatisticasAno.total.count > 0 ? 'bg-blue-50 border-blue-200 hover:bg-blue-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
+            title="Ver lista completa do ano"
+          >
+            <span className={`text-[10px] uppercase font-bold flex items-center gap-1 mb-1 ${estatisticasAno.total.count > 0 ? 'text-blue-600' : 'text-slate-400'}`}><Target size={12}/> Planejado no Ano</span>
+            <span className={`text-2xl font-black ${estatisticasAno.total.count > 0 ? 'text-blue-800' : 'text-slate-400'}`}>{estatisticasAno.total.count}</span>
+            {estatisticasAno.total.count > 0 && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><ArrowRight size={14} className="text-blue-500"/></div>}
+          </div>
+
+          {/* Realizados */}
+          <div 
+            onClick={() => abrirModalLista(`Manutenções Realizadas - ${ano}`, 'emerald', estatisticasAno.realizados.lista)}
+            className={`p-3 rounded-xl border flex flex-col items-center justify-center relative group transition-all ${estatisticasAno.realizados.count > 0 ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
+          >
+            <span className={`text-[10px] uppercase font-bold flex items-center gap-1 mb-1 ${estatisticasAno.realizados.count > 0 ? 'text-emerald-600' : 'text-slate-400'}`}><CheckCircle2 size={12}/> Realizados</span>
+            <span className={`text-2xl font-black ${estatisticasAno.realizados.count > 0 ? 'text-emerald-800' : 'text-slate-400'}`}>{estatisticasAno.realizados.count}</span>
+            {estatisticasAno.realizados.count > 0 && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><ArrowRight size={14} className="text-emerald-500"/></div>}
+          </div>
+
+          {/* Pendentes */}
+          <div 
+            onClick={() => abrirModalLista(`A Fazer / Pendentes - ${ano}`, 'amber', estatisticasAno.aFazer.lista)}
+            className={`p-3 rounded-xl border flex flex-col items-center justify-center relative group transition-all ${estatisticasAno.aFazer.count > 0 ? 'bg-amber-50 border-amber-200 hover:bg-amber-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
+          >
+            <span className={`text-[10px] uppercase font-bold flex items-center gap-1 mb-1 ${estatisticasAno.aFazer.count > 0 ? 'text-amber-600' : 'text-slate-400'}`}><Clock size={12}/> A Fazer (Pendentes)</span>
+            <span className={`text-2xl font-black ${estatisticasAno.aFazer.count > 0 ? 'text-amber-800' : 'text-slate-400'}`}>{estatisticasAno.aFazer.count}</span>
+            {estatisticasAno.aFazer.count > 0 && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><ArrowRight size={14} className="text-amber-500"/></div>}
+          </div>
+
+          {/* Atrasados */}
+          <div 
+            onClick={() => abrirModalLista(`OS Atrasadas - ${ano}`, 'red', estatisticasAno.atrasados.lista)}
+            className={`p-3 rounded-xl flex flex-col items-center justify-center border relative group transition-all ${estatisticasAno.atrasados.count > 0 ? 'bg-red-50 border-red-200 hover:bg-red-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
+          >
+            <span className={`text-[10px] uppercase font-bold flex items-center gap-1 mb-1 ${estatisticasAno.atrasados.count > 0 ? 'text-red-600' : 'text-slate-400'}`}><AlertTriangle size={12}/> Atrasados</span>
+            <span className={`text-2xl font-black ${estatisticasAno.atrasados.count > 0 ? 'text-red-700' : 'text-slate-600'}`}>{estatisticasAno.atrasados.count}</span>
+            {estatisticasAno.atrasados.count > 0 && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><ArrowRight size={14} className="text-red-500"/></div>}
+          </div>
+
+        </div>
+      </div>
+
+      {/* LEGENDAS */}
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 w-full">
           <span className="px-2 md:px-3 py-2 bg-[#009e49] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Prev. Agendada</span>
           <span className="px-2 md:px-3 py-2 bg-[#1a5ce5] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Calib. Agendada</span>
@@ -197,6 +318,9 @@ export default function AgendaPage() {
         </div>
       </div>
 
+      {/* =========================================================
+          MODAL: LISTA DE ATIVIDADES DO DIA SELECIONADO
+          ========================================================= */}
       {diaSelecionado && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4">
           <div className="bg-slate-50 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] flex flex-col animate-in zoom-in duration-200 relative overflow-hidden border border-slate-200">
@@ -214,7 +338,6 @@ export default function AgendaPage() {
             </div>
 
             <div className="p-4 md:p-8 overflow-y-auto space-y-4 md:space-y-6">
-              
               {eventosDoDiaSelecionado.length === 0 ? (
                 <div className="text-center py-10 md:py-12">
                   <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-200 shadow-sm">
@@ -293,11 +416,83 @@ export default function AgendaPage() {
                           {evento.descricao || 'Nenhuma descrição registrada para esta atividade.'}
                         </p>
                       </div>
-
                     </div>
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================
+          MODAL: LISTA ANUAL (O CLIQUE DAS CAIXINHAS)
+          ========================================================= */}
+      {modalListaAnual.aberto && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col animate-in zoom-in duration-150 border border-slate-200 overflow-hidden">
+            
+            <div className={`p-5 md:p-6 border-b border-slate-100 flex justify-between items-center shrink-0 ${
+              modalListaAnual.cor === 'blue' ? 'bg-blue-50/50' : 
+              modalListaAnual.cor === 'emerald' ? 'bg-emerald-50/50' : 
+              modalListaAnual.cor === 'amber' ? 'bg-amber-50/50' : 'bg-red-50/50'
+            }`}>
+              <div className="flex items-center gap-2">
+                {modalListaAnual.cor === 'red' ? <AlertTriangle className="text-red-600" /> : 
+                 modalListaAnual.cor === 'emerald' ? <CheckCircle2 className="text-emerald-600" /> :
+                 modalListaAnual.cor === 'amber' ? <Clock className="text-amber-600" /> :
+                 <Target className="text-blue-600" />
+                }
+                <h2 className={`text-lg md:text-xl font-bold ${
+                  modalListaAnual.cor === 'blue' ? 'text-blue-900' : 
+                  modalListaAnual.cor === 'emerald' ? 'text-emerald-900' : 
+                  modalListaAnual.cor === 'amber' ? 'text-amber-900' : 'text-red-900'
+                }`}>
+                  {modalListaAnual.titulo} ({modalListaAnual.lista.length})
+                </h2>
+              </div>
+              <button 
+                onClick={() => setModalListaAnual({ ...modalListaAnual, aberto: false })} 
+                className="p-1.5 hover:bg-slate-200/50 rounded-full text-slate-500 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 md:p-6 overflow-y-auto divide-y divide-slate-100 flex-1">
+              {modalListaAnual.lista.map(os => {
+                const dataShow = os.data_prevista ? new Date(os.data_prevista).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : new Date(os.data_abertura).toLocaleDateString('pt-BR')
+                
+                return (
+                  <div key={os.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 group">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          os.tipo_intervencao === 'Preventiva' ? 'bg-green-100 text-green-800' :
+                          os.tipo_intervencao === 'Calibração' ? 'bg-blue-100 text-blue-800' :
+                          os.tipo_intervencao === 'Qualificação' ? 'bg-purple-100 text-purple-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {os.tipo_intervencao}
+                        </span>
+                        <h4 className="font-bold text-slate-800 text-sm md:text-base line-clamp-1">{os.equipamento?.nome || 'Equipamento Excluído'}</h4>
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 font-medium">
+                        <span><strong className="text-slate-400 font-semibold uppercase text-[10px]">Patr:</strong> {os.equipamento?.patrimonio || '-'}</span>
+                        <span className="flex items-center gap-1"><MapPin size={12} className="text-slate-400"/> {os.equipamento?.unidade?.nome}</span>
+                        <span className="flex items-center gap-1 text-slate-700 font-bold bg-slate-100 px-1.5 rounded"><CalendarIcon size={12}/> {dataShow}</span>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => navigate('/chamados')}
+                      className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition-all flex items-center justify-center gap-1 w-full sm:w-auto shrink-0"
+                    >
+                      Ir para OS <ArrowRight size={12} />
+                    </button>
+                  </div>
+                )
+              })}
             </div>
 
           </div>

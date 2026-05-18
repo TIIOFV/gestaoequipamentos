@@ -4,290 +4,341 @@ import { supabase } from '../lib/supabase'
 import { 
   Activity, Wrench, AlertTriangle, CheckCircle, 
   ArrowRight, Clock, MonitorPlay, Building2, 
-  TrendingUp, CalendarClock, ShieldCheck
+  TrendingUp, CalendarClock, PieChart as PieIcon, X
 } from 'lucide-react'
 import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
-  PieChart, Pie, Cell, Legend, AreaChart, Area, CartesianGrid
+  AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
 } from 'recharts'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
+  
   const [unidades, setUnidades] = useState([])
   const [filtroUnidade, setFiltroUnidade] = useState('Todas')
   
-  // Estados de Dados
+  const [modalInoperantes, setModalInoperantes] = useState({ aberto: false, lista: [] })
+  
   const [kpis, setKpis] = useState({
-    total: 0,
-    inoperantes: 0,
-    abertos: 0,
-    disponibilidade: 0,
-    atrasados: 0
+    totalEquip: 0,
+    dispPercent: 0,
+    osAbertas: 0,
+    osAtrasadas: 0,
+    concluidasMes: 0,
+    inoperantes: 0
   })
 
   const [graficos, setGraficos] = useState({
-    status: [],
-    intervencao: [],
-    unidades: [],
-    tendencia: []
+    tendencia: [],
+    statusParque: []
   })
 
   const [listas, setListas] = useState({
-    urgentes: [],
-    proximos: []
+    atrasadas: [],
+    proximas: []
   })
 
   useEffect(() => {
-    carregarTudo()
+    carregarPainel()
   }, [filtroUnidade])
 
-  const carregarTudo = async () => {
+  const carregarPainel = async () => {
     setLoading(true)
     
-    // Busca Unidades para o Filtro
-    const { data: uniData } = await supabase.from('unidades').select('*').order('nome')
-    setUnidades(uniData || [])
+    const { data: uniData } = await supabase.from('unidades').select('id, nome').order('nome')
+    if (uniData) setUnidades(uniData)
 
-    // Busca Dados Brutos
-    let eqQuery = supabase.from('equipamentos').select('*, status:status_id(nome), unidade:unidade_id(nome)')
-    let chQuery = supabase.from('chamados').select('*, status:status_id(nome), equipamento:equipamento_id(nome, unidade_id)')
+    let eqQuery = supabase.from('equipamentos').select('id, nome, patrimonio, status_id, unidade_id, status:status_id(nome), unidade:unidade_id(nome), setor:setor_id(nome)')
+    let chQuery = supabase.from('chamados').select('*, status:status_id(nome), equipamento:equipamento_id(nome, patrimonio, unidade_id)')
 
     if (filtroUnidade !== 'Todas') {
       eqQuery = eqQuery.eq('unidade_id', filtroUnidade)
-      chQuery = chQuery.filter('equipamento.unidade_id', 'eq', filtroUnidade) // Nota: ajuste conforme sua estrutura de RLs
+      chQuery = chQuery.filter('equipamento.unidade_id', 'eq', filtroUnidade)
     }
 
     const [equipReq, chamadosReq] = await Promise.all([eqQuery, chQuery])
     const equipamentos = equipReq.data || []
-    const chamados = chamadosReq.data || []
+    const chamados = (chamadosReq.data || []).filter(ch => ch.equipamento !== null)
 
-    processarMetricas(equipamentos, chamados)
+    processarDadosReais(equipamentos, chamados)
     setLoading(false)
   }
 
-  const processarMetricas = (equipamentos, chamados) => {
+  const processarDadosReais = (equipamentos, chamados) => {
     const hoje = new Date()
+    hoje.setHours(0, 0, 0, 0)
+    
+    const mesAtual = hoje.getMonth()
+    const anoAtual = hoje.getFullYear()
 
-    // 1. KPIs Básicos
-    const inoperantes = equipamentos.filter(eq => eq.status?.nome?.toLowerCase().includes('inoperante')).length
-    const abertos = chamados.filter(ch => ch.status?.nome !== 'Concluído').length
-    const atrasados = chamados.filter(ch => {
-      if (ch.status?.nome === 'Concluído') return false
-      const dataRef = ch.data_prevista ? new Date(ch.data_prevista) : null
-      return dataRef && dataRef < hoje
-    }).length
-
-    const disp = equipamentos.length > 0 
-      ? (((equipamentos.length - inoperantes) / equipamentos.length) * 100).toFixed(1) 
-      : 0
-
-    setKpis({
-      total: equipamentos.length,
-      inoperantes,
-      abertos,
-      atrasados,
-      disponibilidade: disp
+    const listaInoperantes = equipamentos.filter(eq => eq.status?.nome?.toLowerCase().includes('inoperante'))
+    const osAbertas = chamados.filter(ch => ch.status?.nome !== 'Concluído')
+    
+    const osAtrasadas = osAbertas.filter(ch => {
+      if (!ch.data_prevista) return false
+      const prev = new Date(ch.data_prevista)
+      prev.setHours(0,0,0,0)
+      return prev < hoje
     })
 
-    // 2. Gráfico Status (Pizza)
-    const coresStatus = { 'Operante': '#10b981', 'Em Manutenção': '#f59e0b', 'Inoperante': '#ef4444', 'Sem Status': '#94a3b8' }
-    const statusMap = equipamentos.reduce((acc, eq) => {
+    const concluidasMes = chamados.filter(ch => {
+      if (ch.status?.nome !== 'Concluído' || !ch.data_conclusao) return false
+      const conc = new Date(ch.data_conclusao)
+      return conc.getMonth() === mesAtual && conc.getFullYear() === anoAtual
+    })
+
+    setKpis({
+      totalEquip: equipamentos.length,
+      dispPercent: equipamentos.length > 0 ? (((equipamentos.length - listaInoperantes.length) / equipamentos.length) * 100).toFixed(1) : 0,
+      osAbertas: osAbertas.length,
+      osAtrasadas: osAtrasadas.length,
+      concluidasMes: concluidasMes.length,
+      inoperantes: listaInoperantes.length
+    })
+
+    setModalInoperantes(prev => ({ ...prev, lista: listaInoperantes }))
+
+    const ultimos6Meses = []
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(anoAtual, mesAtual - i, 1)
+      ultimos6Meses.push({
+        mesReal: d.getMonth(),
+        anoReal: d.getFullYear(),
+        name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(),
+        "OS Abertas": 0
+      })
+    }
+
+    chamados.forEach(ch => {
+      if (!ch.data_abertura) return
+      const dAbertura = new Date(ch.data_abertura)
+      const index = ultimos6Meses.findIndex(m => m.mesReal === dAbertura.getMonth() && m.anoReal === dAbertura.getFullYear())
+      if (index !== -1) ultimos6Meses[index]["OS Abertas"]++
+    })
+
+    const coresStatus = { 'Operante': '#10b981', 'Em Manutenção': '#f59e0b', 'Inoperante': '#ef4444', 'Sem Status': '#cbd5e1' }
+    const mapaStatus = equipamentos.reduce((acc, eq) => {
       const nome = eq.status?.nome || 'Sem Status'
       acc[nome] = (acc[nome] || 0) + 1
       return acc
     }, {})
-    setGraficos(prev => ({ ...prev, status: Object.keys(statusMap).map(k => ({ name: k, value: statusMap[k], color: coresStatus[k] || '#3b82f6' })) }))
 
-    // 3. Gráfico Intervenção (Barras)
-    const intervMap = chamados.reduce((acc, ch) => {
-      acc[ch.tipo_intervencao] = (acc[intervMap] || 0) + 1
-      return acc
-    }, {})
-    setGraficos(prev => ({ ...prev, intervencao: Object.keys(intervMap).map(k => ({ name: k, Quantidade: intervMap[k] })) }))
+    setGraficos({
+      tendencia: ultimos6Meses,
+      statusParque: Object.keys(mapaStatus).map(k => ({ name: k, value: mapaStatus[k], color: coresStatus[k] || '#3b82f6' }))
+    })
 
-    // 4. Tendência Mensal (Simulação de últimos 6 meses baseado em data_abertura)
-    // Aqui agruparíamos por mês/ano. Exemplo simplificado:
-    const meses = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun']
-    const tendenciaMock = meses.map(m => ({ name: m, chamados: Math.floor(Math.random() * 20) + 5 }))
-    setGraficos(prev => ({ ...prev, tendencia: tendenciaMock }))
-
-    // 5. Listas
     setListas({
-      urgentes: chamados.filter(ch => ch.status?.nome !== 'Concluído').slice(0, 5),
-      proximos: chamados.filter(ch => {
-        const d = new Date(ch.data_prevista)
-        return d > hoje && d < new Date(hoje.getTime() + 15 * 24 * 60 * 60 * 1000)
-      }).slice(0, 5)
+      atrasadas: [...osAtrasadas].sort((a, b) => new Date(a.data_prevista) - new Date(b.data_prevista)).slice(0, 5),
+      proximas: osAbertas.filter(ch => ch.data_prevista && new Date(ch.data_prevista).setHours(0,0,0,0) >= hoje)
+        .sort((a, b) => new Date(a.data_prevista) - new Date(b.data_prevista)).slice(0, 5)
     })
   }
 
+  if (loading) return <div className="flex h-full items-center justify-center text-slate-500 font-medium">Analisando dados do parque...</div>
+
   return (
-    <div className="space-y-6 pb-10 animate-in fade-in duration-700">
+    <div className="space-y-6 pb-10 animate-in fade-in duration-500 font-sans">
       
-      {/* HEADER COM FILTRO ESTRATÉGICO */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-            <Activity className="text-blue-600" size={32} /> Dashboard Executivo
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
+            <Activity className="text-blue-600" size={28} /> Dashboard Técnico
           </h1>
-          <p className="text-slate-500 font-medium">Análise em tempo real do parque tecnológico.</p>
+          <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores reais de Engenharia Clínica.</p>
         </div>
         
-        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm">
-          <Building2 size={18} className="text-slate-400 ml-2" />
-          <select 
-            value={filtroUnidade}
-            onChange={(e) => setFiltroUnidade(e.target.value)}
-            className="bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700 pr-8 cursor-pointer"
-          >
-            <option value="Todas">Todas as Unidades</option>
-            {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-          </select>
-        </div>
-      </div>
-
-      {/* KPIs DE ALTO IMPACTO */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KpiCard title="Inventário" value={kpis.total} icon={<MonitorPlay />} color="blue" />
-        <KpiCard title="Disponibilidade" value={`${kpis.disponibilidade}%`} icon={<ShieldCheck />} color="emerald" sub="Equips. Operantes" />
-        <KpiCard title="OS em Aberto" value={kpis.abertos} icon={<Wrench />} color="amber" />
-        <KpiCard title="Inoperantes" value={kpis.inoperantes} icon={<AlertTriangle />} color="red" sub="Atenção Crítica" />
-        <KpiCard title="OS Atrasadas" value={kpis.atrasados} icon={<Clock />} color="rose" sub="Fora do Prazo" />
-      </div>
-
-      {/* LINHA 1 DE GRÁFICOS: TENDÊNCIA E STATUS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* TENDÊNCIA DE CHAMADOS */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2"><TrendingUp size={20} className="text-blue-500" /> Fluxo de Manutenções</h3>
-            <span className="text-[10px] font-black bg-blue-50 text-blue-700 px-2 py-1 rounded-lg uppercase">Últimos 6 meses</span>
+        <div className="flex items-center gap-3 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 w-full md:w-auto">
+          <Building2 size={20} className="text-slate-400 shrink-0" />
+          <div className="flex flex-col w-full">
+            <span className="text-[10px] font-bold text-slate-400 uppercase">Filtrar Unidade</span>
+            <select 
+              value={filtroUnidade}
+              onChange={(e) => setFiltroUnidade(e.target.value)}
+              className="bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-700 p-0 cursor-pointer w-full md:w-48 outline-none"
+            >
+              <option value="Todas">Visão Geral (Todas)</option>
+              {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+            </select>
           </div>
-          <div className="h-72 w-full">
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+        <KpiCard titulo="Total de Equip." valor={kpis.totalEquip} icone={<MonitorPlay />} cor="slate" />
+        <KpiCard titulo="Disponibilidade" valor={`${kpis.dispPercent}%`} icone={<CheckCircle />} cor={kpis.dispPercent > 90 ? 'emerald' : 'amber'} />
+        <KpiCard titulo="OS Abertas" valor={kpis.osAbertas} icone={<Wrench />} cor="blue" />
+        
+        <div 
+          onClick={() => setModalInoperantes(prev => ({ ...prev, aberto: true }))}
+          className="cursor-pointer group hover:-translate-y-1 transition-all relative"
+          title="Clique para ver os detalhes"
+        >
+          <KpiCard 
+            titulo="Inoperantes" 
+            valor={kpis.inoperantes} 
+            icone={<AlertTriangle />} 
+            cor="red" 
+            pulse={kpis.inoperantes > 0} 
+          />
+          <div className="absolute top-3 right-3 bg-red-50 p-1.5 rounded-full text-red-400 opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-red-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">Ver Lista <ArrowRight size={12}/></span>
+          </div>
+        </div>
+
+        <KpiCard titulo="Concluídas no Mês" valor={kpis.concluidasMes} icone={<Activity />} cor="indigo" />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
+          <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-6"><TrendingUp size={18} className="text-blue-500" /> Fluxo de OS Abertas (6 Meses)</h3>
+          <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={graficos.tendencia}>
+              <AreaChart data={graficos.tendencia} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="colorCh" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                  <linearGradient id="corOS" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#94a3b8'}} />
-                <Tooltip contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
-                <Area type="monotone" dataKey="chamados" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorCh)" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
+                <Tooltip />
+                <Area type="monotone" dataKey="OS Abertas" stroke="#3b82f6" strokeWidth={3} fill="url(#corOS)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* STATUS DO PARQUE */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-800 mb-6 flex items-center gap-2"><MonitorPlay size={20} className="text-emerald-500" /> Saúde do Parque</h3>
-          <div className="h-72 w-full">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
+          <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><PieIcon size={18} className="text-emerald-500" /> Situação Atual</h3>
+          <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={graficos.status} innerRadius={70} outerRadius={90} paddingAngle={8} dataKey="value">
-                  {graficos.status.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} cornerRadius={10} />
-                  ))}
+                <Pie data={graficos.statusParque} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                  {graficos.statusParque.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
                 </Pie>
-                <Tooltip />
-                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{paddingTop: '20px', fontSize: '12px'}} />
+                <Tooltip formatter={(value) => [value, 'Equipamentos']} />
+                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
               </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      {/* LINHA 2: LISTAS TÉCNICAS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
-        {/* LISTA 1: OS URGENTES */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2"><AlertTriangle size={18} className="text-red-500" /> OS Pendentes (Atenção)</h3>
-            <button onClick={() => navigate('/chamados')} className="text-xs font-bold text-blue-600 hover:underline">Ver todas</button>
+        <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-red-50/50 p-5 border-b border-red-100 flex justify-between items-center">
+            <h3 className="font-bold text-red-800 flex items-center gap-2"><AlertTriangle size={18} className="text-red-600" /> OS Atrasadas</h3>
+            <button onClick={() => navigate('/chamados')} className="text-xs font-bold text-red-600 hover:underline">Resolver pendências</button>
           </div>
-          <div className="divide-y divide-slate-50">
-            {listas.urgentes.map(ch => (
-              <div key={ch.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                <div className="flex items-center gap-4">
-                  <div className={`p-2 rounded-xl ${ch.tipo_intervencao === 'Corretiva' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                    <Wrench size={16} />
-                  </div>
+          <div className="divide-y divide-slate-100 flex-1">
+            {listas.atrasadas.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">Nenhuma OS em atraso! 🎉</div> : listas.atrasadas.map(ch => (
+              <div key={ch.id} className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-100 text-red-600 rounded-lg"><Clock size={16} /></div>
                   <div>
                     <p className="text-sm font-bold text-slate-800">{ch.equipamento?.nome}</p>
-                    <p className="text-[10px] text-slate-400 font-medium">{ch.tipo_intervencao} • Aberta em {new Date(ch.data_abertura).toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Previsão era {new Date(ch.data_prevista).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <ArrowRight size={14} className="text-slate-300 group-hover:text-blue-500 group-hover:translate-x-1 transition-all" />
+                <ArrowRight size={16} className="text-slate-300" />
               </div>
             ))}
           </div>
         </div>
 
-        {/* LISTA 2: PRÓXIMAS PREVENTIVAS / CALIBRAÇÕES */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2"><CalendarClock size={18} className="text-blue-500" /> Próximos 15 dias</h3>
+        <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden flex flex-col">
+          <div className="bg-blue-50/50 p-5 border-b border-blue-100 flex justify-between items-center">
+            <h3 className="font-bold text-blue-800 flex items-center gap-2"><CalendarClock size={18} className="text-blue-600" /> Próximas na Agenda</h3>
             <button onClick={() => navigate('/agenda')} className="text-xs font-bold text-blue-600 hover:underline">Ver Agenda</button>
           </div>
-          <div className="divide-y divide-slate-50">
-            {listas.proximos.length > 0 ? listas.proximos.map(ch => (
-              <div key={ch.id} className="p-4 hover:bg-slate-50 transition-colors flex items-center justify-between group">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-xl bg-indigo-50 text-indigo-600">
-                    <ShieldCheck size={16} />
-                  </div>
+          <div className="divide-y divide-slate-100 flex-1">
+            {listas.proximas.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">Nenhum agendamento futuro.</div> : listas.proximas.map(ch => (
+              <div key={ch.id} className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Wrench size={16} /></div>
                   <div>
                     <p className="text-sm font-bold text-slate-800">{ch.equipamento?.nome}</p>
-                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{ch.tipo_intervencao} agendada para {new Date(ch.data_prevista).toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Agendado: {new Date(ch.data_prevista).toLocaleDateString()}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                   <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">Agendado</span>
-                </div>
+                <ArrowRight size={16} className="text-slate-300" />
               </div>
-            )) : (
-              <div className="p-10 text-center text-slate-400 text-sm">Nenhum agendamento para os próximos dias.</div>
-            )}
+            ))}
           </div>
         </div>
-
       </div>
+
+      {/* MODAL INOPERANTES COM NAVEGAÇÃO PARA FICHA */}
+      {modalInoperantes.aberto && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in duration-150">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-red-50/30 rounded-t-2xl">
+              <div className="flex items-center gap-2 text-red-700">
+                <AlertTriangle size={22} />
+                <h2 className="text-xl font-bold">Equipamentos Inoperantes ({modalInoperantes.lista.length})</h2>
+              </div>
+              <button 
+                onClick={() => setModalInoperantes(prev => ({ ...prev, aberto: false }))} 
+                className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto divide-y divide-slate-100 flex-1">
+              {modalInoperantes.lista.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 font-medium">Excelente! Nenhum equipamento inoperante. 🎉</div>
+              ) : (
+                modalInoperantes.lista.map(eq => (
+                  <div key={eq.id} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between group">
+                    <div>
+                      <h4 className="font-bold text-slate-800 text-sm md:text-base">{eq.nome}</h4>
+                      <div className="flex gap-4 text-xs text-slate-400 mt-1 font-medium">
+                        <span><strong className="text-slate-500">Património:</strong> {eq.patrimonio || '-'}</span>
+                        <span><strong className="text-slate-500">Local:</strong> {eq.unidade?.nome} ({eq.setor?.nome || '-'})</span>
+                      </div>
+                    </div>
+                    {/* BOTAO PARA NAVEGAR PARA O EQUIPAMENTO ESPECÍFICO */}
+                    <button 
+                      onClick={() => {
+                        setModalInoperantes(prev => ({ ...prev, aberto: false }));
+                        navigate('/equipamentos', { state: { openDetailsId: eq.id } });
+                      }}
+                      className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition-all flex items-center gap-1 shadow-sm"
+                    >
+                      Ver Detalhes <ArrowRight size={12} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
 
-// Sub-componente para os Cards de KPI
-function KpiCard({ title, value, icon, color, sub }) {
-  const colors = {
-    blue: 'bg-blue-50 text-blue-600 border-blue-100',
-    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-    amber: 'bg-amber-50 text-amber-600 border-amber-100',
+function KpiCard({ titulo, valor, icone, cor, pulse }) {
+  const estilos = {
+    slate: 'bg-slate-50 text-slate-600',
+    blue: 'bg-blue-50 text-blue-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    amber: 'bg-amber-50 text-amber-600',
     red: 'bg-red-50 text-red-600 border-red-100',
-    rose: 'bg-rose-50 text-rose-600 border-rose-100'
+    indigo: 'bg-indigo-50 text-indigo-600',
   }
-
   return (
-    <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-4">
-        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${colors[color]}`}>
-          {cloneElement(icon, { size: 24 })}
-        </div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">{title}</p>
-          <h3 className="text-2xl font-black text-slate-800 leading-none">{value}</h3>
-          {sub && <p className="text-[10px] font-bold text-slate-400 mt-1">{sub}</p>}
-        </div>
+    <div className={`bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 h-full ${pulse ? 'ring-2 ring-red-100' : ''}`}>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${estilos[cor]}`}>{icone}</div>
+      <div>
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{titulo}</p>
+        <h3 className="text-xl md:text-2xl font-black text-slate-800">{valor}</h3>
       </div>
     </div>
   )
 }
-
-// Helper para clonar o ícone e aplicar tamanho
-import { cloneElement } from 'react'

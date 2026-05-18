@@ -12,30 +12,33 @@ export default function AppLayout() {
   const navigate = useNavigate()
   const { profile } = useAuth()
 
-  // Estados do Menu Mobile e Notificações
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showNotif, setShowNotif] = useState(false)
   const [alertas, setAlertas] = useState([])
 
-  // --- TRAVA DE SEGURANÇA E ATUALIZAÇÃO DE ALERTAS ---
   useEffect(() => {
-    // Se for visualizador, trava na agenda
     if (profile?.perfil === 'visualizador' && location.pathname !== '/agenda') {
       navigate('/agenda')
     }
 
-    // Agora todos os perfis buscam pendências
     if (profile) {
       buscarAlertas()
     }
+
+    // OUVINTE REALTIME: Atualiza o contador de pendências sem Refresh
+    const canalNotificacoes = supabase
+      .channel('fluxo-alertas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => buscarAlertas())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => buscarAlertas())
+      .subscribe();
+
+    return () => { supabase.removeChannel(canalNotificacoes); };
   }, [profile, location, navigate])
 
-  // --- MOTOR DE BUSCA DE PENDÊNCIAS ---
   const buscarAlertas = async () => {
     let novosAlertas = []
 
     try {
-      // 1. Busca Equipamentos sem etiqueta
       const { data: semEtiqueta } = await supabase
         .from('equipamentos')
         .select('id, nome, patrimonio')
@@ -47,12 +50,12 @@ export default function AppLayout() {
             id: `eq-${eq.id}`,
             tipo: 'etiqueta',
             texto: `${eq.nome} (${eq.patrimonio || 'Sem Patr.'}) está sem etiqueta.`,
-            link: '/equipamentos'
+            link: '/equipamentos',
+            targetId: eq.id // ID PARA REDIRECIONAMENTO DIRETO
           })
         })
       }
 
-      // 1.5 Busca Equipamentos SEM PATRIMÔNIO
       const { data: semPatrimonio } = await supabase
         .from('equipamentos')
         .select('id, nome')
@@ -64,12 +67,12 @@ export default function AppLayout() {
             id: `pat-${eq.id}`,
             tipo: 'patrimonio',
             texto: `URGENTE: ${eq.nome} aguardando colagem de patrimônio.`,
-            link: '/equipamentos'
+            link: '/equipamentos',
+            targetId: eq.id // ID PARA REDIRECIONAMENTO DIRETO
           })
         })
       }
 
-      // 2. Busca Calibrações/Preventivas Atrasadas ou de Hoje
       const hoje = new Date().toISOString().split('T')[0]
       
       const { data: statusConcluido } = await supabase
@@ -113,7 +116,6 @@ export default function AppLayout() {
   }
 
   const isActive = (path) => location.pathname.includes(path)
-  
   const handleMenuClick = () => setIsMobileMenuOpen(false)
 
   const menuItems = [
@@ -134,7 +136,6 @@ export default function AppLayout() {
         />
       )}
 
-      {/* BARRA LATERAL (SIDEBAR) */}
       <aside className={`
         fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 flex flex-col shadow-2xl md:shadow-sm z-50 
         transform transition-transform duration-300 ease-in-out
@@ -164,7 +165,6 @@ export default function AppLayout() {
           </span>
         </div>
 
-        {/* CENTRAL DE NOTIFICAÇÕES (Habilitada para todos) */}
         <div className="px-4 py-3 border-b border-slate-100 shrink-0">
           <button 
             onClick={() => setShowNotif(!showNotif)} 
@@ -191,6 +191,7 @@ export default function AppLayout() {
                 alertas.map(al => (
                   <Link 
                     to={profile?.perfil === 'visualizador' ? '/agenda' : al.link} 
+                    state={al.targetId ? { openDetailsId: al.targetId } : {}} // PASSA O ID PRO ROUTER
                     key={al.id} 
                     onClick={handleMenuClick}
                     className={`block text-xs p-2.5 rounded-lg border transition-all ${
