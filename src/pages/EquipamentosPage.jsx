@@ -62,7 +62,7 @@ export default function EquipamentosPage() {
 
   useEffect(() => {
     if (equipamentos.length > 0 && location.state?.openDetailsId) {
-      const eqTarget = equipments.find(e => e.id === location.state.openDetailsId);
+      const eqTarget = equipamentos.find(e => e.id === location.state.openDetailsId);
       if (eqTarget) abrirDetalhes(eqTarget);
       window.history.replaceState({}, document.title);
     }

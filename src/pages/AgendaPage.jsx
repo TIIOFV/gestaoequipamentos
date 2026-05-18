@@ -18,7 +18,6 @@ export default function AgendaPage() {
   
   const [diaSelecionado, setDiaSelecionado] = useState(null)
   
-  // NOVO: Estado para as listas detalhadas do ano e controle do Modal
   const [estatisticasAno, setEstatisticasAno] = useState({
     total: { count: 0, lista: [] }, 
     realizados: { count: 0, lista: [] }, 
@@ -26,6 +25,9 @@ export default function AgendaPage() {
     atrasados: { count: 0, lista: [] }
   })
   const [modalListaAnual, setModalListaAnual] = useState({ aberto: false, titulo: '', cor: '', lista: [] })
+
+  // SEGURANÇA: Somente se for explicitamente admin ou analista. Erros do banco = acesso negado.
+  const canEdit = profile?.perfil === 'administrador' || profile?.perfil === 'analista'
 
   useEffect(() => {
     carregarDados()
@@ -90,7 +92,6 @@ export default function AgendaPage() {
       }
     })
 
-    // Ordenar as listas por data
     const ordenarPorData = (a, b) => new Date(a.data_prevista || a.data_abertura) - new Date(b.data_prevista || b.data_abertura);
 
     setEstatisticasAno({ 
@@ -102,7 +103,7 @@ export default function AgendaPage() {
   }
 
   const abrirModalLista = (titulo, cor, lista) => {
-    if (lista.length === 0) return; // Não abre se não tiver nada
+    if (lista.length === 0) return; 
     setModalListaAnual({ aberto: true, titulo, cor, lista })
   }
 
@@ -158,7 +159,8 @@ export default function AgendaPage() {
           <p className="text-sm md:text-base text-slate-500 mt-1">Acompanhamento e planejamento do cronograma.</p>
         </div>
 
-        {profile?.perfil !== 'visualizador' && (
+        {/* CONTROLE RIGOROSO DO BOTÃO AGENDAR */}
+        {canEdit && (
           <button 
             onClick={() => navigate('/chamados', { state: { action: 'novo' } })}
             className="w-full md:w-auto bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -195,7 +197,6 @@ export default function AgendaPage() {
         {/* CAIXAS DE MÉTRICAS INTERATIVAS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
           
-          {/* Total Agendado */}
           <div 
             onClick={() => abrirModalLista(`Planejamento Total - ${ano}`, 'blue', estatisticasAno.total.lista)}
             className={`p-3 rounded-xl border flex flex-col items-center justify-center relative group transition-all ${estatisticasAno.total.count > 0 ? 'bg-blue-50 border-blue-200 hover:bg-blue-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
@@ -206,7 +207,6 @@ export default function AgendaPage() {
             {estatisticasAno.total.count > 0 && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><ArrowRight size={14} className="text-blue-500"/></div>}
           </div>
 
-          {/* Realizados */}
           <div 
             onClick={() => abrirModalLista(`Manutenções Realizadas - ${ano}`, 'emerald', estatisticasAno.realizados.lista)}
             className={`p-3 rounded-xl border flex flex-col items-center justify-center relative group transition-all ${estatisticasAno.realizados.count > 0 ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
@@ -216,7 +216,6 @@ export default function AgendaPage() {
             {estatisticasAno.realizados.count > 0 && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><ArrowRight size={14} className="text-emerald-500"/></div>}
           </div>
 
-          {/* Pendentes */}
           <div 
             onClick={() => abrirModalLista(`A Fazer / Pendentes - ${ano}`, 'amber', estatisticasAno.aFazer.lista)}
             className={`p-3 rounded-xl border flex flex-col items-center justify-center relative group transition-all ${estatisticasAno.aFazer.count > 0 ? 'bg-amber-50 border-amber-200 hover:bg-amber-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
@@ -226,7 +225,6 @@ export default function AgendaPage() {
             {estatisticasAno.aFazer.count > 0 && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"><ArrowRight size={14} className="text-amber-500"/></div>}
           </div>
 
-          {/* Atrasados */}
           <div 
             onClick={() => abrirModalLista(`OS Atrasadas - ${ano}`, 'red', estatisticasAno.atrasados.lista)}
             className={`p-3 rounded-xl flex flex-col items-center justify-center border relative group transition-all ${estatisticasAno.atrasados.count > 0 ? 'bg-red-50 border-red-200 hover:bg-red-100 cursor-pointer' : 'bg-slate-50 border-slate-100 opacity-70'}`}
@@ -484,12 +482,15 @@ export default function AgendaPage() {
                       </div>
                     </div>
                     
-                    <button 
-                      onClick={() => navigate('/chamados')}
-                      className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition-all flex items-center justify-center gap-1 w-full sm:w-auto shrink-0"
-                    >
-                      Ir para OS <ArrowRight size={12} />
-                    </button>
+                    {/* CONTROLE RIGOROSO DO BOTÃO 'IR PARA OS' */}
+                    {canEdit && (
+                      <button 
+                        onClick={() => navigate('/chamados')}
+                        className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition-all flex items-center justify-center gap-1 w-full sm:w-auto shrink-0"
+                      >
+                        Ir para OS <ArrowRight size={12} />
+                      </button>
+                    )}
                   </div>
                 )
               })}

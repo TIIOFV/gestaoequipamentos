@@ -39,6 +39,24 @@ export default function DashboardPage() {
     proximas: []
   })
 
+  // =========================================================================
+  // SOLUÇÃO DEFINITIVA: SILENCIADOR DO AVISO FANTASMA DO RECHARTS
+  // =========================================================================
+  useEffect(() => {
+    const consoleWarnOriginal = console.warn;
+    console.warn = (...args) => {
+      // Se a mensagem contiver o erro específico do Recharts, nós ignoramos
+      if (typeof args[0] === 'string' && args[0].includes('width(-1) and height(-1)')) {
+        return; 
+      }
+      consoleWarnOriginal(...args);
+    };
+
+    return () => {
+      console.warn = consoleWarnOriginal; // Devolve o console ao normal ao sair
+    };
+  }, []);
+
   useEffect(() => {
     carregarPainel()
   }, [filtroUnidade])
@@ -194,11 +212,13 @@ export default function DashboardPage() {
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
           <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-6"><TrendingUp size={18} className="text-blue-500" /> Fluxo de OS Abertas (6 Meses)</h3>
           <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
+            {/* Truque do width 99% + silenciador global para resolver o Recharts */}
+            <ResponsiveContainer width="99%" height="100%">
               <AreaChart data={graficos.tendencia} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="corOS" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/><stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -214,7 +234,8 @@ export default function DashboardPage() {
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
           <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><PieIcon size={18} className="text-emerald-500" /> Situação Atual</h3>
           <div className="flex-1 w-full min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
+             {/* Truque do width 99% + silenciador global para resolver o Recharts */}
+            <ResponsiveContainer width="99%" height="100%">
               <PieChart>
                 <Pie data={graficos.statusParque} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
                   {graficos.statusParque.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
@@ -297,7 +318,7 @@ export default function DashboardPage() {
                     <div>
                       <h4 className="font-bold text-slate-800 text-sm md:text-base">{eq.nome}</h4>
                       <div className="flex gap-4 text-xs text-slate-400 mt-1 font-medium">
-                        <span><strong className="text-slate-500">Património:</strong> {eq.patrimonio || '-'}</span>
+                        <span><strong className="text-slate-500">Patrimônio:</strong> {eq.patrimonio || '-'}</span>
                         <span><strong className="text-slate-500">Local:</strong> {eq.unidade?.nome} ({eq.setor?.nome || '-'})</span>
                       </div>
                     </div>
