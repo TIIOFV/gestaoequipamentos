@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { 
   Plus, Search, ArrowLeft, Image as ImageIcon, 
   CheckCircle2, AlertCircle, X, Edit, FileText, Wrench, Calendar, Clock, User, Trash2, Upload, Copy,
-  Images, AlertTriangle, Filter
+  Images, AlertTriangle, Filter, Factory
 } from 'lucide-react'
 
 export default function EquipamentosPage() {
@@ -42,6 +42,7 @@ export default function EquipamentosPage() {
     id: null, nome: '', numero_serie: '', patrimonio: '', modelo: '',
     fabricante_id: '', prestador_id: '', unidade_id: '', setor_id: '', 
     status_id: '', observacoes: '', imagem_url: '',
+    data_fabricacao: '', desconhece_fabricacao: false, 
     possui_etiqueta: false, possui_manual: false, sem_numero_serie: false,
     sem_patrimonio: false, data_ultima_calibracao: '', data_proxima_calibracao: '',
     fotos_adicionais: [] 
@@ -52,6 +53,7 @@ export default function EquipamentosPage() {
     buscarEquipamentos()
     carregarAuxiliares()
 
+    // Mantemos o listener para caso outra pessoa edite em outro PC, mas não dependemos só dele
     const canalEquipamentos = supabase
       .channel('lista-viva')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => buscarEquipamentos())
@@ -126,6 +128,12 @@ export default function EquipamentosPage() {
     }
   }
 
+  const handleRemoverImagemPrincipal = () => {
+    setArquivoImagem(null);
+    setPreviewImagem(null);
+    setFormData(prev => ({ ...prev, imagem_url: '' }));
+  }
+
   const handleUploadFotosAdicionais = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -178,10 +186,22 @@ export default function EquipamentosPage() {
         urlImagemFinal = publicUrlData.publicUrl
       }
 
-      const payload = { ...formData, imagem_url: urlImagemFinal }
+      const payload = { 
+        ...formData, 
+        imagem_url: urlImagemFinal,
+        fabricante_id: formData.fabricante_id === "" ? null : formData.fabricante_id,
+        prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
+        unidade_id: formData.unidade_id === "" ? null : formData.unidade_id,
+        setor_id: formData.setor_id === "" ? null : formData.setor_id,
+        status_id: formData.status_id === "" ? null : formData.status_id,
+        data_ultima_calibracao: formData.data_ultima_calibracao === "" ? null : formData.data_ultima_calibracao,
+        data_proxima_calibracao: formData.data_proxima_calibracao === "" ? null : formData.data_proxima_calibracao,
+        data_fabricacao: formData.desconhece_fabricacao ? null : (formData.data_fabricacao === "" ? null : formData.data_fabricacao)
+      }
+      
+      delete payload.desconhece_fabricacao; 
+      
       if (view === 'novo') delete payload.id
-      if (!payload.data_ultima_calibracao) payload.data_ultima_calibracao = null
-      if (!payload.data_proxima_calibracao) payload.data_proxima_calibracao = null
 
       let equipamentoId = formData.id;
 
@@ -232,6 +252,7 @@ export default function EquipamentosPage() {
       
       mostrarToast(view === 'novo' ? 'Equipamento cadastrado com sucesso!' : 'Equipamento atualizado!')
       resetarFormulario()
+      buscarEquipamentos() // <-- CORREÇÃO SÊNIOR: Força a atualização da lista imediatamente
 
     } catch (error) {
       mostrarToast('Erro ao salvar: ' + error.message, 'error')
@@ -250,6 +271,7 @@ export default function EquipamentosPage() {
       } else {
         mostrarToast('Equipamento excluído com sucesso!', 'success')
         resetarFormulario()
+        buscarEquipamentos() // <-- CORREÇÃO SÊNIOR: Força a atualização da lista imediatamente
       }
       setLoading(false)
     }
@@ -264,6 +286,8 @@ export default function EquipamentosPage() {
       unidade_id: eq.unidade_id || '', setor_id: eq.setor_id || '', 
       status_id: eq.status_id || '', observacoes: eq.observacoes || '',
       imagem_url: eq.imagem_url || '',
+      data_fabricacao: eq.data_fabricacao || '', 
+      desconhece_fabricacao: eq.data_fabricacao ? false : true,
       possui_etiqueta: eq.possui_etiqueta || false, possui_manual: eq.possui_manual || false,
       sem_numero_serie: eq.sem_numero_serie || false, sem_patrimonio: eq.sem_patrimonio || false,
       data_ultima_calibracao: eq.data_ultima_calibracao ? eq.data_ultima_calibracao.split('T')[0] : '',
@@ -283,6 +307,8 @@ export default function EquipamentosPage() {
       nome: eq.nome || '', modelo: eq.modelo || '', fabricante_id: eq.fabricante_id || '',
       prestador_id: eq.prestador_id || '', unidade_id: eq.unidade_id || '', setor_id: eq.setor_id || '',
       status_id: eq.status_id || '', observacoes: eq.observacoes || '',
+      data_fabricacao: eq.data_fabricacao || '',
+      desconhece_fabricacao: eq.data_fabricacao ? false : true,
       possui_etiqueta: eq.possui_etiqueta || false, possui_manual: eq.possui_manual || false,
     })
     setArquivoImagem(null)
@@ -365,13 +391,11 @@ export default function EquipamentosPage() {
           </div>
 
           <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            {/* LINHA 1: BARRA DE PESQUISA PRINCIPAL */}
             <div className="relative w-full">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
               <input type="text" placeholder="Buscar por nome, N/S ou patrimônio" value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm font-medium" />
             </div>
             
-            {/* MATRIZ DE FILTROS CENTRALIZADA E RESPONSIVA (Sem Scroll) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2">
               <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700">
                 <option value="">Todas as unidades</option>
@@ -399,7 +423,6 @@ export default function EquipamentosPage() {
               </select>
             </div>
 
-            {/* FILTROS RÁPIDOS (PILLS) */}
             <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
               <span className="text-xs font-bold text-slate-400 mr-2 flex items-center gap-1"><Filter size={14}/> Filtros Rápidos:</span>
               
@@ -551,8 +574,16 @@ export default function EquipamentosPage() {
                 <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Patrimônio</span><span className="font-medium text-slate-800">{equipSelecionado.patrimonio || '-'}</span></div>
                 <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Modelo</span><span className="font-medium text-slate-800">{equipSelecionado.modelo || '-'}</span></div>
                 <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Fabricante</span><span className="font-medium text-slate-800">{equipSelecionado.fabricante?.nome || '-'}</span></div>
+                
+                <div className="flex flex-col border-b border-slate-50 pb-2">
+                  <span className="text-slate-500 font-semibold mb-1 flex items-center gap-1"><Factory size={14}/> Data de Fabricação</span>
+                  <span className="font-medium text-slate-800">
+                    {equipSelecionado.data_fabricacao ? new Date(equipSelecionado.data_fabricacao).toLocaleDateString('pt-BR', {timeZone: 'UTC'}) : 'Desconhecida'}
+                  </span>
+                </div>
+                
                 <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Prestador</span><span className="font-medium text-slate-800">{equipSelecionado.prestador?.nome || '-'}</span></div>
-                <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Unidade / Setor</span><span className="font-medium text-slate-800">{equipSelecionado.unidade?.nome || '-'} / {equipSelecionado.setor?.nome || '-'}</span></div>
+                <div className="flex flex-col border-b border-slate-50 pb-2 md:col-span-2"><span className="text-slate-500 font-semibold mb-1">Unidade / Setor</span><span className="font-medium text-slate-800">{equipSelecionado.unidade?.nome || '-'} / {equipSelecionado.setor?.nome || '-'}</span></div>
               </div>
             </div>
 
@@ -698,7 +729,7 @@ export default function EquipamentosPage() {
               <div className="flex flex-col md:flex-row gap-6 items-start p-5 bg-slate-50 border border-slate-200 rounded-xl">
                 <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center border border-slate-200 shrink-0 overflow-hidden shadow-sm relative group">
                   {previewImagem ? <img src={previewImagem} alt="Preview" className="w-full h-full object-cover" /> : <ImageIcon size={32} className="text-slate-300" />}
-                  {previewImagem && <div onClick={() => {setArquivoImagem(null); setPreviewImagem(null); setFormData({...formData, imagem_url: ''})}} className="absolute inset-0 bg-red-500/80 hidden group-hover:flex items-center justify-center text-white cursor-pointer transition-all"><Trash2 size={24} /></div>}
+                  {previewImagem && <div onClick={handleRemoverImagemPrincipal} className="absolute inset-0 bg-red-500/80 hidden group-hover:flex items-center justify-center text-white cursor-pointer transition-all"><Trash2 size={24} /></div>}
                 </div>
                 <div className="flex-1 w-full space-y-4">
                   <div>
@@ -732,6 +763,7 @@ export default function EquipamentosPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Nome do equipamento</label><input required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
+                
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-sm font-bold text-slate-700">Número de série</label>
@@ -739,6 +771,7 @@ export default function EquipamentosPage() {
                   </div>
                   <input required disabled={formData.sem_numero_serie} value={formData.numero_serie} onChange={e => setFormData({...formData, numero_serie: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
                 </div>
+                
                 <div>
                   <div className="flex justify-between items-center mb-2">
                     <label className="text-sm font-bold text-slate-700">Patrimônio</label>
@@ -746,9 +779,22 @@ export default function EquipamentosPage() {
                   </div>
                   <input required={!formData.sem_patrimonio} disabled={formData.sem_patrimonio} value={formData.patrimonio} onChange={e => setFormData({...formData, patrimonio: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-red-50/30 disabled:text-red-600 disabled:font-bold" />
                 </div>
+                
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Modelo</label><input value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Fabricante</label><select value={formData.fabricante_id} onChange={e => setFormData({...formData, fabricante_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.fabricantes.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></div>
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Prestador</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.prestadores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></div>
+              </div>
+
+              {/* AQUI ENTRA A DATA DE FABRICAÇÃO */}
+              <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-xl">
+                 <div className="flex justify-between items-center mb-3">
+                   <label className="text-sm font-bold text-indigo-900 flex items-center gap-2"><Factory size={16}/> Data de Fabricação</label>
+                   <label className="flex items-center gap-1 text-xs cursor-pointer font-bold text-rose-600 hover:text-rose-800 bg-rose-50 px-2 py-1.5 rounded border border-rose-200 transition-colors">
+                     <input type="checkbox" checked={formData.desconhece_fabricacao} onChange={e => setFormData({...formData, desconhece_fabricacao: e.target.checked, data_fabricacao: e.target.checked ? '' : formData.data_fabricacao})} className="w-3.5 h-3.5" />
+                     Desconhecida
+                   </label>
+                 </div>
+                 <input type="date" disabled={formData.desconhece_fabricacao} value={formData.data_fabricacao} onChange={e => setFormData({...formData, data_fabricacao: e.target.value})} className="w-full md:w-1/2 px-4 py-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-slate-100 pt-6">

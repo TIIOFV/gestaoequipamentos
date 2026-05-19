@@ -40,29 +40,36 @@ export default function DashboardPage() {
   })
 
   // =========================================================================
-  // SOLUÇÃO DEFINITIVA: SILENCIADOR DO AVISO FANTASMA DO RECHARTS
+  // SILENCIADOR DO AVISO FANTASMA DO RECHARTS
   // =========================================================================
   useEffect(() => {
     const consoleWarnOriginal = console.warn;
     console.warn = (...args) => {
-      // Se a mensagem contiver o erro específico do Recharts, nós ignoramos
-      if (typeof args[0] === 'string' && args[0].includes('width(-1) and height(-1)')) {
-        return; 
-      }
+      if (typeof args[0] === 'string' && args[0].includes('width(-1) and height(-1)')) return; 
       consoleWarnOriginal(...args);
     };
-
-    return () => {
-      console.warn = consoleWarnOriginal; // Devolve o console ao normal ao sair
-    };
+    return () => { console.warn = consoleWarnOriginal; };
   }, []);
 
+  // =========================================================================
+  // CARREGAMENTO INICIAL E REAL-TIME (DASHBOARD VIVO)
+  // =========================================================================
   useEffect(() => {
     carregarPainel()
+
+    // Ouve mudanças em chamados e equipamentos para atualizar o dashboard na hora!
+    const canalDashboard = supabase
+      .channel('dashboard-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => carregarPainel(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => carregarPainel(false))
+      .subscribe();
+
+    return () => { supabase.removeChannel(canalDashboard); };
   }, [filtroUnidade])
 
-  const carregarPainel = async () => {
-    setLoading(true)
+  // Aceita o parâmetro showLoading para não piscar a tela no real-time
+  const carregarPainel = async (showLoading = true) => {
+    if (showLoading) setLoading(true)
     
     const { data: uniData } = await supabase.from('unidades').select('id, nome').order('nome')
     if (uniData) setUnidades(uniData)
@@ -80,7 +87,7 @@ export default function DashboardPage() {
     const chamados = (chamadosReq.data || []).filter(ch => ch.equipamento !== null)
 
     processarDadosReais(equipamentos, chamados)
-    setLoading(false)
+    if (showLoading) setLoading(false)
   }
 
   const processarDadosReais = (equipamentos, chamados) => {
@@ -115,6 +122,7 @@ export default function DashboardPage() {
       inoperantes: listaInoperantes.length
     })
 
+    // Atualiza a lista de inoperantes do Modal caso ele esteja aberto
     setModalInoperantes(prev => ({ ...prev, lista: listaInoperantes }))
 
     const ultimos6Meses = []
@@ -124,7 +132,7 @@ export default function DashboardPage() {
         mesReal: d.getMonth(),
         anoReal: d.getFullYear(),
         name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(),
-        "OS Abertas": 0
+        "OS Registradas": 0 // Alterado o nome para refletir a realidade
       })
     }
 
@@ -132,10 +140,11 @@ export default function DashboardPage() {
       if (!ch.data_abertura) return
       const dAbertura = new Date(ch.data_abertura)
       const index = ultimos6Meses.findIndex(m => m.mesReal === dAbertura.getMonth() && m.anoReal === dAbertura.getFullYear())
-      if (index !== -1) ultimos6Meses[index]["OS Abertas"]++
+      if (index !== -1) ultimos6Meses[index]["OS Registradas"]++
     })
 
-    const coresStatus = { 'Operante': '#10b981', 'Em Manutenção': '#f59e0b', 'Inoperante': '#ef4444', 'Sem Status': '#cbd5e1' }
+    // Cores padronizadas com o Tailwind UI
+    const coresStatus = { 'Operante': '#10b981', 'Em Manutenção': '#f59e0b', 'Inoperante': '#ef4444', 'Sem Status': '#94a3b8' }
     const mapaStatus = equipamentos.reduce((acc, eq) => {
       const nome = eq.status?.nome || 'Sem Status'
       acc[nome] = (acc[nome] || 0) + 1
@@ -164,13 +173,13 @@ export default function DashboardPage() {
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
             <Activity className="text-blue-600" size={28} /> Dashboard Técnico
           </h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores reais de Engenharia Clínica.</p>
+          <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores em tempo real da Engenharia Clínica.</p>
         </div>
         
         <div className="flex items-center gap-3 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 w-full md:w-auto">
           <Building2 size={20} className="text-slate-400 shrink-0" />
           <div className="flex flex-col w-full">
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Filtrar Unidade</span>
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Filtrar Unidade</span>
             <select 
               value={filtroUnidade}
               onChange={(e) => setFiltroUnidade(e.target.value)}
@@ -183,67 +192,84 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* KPIS INTERATIVOS */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-        <KpiCard titulo="Total de Equip." valor={kpis.totalEquip} icone={<MonitorPlay />} cor="slate" />
-        <KpiCard titulo="Disponibilidade" valor={`${kpis.dispPercent}%`} icone={<CheckCircle />} cor={kpis.dispPercent > 90 ? 'emerald' : 'amber'} />
-        <KpiCard titulo="OS Abertas" valor={kpis.osAbertas} icone={<Wrench />} cor="blue" />
+        <KpiCard 
+          titulo="Total de Equip." valor={kpis.totalEquip} icone={<MonitorPlay />} cor="slate" 
+          onClick={() => navigate('/equipamentos')}
+        />
+        <KpiCard 
+          titulo="Disponibilidade" valor={`${kpis.dispPercent}%`} icone={<CheckCircle />} 
+          cor={kpis.dispPercent > 90 ? 'emerald' : 'amber'} 
+        />
+        <KpiCard 
+          titulo="OS Abertas" valor={kpis.osAbertas} icone={<Wrench />} cor="blue" 
+          onClick={() => navigate('/chamados')}
+        />
         
         <div 
           onClick={() => setModalInoperantes(prev => ({ ...prev, aberto: true }))}
           className="cursor-pointer group hover:-translate-y-1 transition-all relative"
-          title="Clique para ver os detalhes"
+          title="Ver equipamentos inoperantes"
         >
           <KpiCard 
-            titulo="Inoperantes" 
-            valor={kpis.inoperantes} 
-            icone={<AlertTriangle />} 
-            cor="red" 
-            pulse={kpis.inoperantes > 0} 
+            titulo="Inoperantes" valor={kpis.inoperantes} icone={<AlertTriangle />} cor="red" pulse={kpis.inoperantes > 0} 
           />
           <div className="absolute top-3 right-3 bg-red-50 p-1.5 rounded-full text-red-400 opacity-0 group-hover:opacity-100 transition-all shadow-sm border border-red-100">
             <span className="text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">Ver Lista <ArrowRight size={12}/></span>
           </div>
         </div>
 
-        <KpiCard titulo="Concluídas no Mês" valor={kpis.concluidasMes} icone={<Activity />} cor="indigo" />
+        <KpiCard 
+          titulo="Concluídas no Mês" valor={kpis.concluidasMes} icone={<Activity />} cor="indigo" 
+          onClick={() => navigate('/chamados')}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-6"><TrendingUp size={18} className="text-blue-500" /> Fluxo de OS Abertas (6 Meses)</h3>
+          <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-6"><TrendingUp size={18} className="text-blue-500" /> Volume de OS Registradas (6 Meses)</h3>
           <div className="flex-1 w-full min-h-0">
-            {/* Truque do width 99% + silenciador global para resolver o Recharts */}
             <ResponsiveContainer width="99%" height="100%">
               <AreaChart data={graficos.tendencia} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="corOS" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
-                <Tooltip />
-                <Area type="monotone" dataKey="OS Abertas" stroke="#3b82f6" strokeWidth={3} fill="url(#corOS)" />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
+                />
+                <Area type="monotone" dataKey="OS Registradas" stroke="#3b82f6" strokeWidth={3} fill="url(#corOS)" activeDot={{ r: 6, strokeWidth: 0, fill: '#2563eb' }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[350px]">
-          <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><PieIcon size={18} className="text-emerald-500" /> Situação Atual</h3>
-          <div className="flex-1 w-full min-h-0">
-             {/* Truque do width 99% + silenciador global para resolver o Recharts */}
-            <ResponsiveContainer width="99%" height="100%">
-              <PieChart>
-                <Pie data={graficos.statusParque} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                  {graficos.statusParque.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-                <Tooltip formatter={(value) => [value, 'Equipamentos']} />
-                <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
-              </PieChart>
-            </ResponsiveContainer>
+          <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><PieIcon size={18} className="text-emerald-500" /> Status do Parque</h3>
+          <div className="flex-1 w-full min-h-0 relative">
+            {graficos.statusParque.length === 0 ? (
+               <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-medium">Nenhum equipamento</div>
+            ) : (
+              <ResponsiveContainer width="99%" height="100%">
+                <PieChart>
+                  <Pie data={graficos.statusParque} innerRadius={60} outerRadius={85} paddingAngle={4} dataKey="value" stroke="none">
+                    {graficos.statusParque.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value) => [value, 'Equipamentos']} 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '12px', paddingTop: '20px', fontWeight: '500', color: '#475569'}} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -252,19 +278,19 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden flex flex-col">
           <div className="bg-red-50/50 p-5 border-b border-red-100 flex justify-between items-center">
             <h3 className="font-bold text-red-800 flex items-center gap-2"><AlertTriangle size={18} className="text-red-600" /> OS Atrasadas</h3>
-            <button onClick={() => navigate('/chamados')} className="text-xs font-bold text-red-600 hover:underline">Resolver pendências</button>
+            <button onClick={() => navigate('/chamados')} className="text-xs font-bold text-red-600 hover:text-red-800 hover:underline px-2 py-1 rounded transition-colors">Resolver pendências</button>
           </div>
           <div className="divide-y divide-slate-100 flex-1">
             {listas.atrasadas.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">Nenhuma OS em atraso! 🎉</div> : listas.atrasadas.map(ch => (
-              <div key={ch.id} className="p-4 flex items-center justify-between">
+              <div key={ch.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-red-100 text-red-600 rounded-lg"><Clock size={16} /></div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{ch.equipamento?.nome}</p>
-                    <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Previsão era {new Date(ch.data_prevista).toLocaleDateString()}</p>
+                    <p className="text-sm font-bold text-slate-800 line-clamp-1">{ch.equipamento?.nome}</p>
+                    <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Previsão era {new Date(ch.data_prevista).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</p>
                   </div>
                 </div>
-                <ArrowRight size={16} className="text-slate-300" />
+                <button onClick={() => navigate('/chamados', { state: { openDetailsId: ch.id } })} className="p-2 hover:bg-white rounded-full transition-colors"><ArrowRight size={16} className="text-slate-300 hover:text-red-500" /></button>
               </div>
             ))}
           </div>
@@ -273,37 +299,37 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden flex flex-col">
           <div className="bg-blue-50/50 p-5 border-b border-blue-100 flex justify-between items-center">
             <h3 className="font-bold text-blue-800 flex items-center gap-2"><CalendarClock size={18} className="text-blue-600" /> Próximas na Agenda</h3>
-            <button onClick={() => navigate('/agenda')} className="text-xs font-bold text-blue-600 hover:underline">Ver Agenda</button>
+            <button onClick={() => navigate('/agenda')} className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline px-2 py-1 rounded transition-colors">Ver Agenda Completa</button>
           </div>
           <div className="divide-y divide-slate-100 flex-1">
-            {listas.proximas.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">Nenhum agendamento futuro.</div> : listas.proximas.map(ch => (
-              <div key={ch.id} className="p-4 flex items-center justify-between">
+            {listas.proximas.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">Nenhum agendamento futuro no sistema.</div> : listas.proximas.map(ch => (
+              <div key={ch.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-100 text-blue-600 rounded-lg"><Wrench size={16} /></div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{ch.equipamento?.nome}</p>
-                    <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Agendado: {new Date(ch.data_prevista).toLocaleDateString()}</p>
+                    <p className="text-sm font-bold text-slate-800 line-clamp-1">{ch.equipamento?.nome}</p>
+                    <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Agendado: {new Date(ch.data_prevista).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</p>
                   </div>
                 </div>
-                <ArrowRight size={16} className="text-slate-300" />
+                <button onClick={() => navigate('/chamados', { state: { openDetailsId: ch.id } })} className="p-2 hover:bg-white rounded-full transition-colors"><ArrowRight size={16} className="text-slate-300 hover:text-blue-500" /></button>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* MODAL INOPERANTES COM NAVEGAÇÃO PARA FICHA */}
+      {/* MODAL INOPERANTES */}
       {modalInoperantes.aberto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in duration-150">
-            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-red-50/30 rounded-t-2xl">
-              <div className="flex items-center gap-2 text-red-700">
-                <AlertTriangle size={22} />
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in duration-150 border border-slate-200">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-red-50/50 rounded-t-2xl">
+              <div className="flex items-center gap-3 text-red-700">
+                <div className="bg-red-100 p-2 rounded-lg"><AlertTriangle size={20} /></div>
                 <h2 className="text-xl font-bold">Equipamentos Inoperantes ({modalInoperantes.lista.length})</h2>
               </div>
               <button 
                 onClick={() => setModalInoperantes(prev => ({ ...prev, aberto: false }))} 
-                className="p-1.5 hover:bg-slate-200 rounded-full text-slate-500 transition-colors"
+                className="p-1.5 hover:bg-slate-200/50 rounded-full text-slate-500 transition-colors"
               >
                 <X size={20} />
               </button>
@@ -314,23 +340,23 @@ export default function DashboardPage() {
                 <div className="text-center py-10 text-slate-400 font-medium">Excelente! Nenhum equipamento inoperante. 🎉</div>
               ) : (
                 modalInoperantes.lista.map(eq => (
-                  <div key={eq.id} className="py-3.5 first:pt-0 last:pb-0 flex items-center justify-between group">
+                  <div key={eq.id} className="py-4 first:pt-2 last:pb-2 flex items-center justify-between group">
                     <div>
                       <h4 className="font-bold text-slate-800 text-sm md:text-base">{eq.nome}</h4>
-                      <div className="flex gap-4 text-xs text-slate-400 mt-1 font-medium">
-                        <span><strong className="text-slate-500">Patrimônio:</strong> {eq.patrimonio || '-'}</span>
-                        <span><strong className="text-slate-500">Local:</strong> {eq.unidade?.nome} ({eq.setor?.nome || '-'})</span>
+                      <div className="flex flex-wrap gap-3 md:gap-4 text-xs text-slate-500 mt-1 font-medium">
+                        <span><strong className="text-slate-400 uppercase text-[10px]">Pat:</strong> {eq.patrimonio || '-'}</span>
+                        <span><strong className="text-slate-400 uppercase text-[10px]">Unid:</strong> {eq.unidade?.nome}</span>
+                        <span><strong className="text-slate-400 uppercase text-[10px]">Setor:</strong> {eq.setor?.nome || '-'}</span>
                       </div>
                     </div>
-                    {/* BOTAO PARA NAVEGAR PARA O EQUIPAMENTO ESPECÍFICO */}
                     <button 
                       onClick={() => {
                         setModalInoperantes(prev => ({ ...prev, aberto: false }));
                         navigate('/equipamentos', { state: { openDetailsId: eq.id } });
                       }}
-                      className="text-xs font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 transition-all flex items-center gap-1 shadow-sm"
+                      className="text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg border border-red-200 transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap ml-4"
                     >
-                      Ver Detalhes <ArrowRight size={12} />
+                      Ver Equip. <ArrowRight size={14} />
                     </button>
                   </div>
                 ))
@@ -344,21 +370,27 @@ export default function DashboardPage() {
   )
 }
 
-function KpiCard({ titulo, valor, icone, cor, pulse }) {
+function KpiCard({ titulo, valor, icone, cor, pulse, onClick }) {
   const estilos = {
-    slate: 'bg-slate-50 text-slate-600',
-    blue: 'bg-blue-50 text-blue-600',
-    emerald: 'bg-emerald-50 text-emerald-600',
-    amber: 'bg-amber-50 text-amber-600',
+    slate: 'bg-slate-50 text-slate-600 border-slate-100',
+    blue: 'bg-blue-50 text-blue-600 border-blue-100',
+    emerald: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+    amber: 'bg-amber-50 text-amber-600 border-amber-100',
     red: 'bg-red-50 text-red-600 border-red-100',
-    indigo: 'bg-indigo-50 text-indigo-600',
+    indigo: 'bg-indigo-50 text-indigo-600 border-indigo-100',
   }
+  
   return (
-    <div className={`bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 h-full ${pulse ? 'ring-2 ring-red-100' : ''}`}>
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border ${estilos[cor]}`}>{icone}</div>
+    <div 
+      onClick={onClick}
+      className={`bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3 md:gap-4 h-full transition-all ${pulse ? 'ring-2 ring-red-200 ring-offset-2' : ''} ${onClick ? 'cursor-pointer hover:-translate-y-1 hover:shadow-md hover:border-slate-300' : ''}`}
+    >
+      <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center shrink-0 border shadow-inner ${estilos[cor]}`}>
+        {icone}
+      </div>
       <div>
-        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{titulo}</p>
-        <h3 className="text-xl md:text-2xl font-black text-slate-800">{valor}</h3>
+        <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">{titulo}</p>
+        <h3 className="text-xl md:text-2xl font-black text-slate-800 leading-none">{valor}</h3>
       </div>
     </div>
   )
