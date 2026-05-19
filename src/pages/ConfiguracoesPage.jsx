@@ -33,7 +33,7 @@ export default function ConfiguracoesPage() {
     { id: 'prestadores', nome: 'Prestadores', tabela: 'prestadores' },
     { id: 'unidades', nome: 'Unidades', tabela: 'unidades' },
     { id: 'setores', nome: 'Setores', tabela: 'setores' },
-    { id: 'status_equipamento', nome: 'Status do Equipamento', tabela: 'status_equipamento' },
+    { id: 'status_equipmento', nome: 'Status do Equipamento', tabela: 'status_equipamento' },
   ]
 
   const tabelaAtual = abas.find(a => a.id === abaAtiva).tabela
@@ -69,7 +69,7 @@ export default function ConfiguracoesPage() {
       alert(`Erro ao atualizar: ${error.message}. Verifique se você tem permissão de Administrador no banco.`);
     } else {
       setUsuarios(usuarios.map(u => u.id === id ? { ...u, perfil: novoCargo } : u));
-      alert('Permissão atualizada com sucesso!');
+      alert('Permissão updated com sucesso!');
     }
     
     setLoading(false);
@@ -90,7 +90,7 @@ export default function ConfiguracoesPage() {
       alert('Erro ao criar conta no Auth: ' + authError.message)
     } else {
       // 2. INSERE o perfil usando supabaseAdmin para ignorar as restrições de RLS no banco
-      const { error: profileError } = await supabaseAdmin // <-- A MÁGICA ESTÁ AQUI (Trocado de supabase para supabaseAdmin)
+      const { error: profileError } = await supabaseAdmin
         .from('perfis')
         .insert([{ 
           user_id: authData.user.id, 
@@ -102,7 +102,6 @@ export default function ConfiguracoesPage() {
         }])
 
       if (profileError) {
-        // Se falhar o perfil, remove o usuário do Auth para não gerar lixo eletrônico
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
         alert('Erro ao criar perfil na tabela pública: ' + profileError.message)
       } else {
@@ -114,7 +113,6 @@ export default function ConfiguracoesPage() {
     setLoading(false)
   }
 
-  // NOVA FUNÇÃO: Bloquear / Desbloquear Acesso de forma segura (Preserva histórico)
   const toggleBloqueio = async (id, statusAtual, nome) => {
     if (!window.confirm(`Deseja realmente ${statusAtual ? 'DESBLOQUEAR' : 'BLOQUEAR'} o acesso de ${nome}?`)) return
     
@@ -133,13 +131,11 @@ export default function ConfiguracoesPage() {
     setLoading(false)
   }
 
-  // NOVA FUNÇÃO: Exclusão total definitiva (Perfil + Auth)
   const handleExcluirUsuario = async (profileId, authUserId, nome) => {
     if (!window.confirm(`ATENÇÃO CRÍTICA: Tem certeza que deseja EXCLUIR permanentemente ${nome}?`)) return
     
     setLoading(true)
     
-    // Tenta remover da tabela pública de perfis primeiro (isso remove ele da lista na tela)
     const { error: profileError } = await supabase
       .from('perfis')
       .delete()
@@ -148,12 +144,11 @@ export default function ConfiguracoesPage() {
     if (profileError) {
       alert('Erro ao remover perfil. Verifique se ele possui vínculos não resolvidos: ' + profileError.message)
     } else {
-      // Se apagou da tela, tenta apagar do cofre de senhas (Auth) em segundo plano
       if (authUserId) {
         try {
            await supabaseAdmin.auth.admin.deleteUser(authUserId)
         } catch (e) {
-           console.warn('O perfil sumiu da tela, mas a credencial Auth precisa ser apagada manualmente no painel do Supabase (Authentication > Users) por questões de segurança de API.', e)
+           console.warn('O perfil sumiu da tela, mas a credencial Auth precisa ser apagada manualmente no painel do Supabase.', e)
         }
       }
       alert('Usuário excluído permanentemente do sistema!')
@@ -181,7 +176,7 @@ export default function ConfiguracoesPage() {
       alert(`Senha do usuário ${modalSenha.email} alterada com sucesso!`);
       setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' });
     }
-    loading(false);
+    setLoading(false); // CORRIGIDO: de loading(false) para setLoading(false)
   }
 
   // --- FUNÇÕES DAS OUTRAS ABAS ---
@@ -199,7 +194,7 @@ export default function ConfiguracoesPage() {
     }
     const { data, error } = await query
     if (!error) setDados(data || [])
-    loading(false)
+    setLoading(false) // CORRIGIDO: de loading(false) para setLoading(false)
   }
 
   const handleCadastrarItem = async (e) => {
@@ -357,7 +352,6 @@ export default function ConfiguracoesPage() {
                       <KeyRound className="w-3.5 h-3.5" /> Senha
                     </button>
 
-                    {/* BOTÃO DE BLOQUEIO / DESBLOQUEIO INTEGRADO */}
                     <button 
                       onClick={() => toggleBloqueio(user.id, user.esta_bloqueado, user.nome)}
                       className={`flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium border rounded-lg transition-colors whitespace-nowrap ${
@@ -371,7 +365,6 @@ export default function ConfiguracoesPage() {
                       {user.esta_bloqueado ? 'Desbloquear' : 'Bloquear'}
                     </button>
 
-                    {/* BOTÃO DE EXCLUSÃO DEFINITIVA */}
                     <button 
                       onClick={() => handleExcluirUsuario(user.id, user.user_id, user.nome)}
                       className="p-2 text-slate-400 hover:text-red-600 bg-white border border-slate-200 hover:border-red-200 rounded-lg transition-colors"
@@ -386,7 +379,7 @@ export default function ConfiguracoesPage() {
           </div>
         ) : (
           
-          /* LÓGICA DAS OUTRAS ABAS */
+          /* LÓGICA DAS OUTRAS ABAS (CADASTROS + EDIÇÃO INLINE) */
           <>
             <form onSubmit={handleCadastrarItem} className="flex flex-col sm:flex-row gap-3 mb-6">
               <input
