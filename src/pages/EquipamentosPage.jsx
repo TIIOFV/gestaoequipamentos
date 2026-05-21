@@ -53,7 +53,6 @@ export default function EquipamentosPage() {
     buscarEquipamentos()
     carregarAuxiliares()
 
-    // Mantemos o listener para caso outra pessoa edite em outro PC, mas não dependemos só dele
     const canalEquipamentos = supabase
       .channel('lista-viva')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => buscarEquipamentos())
@@ -214,6 +213,9 @@ export default function EquipamentosPage() {
         if (dbError) throw dbError
       }
 
+      // =========================================================================
+      // SOLUÇÃO: LÓGICA INTELIGENTE DE OS AUTOMÁTICA (EVITA DUPLICIDADE)
+      // =========================================================================
       const { data: authData } = await supabase.auth.getUser()
       let perfilId = null;
       if (authData?.user?.id) {
@@ -221,11 +223,24 @@ export default function EquipamentosPage() {
          if (perfilData) perfilId = perfilData.id;
       }
 
+      // 1. Tratamento da ÚLTIMA calibração (OS Concluída)
       if (payload.data_ultima_calibracao) {
-        const { data: existePassada } = await supabase.from('chamados')
-          .select('id').eq('equipamento_id', equipamentoId).eq('data_prevista', payload.data_ultima_calibracao).maybeSingle()
+        // PROCURA PELA ASSINATURA, não pela data exata
+        const { data: osPassada } = await supabase.from('chamados')
+          .select('id')
+          .eq('equipamento_id', equipamentoId)
+          .ilike('descricao', '%(Lançamento automático)%')
+          .maybeSingle();
 
-        if (!existePassada) {
+        if (osPassada) {
+          // Atualiza a OS existente
+          await supabase.from('chamados').update({
+            data_abertura: payload.data_ultima_calibracao,
+            data_prevista: payload.data_ultima_calibracao,
+            data_conclusao: payload.data_ultima_calibracao
+          }).eq('id', osPassada.id);
+        } else {
+          // Cria a OS pela primeira vez
           const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
           await supabase.from('chamados').insert([{
             equipamento_id: equipamentoId, tipo_intervencao: 'Preventiva', data_abertura: payload.data_ultima_calibracao,
@@ -236,11 +251,22 @@ export default function EquipamentosPage() {
         }
       }
 
+      // 2. Tratamento da PRÓXIMA calibração (OS Aberta / Agendada)
       if (payload.data_proxima_calibracao) {
-        const { data: existeFutura } = await supabase.from('chamados')
-          .select('id').eq('equipamento_id', equipamentoId).eq('data_prevista', payload.data_proxima_calibracao).maybeSingle()
+        // PROCURA PELA ASSINATURA, não pela data exata
+        const { data: osFutura } = await supabase.from('chamados')
+          .select('id')
+          .eq('equipamento_id', equipamentoId)
+          .ilike('descricao', '%programada.%')
+          .maybeSingle();
 
-        if (!existeFutura) {
+        if (osFutura) {
+          // Atualiza a OS existente
+          await supabase.from('chamados').update({
+            data_prevista: payload.data_proxima_calibracao
+          }).eq('id', osFutura.id);
+        } else {
+          // Cria a OS pela primeira vez
           const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
           await supabase.from('chamados').insert([{
             equipamento_id: equipamentoId, tipo_intervencao: 'Preventiva', data_abertura: new Date().toISOString(),
@@ -252,7 +278,7 @@ export default function EquipamentosPage() {
       
       mostrarToast(view === 'novo' ? 'Equipamento cadastrado com sucesso!' : 'Equipamento atualizado!')
       resetarFormulario()
-      buscarEquipamentos() // <-- CORREÇÃO SÊNIOR: Força a atualização da lista imediatamente
+      buscarEquipamentos() 
 
     } catch (error) {
       mostrarToast('Erro ao salvar: ' + error.message, 'error')
@@ -271,7 +297,7 @@ export default function EquipamentosPage() {
       } else {
         mostrarToast('Equipamento excluído com sucesso!', 'success')
         resetarFormulario()
-        buscarEquipamentos() // <-- CORREÇÃO SÊNIOR: Força a atualização da lista imediatamente
+        buscarEquipamentos() 
       }
       setLoading(false)
     }
@@ -344,8 +370,13 @@ export default function EquipamentosPage() {
   }
 
   const equipamentosFiltrados = equipamentos.filter(eq => {
-    const atendeBusca = eq.nome?.toLowerCase().includes(busca.toLowerCase()) || 
-                        eq.patrimonio?.includes(busca) || eq.numero_serie?.includes(busca);
+    const term = busca.toLowerCase(); // <-- RESOLUÇÃO: Busca minúscula
+    
+    // RESOLUÇÃO: Forçamos os dados do equipamento para minúsculo antes de comparar
+    const atendeBusca = (eq.nome?.toLowerCase() || '').includes(term) || 
+                        (eq.patrimonio?.toLowerCase() || '').includes(term) || 
+                        (eq.numero_serie?.toLowerCase() || '').includes(term);
+                        
     const atendeUnidade = filtroUnidade === '' || eq.unidade_id === filtroUnidade;
     const atendeSetor = filtroSetor === '' || eq.setor_id === filtroSetor;
     const atendeStatus = filtroStatus === '' || eq.status_id === filtroStatus;
