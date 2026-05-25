@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import toast from 'react-hot-toast' // 1. Importação do toast
 
 export default function ModalAlterarSenha({ isOpen, onClose, obrigatorio = false, userId }) {
   const [novaSenha, setNovaSenha] = useState('')
@@ -12,16 +13,17 @@ export default function ModalAlterarSenha({ isOpen, onClose, obrigatorio = false
     e.preventDefault()
     
     if (novaSenha !== confirmarSenha) {
-      alert('As senhas não coincidem. Digite novamente.')
+      toast.error('As senhas não coincidem. Digite novamente.')
       return
     }
 
     if (novaSenha.length < 6) {
-      alert('A nova senha deve ter no mínimo 6 caracteres.')
+      toast.error('A nova senha deve ter no mínimo 6 caracteres.')
       return
     }
 
     setLoading(true)
+    const toastId = toast.loading('Atualizando senha...') // Toast de carregamento
 
     // 1. Atualiza a senha no Auth do Supabase
     const { error: authError } = await supabase.auth.updateUser({
@@ -31,9 +33,9 @@ export default function ModalAlterarSenha({ isOpen, onClose, obrigatorio = false
     if (authError) {
       // Traduz o erro nativo do banco e destrava o estado de carregamento
       if (authError.message.includes('different from the old password')) {
-        alert('A nova senha não pode ser igual à senha anterior. Por favor, digite uma senha diferente.')
+        toast.error('A nova senha não pode ser igual à senha anterior. Por favor, digite uma senha diferente.', { id: toastId })
       } else {
-        alert('Erro ao atualizar a senha: ' + authError.message)
+        toast.error('Erro ao atualizar a senha: ' + authError.message, { id: toastId })
       }
       setLoading(false)
       return
@@ -51,13 +53,15 @@ export default function ModalAlterarSenha({ isOpen, onClose, obrigatorio = false
       }
     }
 
-    alert('Senha atualizada com sucesso! Guarde-a em um local seguro.')
+    toast.success('Senha atualizada com sucesso! Guarde-a em um local seguro.', { id: toastId })
     setNovaSenha('')
     setConfirmarSenha('')
     
     // 3. Executa o fluxo de fechamento ou atualização de sessão
     if (obrigatorio) {
-      window.location.reload()
+      setTimeout(() => {
+        window.location.reload()
+      }, 1500) // Pequeno delay para o usuário ler o toast antes da página recarregar
     } else {
       onClose()
     }

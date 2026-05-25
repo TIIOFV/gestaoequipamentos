@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { Toaster } from 'react-hot-toast' // 1. Importação da Lib
+import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './routes/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -15,7 +15,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        {/* 2. O Toaster aqui, no topo, garante que ele funcione em QUALQUER página */}
+        {/* O Toaster agora com zIndex altíssimo para garantir sobreposição a qualquer modal */}
         <Toaster 
           position="top-right" 
           toastOptions={{
@@ -26,6 +26,9 @@ export default function App() {
               fontSize: '14px',
             },
           }} 
+          containerStyle={{
+            zIndex: 999999,
+          }}
         />
         
         <Routes>

@@ -4,6 +4,8 @@ import {
   Settings, Plus, Trash2, Edit2, 
   Check, X, KeyRound, UserX, UserCheck 
 } from 'lucide-react'
+import toast from 'react-hot-toast' // 1. Importação do toast
+import ModalConfirmacao from '../components/ModalConfirmacao' // 2. Importação do Modal
 
 export default function ConfiguracoesPage() {
   const [abaAtiva, setAbaAtiva] = useState('usuarios')
@@ -26,6 +28,16 @@ export default function ConfiguracoesPage() {
 
   // Estado para o Modal de Senha Manual
   const [modalSenha, setModalSenha] = useState({ aberto: false, userId: '', email: '', novaSenha: '' })
+
+  // 3. Estado centralizado para gerenciar os modais de confirmação
+  const [modalConfirm, setModalConfirm] = useState({
+    isOpen: false,
+    titulo: '',
+    mensagem: '',
+    isDestructive: true,
+    textoConfirmar: 'Confirmar',
+    onConfirm: () => {}
+  });
 
   const abas = [
     { id: 'usuarios', nome: 'Usuários', tabela: 'perfis' },
@@ -66,10 +78,10 @@ export default function ConfiguracoesPage() {
 
     if (error) {
       console.error("Erro Supabase:", error);
-      alert(`Erro ao atualizar: ${error.message}. Verifique se você tem permissão de Administrador no banco.`);
+      toast.error(`Erro ao atualizar. Verifique suas permissões.`);
     } else {
       setUsuarios(usuarios.map(u => u.id === id ? { ...u, perfil: novoCargo } : u));
-      alert('Permissão atualizada com sucesso!');
+      toast.success('Permissão atualizada com sucesso!');
     }
     
     setLoading(false);
@@ -79,7 +91,6 @@ export default function ConfiguracoesPage() {
     e.preventDefault()
     setLoading(true)
     
-    // 1. Cria a conta no cofre de autenticação (Auth)
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: novoUsuario.email,
       password: novoUsuario.senha,
@@ -87,13 +98,12 @@ export default function ConfiguracoesPage() {
     })
 
     if (authError) {
-      alert('Erro ao criar conta no Auth: ' + authError.message)
+      toast.error('Erro ao criar conta: ' + authError.message)
       setLoading(false)
       return
     }
 
     try {
-      // 2. Agora que o banco não tem mais gatilhos atrapalhando, inserimos direto!
       const { error: profileError } = await supabaseAdmin
         .from('perfis')
         .insert([{ 
@@ -106,117 +116,117 @@ export default function ConfiguracoesPage() {
         }])
 
       if (profileError) {
-        // Rollback de segurança caso a inserção falhe
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-        alert('Erro ao salvar o perfil definitivo: ' + profileError.message)
+        toast.error('Erro ao salvar o perfil: ' + profileError.message)
       } else {
-        alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
+        toast.success(`Usuário ${novoUsuario.nome} cadastrado!`)
         setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
         buscarUsuarios()
       }
 
     } catch (err) {
       console.error(err)
-      alert('Erro inesperado: ' + err.message)
+      toast.error('Erro inesperado: ' + err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const toggleBloqueio = async (id, statusAtual, nome) => {
-    if (!window.confirm(`Deseja realmente ${statusAtual ? 'DESBLOQUEAR' : 'BLOQUEAR'} o acesso de ${nome}?`)) return
-    
-    setLoading(true)
-    const { error } = await supabase
-      .from('perfis')
-      .update({ esta_bloqueado: !statusAtual })
-      .eq('id', id)
+  const toggleBloqueio = (id, statusAtual, nome) => {
+    // 4. Substituição do window.confirm pelo nosso ModalConfirmacao
+    setModalConfirm({
+      isOpen: true,
+      titulo: statusAtual ? 'Desbloquear Usuário' : 'Bloquear Usuário',
+      mensagem: `Deseja realmente ${statusAtual ? 'liberar' : 'suspender'} o acesso de ${nome} ao sistema?`,
+      isDestructive: !statusAtual, // Vermelho para bloquear, azul para desbloquear
+      textoConfirmar: statusAtual ? 'Sim, Desbloquear' : 'Sim, Bloquear',
+      onConfirm: async () => {
+        setLoading(true)
+        const { error } = await supabase
+          .from('perfis')
+          .update({ esta_bloqueado: !statusAtual })
+          .eq('id', id)
 
-    if (error) {
-      alert('Erro ao alterar status de acesso: ' + error.message)
-    } else {
-      setUsuarios(usuarios.map(u => u.id === id ? { ...u, esta_bloqueado: !statusAtual } : u))
-      alert(`Acesso de ${nome} modificado com sucesso!`)
-    }
-    setLoading(false)
+        if (error) {
+          toast.error('Erro ao alterar status: ' + error.message)
+        } else {
+          setUsuarios(usuarios.map(u => u.id === id ? { ...u, esta_bloqueado: !statusAtual } : u))
+          toast.success(`Acesso de ${nome} modificado!`)
+        }
+        setLoading(false)
+      }
+    });
   }
 
-  const handleExcluirUsuario = async (profileId, authUserId, nome) => {
-    if (!window.confirm(`ATENÇÃO CRÍTICA: Tem certeza que deseja EXCLUIR permanentemente ${nome}? Isso removerá todos os perfis associados.`)) return
-    
-    setLoading(true)
-    let profileError = null;
+  const handleExcluirUsuario = (profileId, authUserId, nome) => {
+    // 4. Substituição do window.confirm crítico
+    setModalConfirm({
+      isOpen: true,
+      titulo: 'Excluir Usuário Permanentemente',
+      mensagem: `ATENÇÃO CRÍTICA: Tem certeza que deseja excluir ${nome}? Esta ação é irreversível e removerá todos os perfis associados.`,
+      isDestructive: true,
+      textoConfirmar: 'Excluir Definitivamente',
+      onConfirm: async () => {
+        setLoading(true)
+        let profileError = null;
 
-    // 1. Verifica se a conta possui um UUID do Auth válido
-    if (authUserId) {
-      // Conta normal: deleta em lote (limpando possíveis duplicatas)
-      const { error } = await supabaseAdmin
-        .from('perfis')
-        .delete()
-        .eq('user_id', authUserId) 
-      profileError = error;
-    } else {
-      // 2. Conta "Fantasma" (sem user_id): deleta direto pelo ID do perfil
-      const { error } = await supabaseAdmin
-        .from('perfis')
-        .delete()
-        .eq('id', profileId)
-      profileError = error;
-    }
-
-    if (profileError) {
-      alert('Erro ao remover registro de perfis: ' + profileError.message)
-    } else {
-      // 3. Só tenta apagar do cofre Auth se o usuário realmente existir lá
-      if (authUserId) {
-        try {
-           await supabaseAdmin.auth.admin.deleteUser(authUserId)
-        } catch (e) {
-           console.warn('Restrição ao apagar do cofre Auth.', e)
+        if (authUserId) {
+          const { error } = await supabaseAdmin.from('perfis').delete().eq('user_id', authUserId) 
+          profileError = error;
+        } else {
+          const { error } = await supabaseAdmin.from('perfis').delete().eq('id', profileId)
+          profileError = error;
         }
+
+        if (profileError) {
+          toast.error('Erro ao remover perfis: ' + profileError.message)
+        } else {
+          if (authUserId) {
+            try {
+               await supabaseAdmin.auth.admin.deleteUser(authUserId)
+            } catch (e) {
+               console.warn('Restrição ao apagar do cofre Auth.', e)
+            }
+          }
+          toast.success('Usuário removido com sucesso!')
+          buscarUsuarios()
+        }
+        setLoading(false)
       }
-      alert('Usuário removido com sucesso!')
-      buscarUsuarios()
-    }
-    setLoading(false)
+    });
   }
 
   const handleForcarTrocaSenha = async () => {
     if (modalSenha.novaSenha.length < 6) {
-      alert("A senha deve ter no mínimo 6 caracteres.");
+      toast.error("A senha deve ter no mínimo 6 caracteres.");
       return;
     }
 
     setLoading(true);
     
-    // 1. Atualiza a senha no cofre do Supabase Auth
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
       modalSenha.userId,
       { password: modalSenha.novaSenha }
     );
 
     if (authError) {
-      alert("Erro ao alterar senha. Verifique as permissões de Admin API do Supabase.\nDetalhe: " + authError.message);
+      toast.error("Erro ao alterar senha. Verifique as permissões de Admin API.");
       setLoading(false);
       return;
     }
 
-    // 2. O PULO DO GATO: Atualiza o perfil para forçar o usuário a trocar a senha no próximo login
     const { error: profileError } = await supabaseAdmin
       .from('perfis')
       .update({ precisa_trocar_senha: true })
       .eq('user_id', modalSenha.userId);
 
     if (profileError) {
-       console.warn("Senha alterada, mas falha ao marcar aviso de troca obrigatória.", profileError);
+       console.warn("Senha alterada, mas falha ao marcar aviso de troca.", profileError);
     }
 
-    alert(`Senha do usuário ${modalSenha.email} redefinida com sucesso! Ele será obrigado a alterá-la no próximo login.`);
+    toast.success('Senha redefinida! O usuário deverá alterá-la no próximo login.', { duration: 5000 });
     setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' });
-    
-    // Atualiza a lista para refletir a mudança
     buscarUsuarios();
-    
     setLoading(false);
   }
 
@@ -247,22 +257,41 @@ export default function ConfiguracoesPage() {
 
     if (abaAtiva === 'setores') {
       if (!unidadeSelecionada) {
-        alert('Selecione uma unidade.')
+        toast.error('Por favor, selecione uma unidade.');
         setLoading(false); return;
       }
       payload.unidade_id = unidadeSelecionada
     }
 
     const { error } = await supabase.from(tabelaAtual).insert([payload])
-    if (!error) { setNovoItem(''); buscarDados() }
+    if (!error) { 
+      toast.success('Cadastrado com sucesso!');
+      setNovoItem(''); 
+      buscarDados();
+    } else {
+      toast.error('Erro ao cadastrar.');
+    }
     setLoading(false)
   }
 
-  const handleExcluir = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este item?')) return
-    const { error } = await supabase.from(tabelaAtual).delete().eq('id', id)
-    if (!error) buscarDados()
-    else alert('Erro ao excluir. O item pode estar vinculado a algum equipamento.')
+  const handleExcluir = (id) => {
+    // 4. Substituição do window.confirm genérico das abas
+    setModalConfirm({
+      isOpen: true,
+      titulo: 'Excluir Registro',
+      mensagem: 'Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.',
+      isDestructive: true,
+      textoConfirmar: 'Sim, excluir',
+      onConfirm: async () => {
+        const { error } = await supabase.from(tabelaAtual).delete().eq('id', id)
+        if (!error) {
+          toast.success('Item excluído com sucesso!');
+          buscarDados()
+        } else {
+          toast.error('Erro ao excluir. O item pode estar vinculado a algum equipamento.')
+        }
+      }
+    });
   }
 
   const salvarEdicao = async (id) => {
@@ -271,19 +300,24 @@ export default function ConfiguracoesPage() {
     let payload = { nome: textoEdicao }
 
     if (abaAtiva === 'setores') {
-      if (!unidadeEdicao) { alert('Selecione uma unidade.'); setLoading(false); return; }
+      if (!unidadeEdicao) { toast.error('Selecione uma unidade.'); setLoading(false); return; }
       payload.unidade_id = unidadeEdicao
     }
 
     const { error } = await supabase.from(tabelaAtual).update(payload).eq('id', id)
-    if (!error) { setEditandoId(null); buscarDados() }
+    if (!error) { 
+      toast.success('Atualizado com sucesso!');
+      setEditandoId(null); 
+      buscarDados();
+    } else {
+      toast.error('Erro ao atualizar.');
+    }
     setLoading(false)
   }
 
   return (
     <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 font-sans relative pb-10">
       
-      {/* Cabeçalho */}
       <div className="mb-2 md:mb-0">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center">
           <Settings className="w-6 h-6 md:w-8 md:h-8 mr-3 text-blue-600" />
@@ -292,7 +326,6 @@ export default function ConfiguracoesPage() {
         <p className="text-sm md:text-base text-slate-500 mt-1">Gerencie os cadastros auxiliares e permissões de acesso.</p>
       </div>
 
-      {/* Navegação de Abas */}
       <div className="flex space-x-2 border-b border-slate-200 overflow-x-auto pb-px custom-scrollbar w-full">
         {abas.map((aba) => (
           <button
@@ -310,10 +343,8 @@ export default function ConfiguracoesPage() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6">
-        
         {abaAtiva === 'usuarios' ? (
           <div className="space-y-6 md:space-y-8">
-            {/* Formulário de Criação de Usuários */}
             <div className="bg-slate-50 p-4 md:p-6 rounded-xl border border-slate-100">
               <h3 className="text-xs md:text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">Novo Colaborador</h3>
               <form onSubmit={handleCriarUsuario} className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
@@ -349,7 +380,6 @@ export default function ConfiguracoesPage() {
               </form>
             </div>
 
-            {/* LISTA DE USUÁRIOS */}
             <div className="border border-slate-100 rounded-lg divide-y divide-slate-100">
               {loading && usuarios.length === 0 ? (
                 <div className="p-6 text-center text-slate-500 text-sm">Carregando usuários...</div>
@@ -419,8 +449,6 @@ export default function ConfiguracoesPage() {
             </div>
           </div>
         ) : (
-          
-          /* LÓGICA DAS OUTRAS ABAS (CADASTROS + EDIÇÃO INLINE) */
           <>
             <form onSubmit={handleCadastrarItem} className="flex flex-col sm:flex-row gap-3 mb-6">
               <input
@@ -513,10 +541,8 @@ export default function ConfiguracoesPage() {
             </div>
           </>
         )}
-
       </div>
 
-      {/* MODAL MANUAL DE ALTERAÇÃO DE SENHA */}
       {modalSenha.aberto && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 border border-slate-100 animate-in zoom-in duration-200">
@@ -554,6 +580,18 @@ export default function ConfiguracoesPage() {
           </div>
         </div>
       )}
+
+      {/* 5. Renderização do Modal de Confirmação */}
+      <ModalConfirmacao
+        isOpen={modalConfirm.isOpen}
+        onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
+        onConfirm={modalConfirm.onConfirm}
+        titulo={modalConfirm.titulo}
+        mensagem={modalConfirm.mensagem}
+        isDestructive={modalConfirm.isDestructive}
+        textoConfirmar={modalConfirm.textoConfirmar}
+      />
+
     </div>
   )
 }

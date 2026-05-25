@@ -7,6 +7,8 @@ import {
   Paperclip, Image as ImageIcon, Filter, Wrench,
   Monitor, Building, Hash
 } from 'lucide-react'
+import toast from 'react-hot-toast' // 1. Importação do react-hot-toast
+import ModalConfirmacao from '../components/ModalConfirmacao' // 2. Importação do Modal
 
 export default function ChamadosPage() {
   const location = useLocation()
@@ -22,9 +24,16 @@ export default function ChamadosPage() {
   const [filtroPrestador, setFiltroPrestador] = useState('')
 
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
-
   const [usuarioAtual, setUsuarioAtual] = useState({ id: '', nome: 'Carregando...' })
+
+  // 3. Estado do Modal de Confirmação
+  const [modalConfirm, setModalConfirm] = useState({
+    isOpen: false,
+    titulo: '',
+    mensagem: '',
+    textoConfirmar: 'Confirmar',
+    onConfirm: () => {}
+  });
 
   const [auxiliares, setAuxiliares] = useState({
     equipamentos: [],
@@ -117,7 +126,7 @@ export default function ChamadosPage() {
     if (files.length === 0) return;
     
     setLoading(true);
-    mostrarToast('Enviando anexos...', 'success');
+    toast.loading('Enviando anexos...', { id: 'upload-anexo' });
 
     try {
       const novasUrls = [];
@@ -125,7 +134,6 @@ export default function ChamadosPage() {
         const fileExt = file.name.split('.').pop();
         const fileName = `os_anexo_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
 
-        // Aponta para o bucket correto configurado no seu Storage
         const { error: uploadError } = await supabase.storage.from('equipamentos').upload(fileName, file);
         if (uploadError) throw uploadError;
 
@@ -134,10 +142,10 @@ export default function ChamadosPage() {
       }
 
       setFormData(prev => ({ ...prev, anexos: [...(prev.anexos || []), ...novasUrls] }));
-      mostrarToast(`${files.length} anexo(s) carregado(s)!`);
+      toast.success(`${files.length} anexo(s) carregado(s)!`, { id: 'upload-anexo' });
     } catch (error) {
       console.error(error);
-      mostrarToast('Erro ao enviar os arquivos no Storage.', 'error');
+      toast.error('Erro ao enviar os arquivos no Storage.', { id: 'upload-anexo' });
     } finally {
       setLoading(false);
     }
@@ -151,9 +159,6 @@ export default function ChamadosPage() {
     e.preventDefault()
     setLoading(true)
     
-    // =========================================================================
-    // TRATAMENTO PREMIUM: PREVINE ERRO DE SINTAXE UUID NO POSTGRES
-    // =========================================================================
     const payload = { 
       ...formData,
       equipamento_id: formData.equipamento_id || null,
@@ -174,28 +179,36 @@ export default function ChamadosPage() {
     const { error } = await query
     
     if (error) {
-      mostrarToast('Erro ao salvar chamado: ' + error.message, 'error')
+      toast.error('Erro ao salvar chamado: ' + error.message)
     } else {
-      mostrarToast(view === 'novo' ? 'Chamado aberto com sucesso!' : 'Chamado atualizado!')
+      toast.success(view === 'novo' ? 'Chamado aberto com sucesso!' : 'Chamado atualizado!')
       voltarParaLista()
       buscarChamados()
     }
     setLoading(false)
   }
 
-  const handleExcluir = async (id) => {
-    if (window.confirm('Tem certeza que deseja excluir esta Ordem de Serviço? Esta ação apagará o registro do histórico do equipamento.')) {
-      setLoading(true)
-      const { error } = await supabase.from('chamados').delete().eq('id', id)
-      
-      if (error) mostrarToast('Erro ao excluir: ' + error.message, 'error')
-      else {
-        mostrarToast('Ordem de Serviço excluída com sucesso!')
-        voltarParaLista()
-        buscarChamados()
+  const handleExcluir = (id) => {
+    // 4. Substituição do window.confirm pelo Modal de Confirmação
+    setModalConfirm({
+      isOpen: true,
+      titulo: 'Excluir Ordem de Serviço',
+      mensagem: 'Tem certeza que deseja excluir esta OS? Esta ação apagará definitivamente este registro do histórico do equipamento.',
+      textoConfirmar: 'Sim, Excluir OS',
+      onConfirm: async () => {
+        setLoading(true)
+        const { error } = await supabase.from('chamados').delete().eq('id', id)
+        
+        if (error) {
+          toast.error('Erro ao excluir: ' + error.message)
+        } else {
+          toast.success('Ordem de Serviço excluída com sucesso!')
+          voltarParaLista()
+          buscarChamados()
+        }
+        setLoading(false)
       }
-      setLoading(false)
-    }
+    });
   }
 
   const iniciarEdicao = (ch) => {
@@ -214,11 +227,6 @@ export default function ChamadosPage() {
     setChamadoSelecionado(null)
     setFormData({ ...estadoInicialForm, aberto_por_id: usuarioAtual.id, data_abertura: getDataHoraAtual() })
     window.history.replaceState({}, document.title)
-  }
-
-  const mostrarToast = (message, type = 'success') => {
-    setToast({ show: true, message, type })
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000)
   }
 
   const chamadosFiltrados = chamados.filter(ch => {
@@ -248,15 +256,15 @@ export default function ChamadosPage() {
   return (
     <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
       
-      {toast.show && (
-        <div className="fixed top-4 left-4 right-4 md:left-auto md:right-6 md:top-6 z-50 animate-in slide-in-from-top-4 md:slide-in-from-right fade-in duration-300">
-          <div className={`flex items-center gap-3 px-4 py-3 md:px-5 md:py-4 rounded-xl shadow-2xl border ${toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800'}`}>
-            {toast.type === 'error' ? <AlertCircle size={20} className="shrink-0" /> : <CheckCircle2 size={20} className="shrink-0" />}
-            <span className="font-bold text-xs md:text-sm flex-1">{toast.message}</span>
-            <button onClick={() => setToast({...toast, show: false})} className="ml-2 opacity-50 hover:opacity-100 p-1 shrink-0"><X size={16} /></button>
-          </div>
-        </div>
-      )}
+      {/* 5. Renderização do Modal de Confirmação */}
+      <ModalConfirmacao
+        isOpen={modalConfirm.isOpen}
+        onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
+        onConfirm={modalConfirm.onConfirm}
+        titulo={modalConfirm.titulo}
+        mensagem={modalConfirm.mensagem}
+        textoConfirmar={modalConfirm.textoConfirmar}
+      />
 
       {view === 'lista' && (
         <div className="space-y-4 md:space-y-6">

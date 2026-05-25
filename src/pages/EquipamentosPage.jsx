@@ -6,6 +6,8 @@ import {
   CheckCircle2, AlertCircle, X, Edit, FileText, Wrench, Calendar, Clock, User, Trash2, Upload, Copy,
   Images, AlertTriangle, Filter, Factory
 } from 'lucide-react'
+import toast from 'react-hot-toast' // 1. Importação do react-hot-toast
+import ModalConfirmacao from '../components/ModalConfirmacao' // 2. Importação do Modal de Confirmação
 
 export default function EquipamentosPage() {
   const navigate = useNavigate()
@@ -26,7 +28,15 @@ export default function EquipamentosPage() {
   const [filtroRapido, setFiltroRapido] = useState('Todos') 
   
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState({ show: false, message: '', type: 'success' })
+
+  // 3. Estado do Modal de Confirmação
+  const [modalConfirm, setModalConfirm] = useState({
+    isOpen: false,
+    titulo: '',
+    mensagem: '',
+    textoConfirmar: 'Confirmar',
+    onConfirm: () => {}
+  });
 
   const [auxiliares, setAuxiliares] = useState({
     fabricantes: [], prestadores: [], unidades: [], setores: [], status: []
@@ -138,7 +148,7 @@ export default function EquipamentosPage() {
     if (files.length === 0) return;
     
     setLoading(true);
-    mostrarToast('Enviando fotos para a galeria...', 'success');
+    toast.loading('Enviando fotos para a galeria...', { id: 'upload-fotos' });
 
     try {
       const novasUrls = [];
@@ -154,9 +164,9 @@ export default function EquipamentosPage() {
       }
 
       setFormData(prev => ({ ...prev, fotos_adicionais: [...(prev.fotos_adicionais || []), ...novasUrls] }));
-      mostrarToast(`${files.length} foto(s) adicionada(s) à galeria!`);
+      toast.success(`${files.length} foto(s) adicionada(s) à galeria!`, { id: 'upload-fotos' });
     } catch (error) {
-      mostrarToast('Erro ao enviar as fotos.', 'error');
+      toast.error('Erro ao enviar as fotos.', { id: 'upload-fotos' });
     } finally {
       setLoading(false);
     }
@@ -174,7 +184,7 @@ export default function EquipamentosPage() {
       let urlImagemFinal = formData.imagem_url
 
       if (arquivoImagem) {
-        mostrarToast('Fazendo upload da imagem principal...', 'success')
+        toast.loading('Fazendo upload da imagem principal...', { id: 'salvar-eq' });
         const extensao = arquivoImagem.name.split('.').pop()
         const nomeArquivo = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`
 
@@ -225,7 +235,6 @@ export default function EquipamentosPage() {
 
       // 1. Tratamento da ÚLTIMA calibração (OS Concluída)
       if (payload.data_ultima_calibracao) {
-        // PROCURA PELA ASSINATURA, não pela data exata
         const { data: osPassada } = await supabase.from('chamados')
           .select('id')
           .eq('equipamento_id', equipamentoId)
@@ -233,14 +242,12 @@ export default function EquipamentosPage() {
           .maybeSingle();
 
         if (osPassada) {
-          // Atualiza a OS existente
           await supabase.from('chamados').update({
             data_abertura: payload.data_ultima_calibracao,
             data_prevista: payload.data_ultima_calibracao,
             data_conclusao: payload.data_ultima_calibracao
           }).eq('id', osPassada.id);
         } else {
-          // Cria a OS pela primeira vez
           const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
           await supabase.from('chamados').insert([{
             equipamento_id: equipamentoId, tipo_intervencao: 'Preventiva', data_abertura: payload.data_ultima_calibracao,
@@ -253,7 +260,6 @@ export default function EquipamentosPage() {
 
       // 2. Tratamento da PRÓXIMA calibração (OS Aberta / Agendada)
       if (payload.data_proxima_calibracao) {
-        // PROCURA PELA ASSINATURA, não pela data exata
         const { data: osFutura } = await supabase.from('chamados')
           .select('id')
           .eq('equipamento_id', equipamentoId)
@@ -261,12 +267,10 @@ export default function EquipamentosPage() {
           .maybeSingle();
 
         if (osFutura) {
-          // Atualiza a OS existente
           await supabase.from('chamados').update({
             data_prevista: payload.data_proxima_calibracao
           }).eq('id', osFutura.id);
         } else {
-          // Cria a OS pela primeira vez
           const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
           await supabase.from('chamados').insert([{
             equipamento_id: equipamentoId, tipo_intervencao: 'Preventiva', data_abertura: new Date().toISOString(),
@@ -276,31 +280,38 @@ export default function EquipamentosPage() {
         }
       }
       
-      mostrarToast(view === 'novo' ? 'Equipamento cadastrado com sucesso!' : 'Equipamento atualizado!')
+      toast.success(view === 'novo' ? 'Equipamento cadastrado com sucesso!' : 'Equipamento atualizado!', { id: 'salvar-eq' });
       resetarFormulario()
       buscarEquipamentos() 
 
     } catch (error) {
-      mostrarToast('Erro ao salvar: ' + error.message, 'error')
+      toast.error('Erro ao salvar: ' + error.message, { id: 'salvar-eq' });
     } finally {
       setLoading(false)
     }
   }
 
-  const handleExcluir = async (id) => {
-    if (window.confirm('CUIDADO: Tem certeza que deseja excluir este equipamento? Se ele possuir um histórico de Ordens de Serviço, o sistema bloqueará a exclusão para evitar perda de dados médicos.')) {
-      setLoading(true)
-      const { error } = await supabase.from('equipamentos').delete().eq('id', id)
-      
-      if (error) {
-        mostrarToast('Erro ao excluir. O equipamento provavelmente tem OS vinculadas.', 'error')
-      } else {
-        mostrarToast('Equipamento excluído com sucesso!', 'success')
-        resetarFormulario()
-        buscarEquipamentos() 
+  const handleExcluir = (id) => {
+    // 4. Substituição do window.confirm pelo Modal de Confirmação
+    setModalConfirm({
+      isOpen: true,
+      titulo: 'Excluir Equipamento',
+      mensagem: 'CUIDADO: Tem certeza que deseja excluir este equipamento? Se ele possuir um histórico de Ordens de Serviço, o sistema bloqueará a exclusão para evitar perda de dados médicos.',
+      textoConfirmar: 'Sim, Excluir',
+      onConfirm: async () => {
+        setLoading(true)
+        const { error } = await supabase.from('equipamentos').delete().eq('id', id)
+        
+        if (error) {
+          toast.error('Erro ao excluir. O equipamento provavelmente tem OS vinculadas.');
+        } else {
+          toast.success('Equipamento excluído com sucesso!');
+          resetarFormulario()
+          buscarEquipamentos() 
+        }
+        setLoading(false)
       }
-      setLoading(false)
-    }
+    });
   }
 
   const iniciarEdicao = (eq) => {
@@ -341,7 +352,7 @@ export default function EquipamentosPage() {
     setPreviewImagem(null)
     setView('novo')
     window.scrollTo(0, 0);
-    mostrarToast('Equipamento clonado! Altere o Patrimônio e N/S para salvar.', 'success')
+    toast.success('Equipamento clonado! Altere o Patrimônio e N/S para salvar.');
   }
 
   const resetarFormulario = () => {
@@ -355,11 +366,6 @@ export default function EquipamentosPage() {
     }, 50);
   }
 
-  const mostrarToast = (message, type = 'success') => {
-    setToast({ show: true, message, type })
-    setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 4000)
-  }
-
   const chimneysCalibracao = (dataProxima) => {
     if (!dataProxima) return null;
     const dataRef = new Date(dataProxima);
@@ -370,9 +376,8 @@ export default function EquipamentosPage() {
   }
 
   const equipamentosFiltrados = equipamentos.filter(eq => {
-    const term = busca.toLowerCase(); // <-- RESOLUÇÃO: Busca minúscula
+    const term = busca.toLowerCase(); 
     
-    // RESOLUÇÃO: Forçamos os dados do equipamento para minúsculo antes de comparar
     const atendeBusca = (eq.nome?.toLowerCase() || '').includes(term) || 
                         (eq.patrimonio?.toLowerCase() || '').includes(term) || 
                         (eq.numero_serie?.toLowerCase() || '').includes(term);
@@ -394,19 +399,15 @@ export default function EquipamentosPage() {
   return (
     <div className="relative min-h-full font-sans pb-10">
       
-      {toast.show && (
-        <div className="fixed top-6 right-6 z-50 animate-in slide-in-from-right fade-in duration-300">
-          <div className={`flex items-center gap-3 px-5 py-4 rounded-xl shadow-2xl border ${
-            toast.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-green-50 border-green-200 text-green-800'
-          }`}>
-            {toast.type === 'error' ? <AlertCircle size={20} /> : <CheckCircle2 size={20} />}
-            <span className="font-bold text-sm">{toast.message}</span>
-            <button onClick={() => setToast({...toast, show: false})} className="ml-2 opacity-50 hover:opacity-100">
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      )}
+      {/* 5. Renderização do Modal de Confirmação */}
+      <ModalConfirmacao
+        isOpen={modalConfirm.isOpen}
+        onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
+        onConfirm={modalConfirm.onConfirm}
+        titulo={modalConfirm.titulo}
+        mensagem={modalConfirm.mensagem}
+        textoConfirmar={modalConfirm.textoConfirmar}
+      />
 
       {/* TELA DE LISTA */}
       {view === 'lista' && (
@@ -545,6 +546,9 @@ export default function EquipamentosPage() {
                     </button>
                     <button onClick={() => iniciarEdicao(eq)} className="px-5 py-2 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-lg transition-colors flex items-center gap-1.5">
                       <Edit size={14} /> Editar
+                    </button>
+                    <button onClick={() => handleExcluir(eq.id)} className="px-5 py-2 text-xs font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 rounded-lg transition-colors flex items-center gap-1.5">
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </div>
@@ -816,7 +820,6 @@ export default function EquipamentosPage() {
                 <div><label className="block text-sm font-bold text-slate-700 mb-2">Prestador</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.prestadores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></div>
               </div>
 
-              {/* AQUI ENTRA A DATA DE FABRICAÇÃO */}
               <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-xl">
                  <div className="flex justify-between items-center mb-3">
                    <label className="text-sm font-bold text-indigo-900 flex items-center gap-2"><Factory size={16}/> Data de Fabricação</label>
