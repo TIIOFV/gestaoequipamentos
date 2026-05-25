@@ -167,29 +167,40 @@ export default function ConfiguracoesPage() {
   }
 
   const handleExcluirUsuario = async (profileId, authUserId, nome) => {
-    if (!window.confirm(`ATENÇÃO CRÍTICA: Tem certeza que deseja EXCLUIR permanentemente ${nome}? Isso removerá todos os perfis duplicados associados.`)) return
+    if (!window.confirm(`ATENÇÃO CRÍTICA: Tem certeza que deseja EXCLUIR permanentemente ${nome}? Isso removerá todos os perfis associados.`)) return
     
     setLoading(true)
-    
-    // =========================================================================
-    // CORREÇÃO SÊNIOR: DELETA POR USER_ID PARA LIMPAR DUPLICATAS ANTIGAS E EVITAR TRAVAS FK
-    // =========================================================================
-    const { error: profileError } = await supabaseAdmin
-      .from('perfis')
-      .delete()
-      .eq('user_id', authUserId) 
+    let profileError = null;
+
+    // 1. Verifica se a conta possui um UUID do Auth válido
+    if (authUserId) {
+      // Conta normal: deleta em lote (limpando possíveis duplicatas)
+      const { error } = await supabaseAdmin
+        .from('perfis')
+        .delete()
+        .eq('user_id', authUserId) 
+      profileError = error;
+    } else {
+      // 2. Conta "Fantasma" (sem user_id): deleta direto pelo ID do perfil
+      const { error } = await supabaseAdmin
+        .from('perfis')
+        .delete()
+        .eq('id', profileId)
+      profileError = error;
+    }
 
     if (profileError) {
       alert('Erro ao remover registro de perfis: ' + profileError.message)
     } else {
+      // 3. Só tenta apagar do cofre Auth se o usuário realmente existir lá
       if (authUserId) {
         try {
            await supabaseAdmin.auth.admin.deleteUser(authUserId)
         } catch (e) {
-           console.warn('O perfil sumiu da lista pública, mas houve uma restrição na exclusão da credencial Auth.', e)
+           console.warn('Restrição ao apagar do cofre Auth.', e)
         }
       }
-      alert('Usuário e todas as suas instâncias duplicadas foram removidas!')
+      alert('Usuário removido com sucesso!')
       buscarUsuarios()
     }
     setLoading(false)
