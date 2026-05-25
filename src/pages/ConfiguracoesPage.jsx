@@ -94,47 +94,35 @@ export default function ConfiguracoesPage() {
 
     try {
       // =========================================================================
-      // TRATAMENTO SÊNIOR ANTI-DUPLICIDADE: CHECA SE O GATILHO JÁ CRIOU O PERFIL
+      // A MARRETA DO DEV SÊNIOR: ESTRATÉGIA "TERRA ARRASADA" (BYPASS NO GATILHO)
       // =========================================================================
-      const { data: perfilExistente } = await supabaseAdmin
+      
+      // Passo A: Pausa intencional de 1.5 segundos para o banco de dados sincronizar 
+      // e o gatilho automático terminar de inserir o "analista" indesejado.
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Passo B: Deletamos sem perguntar tudo que estiver vinculado a esse ID na tabela perfis.
+      await supabaseAdmin
         .from('perfis')
-        .select('id')
-        .eq('user_id', authData.user.id)
-        .maybeSingle()
+        .delete()
+        .eq('user_id', authData.user.id);
 
-      let errorPerfis;
+      // Passo C: Agora que o terreno está limpo, inserimos a NOSSA versão oficial.
+      const { error: profileError } = await supabaseAdmin
+        .from('perfis')
+        .insert([{ 
+          user_id: authData.user.id, 
+          email: novoUsuario.email,
+          nome: novoUsuario.nome, 
+          perfil: novoUsuario.perfil,
+          cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista',
+          esta_bloqueado: false
+        }])
 
-      if (perfilExistente) {
-        // Se o gatilho automático já criou a linha, nós atualizamos ela com os dados reais
-        const { error } = await supabaseAdmin
-          .from('perfis')
-          .update({
-            email: novoUsuario.email,
-            nome: novoUsuario.nome, 
-            perfil: novoUsuario.perfil,
-            cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista'
-          })
-          .eq('id', perfilExistente.id)
-        errorPerfis = error;
-      } else {
-        // Se o gatilho não criou a tempo, fazemos a inserção padrão com segurança
-        const { error } = await supabaseAdmin
-          .from('perfis')
-          .insert([{ 
-            user_id: authData.user.id, 
-            email: novoUsuario.email,
-            nome: novoUsuario.nome, 
-            perfil: novoUsuario.perfil,
-            cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista',
-            esta_bloqueado: false
-          }])
-        errorPerfis = error;
-      }
-
-      if (errorPerfis) {
+      if (profileError) {
         // Rollback de segurança caso a inserção falhe
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-        alert('Erro ao mapear tabela de perfis: ' + errorPerfis.message)
+        alert('Erro ao salvar o perfil definitivo: ' + profileError.message)
       } else {
         alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
         setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
