@@ -189,17 +189,34 @@ export default function ConfiguracoesPage() {
 
     setLoading(true);
     
-    const { error } = await supabaseAdmin.auth.admin.updateUserById(
+    // 1. Atualiza a senha no cofre do Supabase Auth
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
       modalSenha.userId,
       { password: modalSenha.novaSenha }
     );
 
-    if (error) {
-      alert("Erro ao alterar senha. Verifique as permissões de Admin API do Supabase.\nDetalhe: " + error.message);
-    } else {
-      alert(`Senha do usuário ${modalSenha.email} alterada com sucesso!`);
-      setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' });
+    if (authError) {
+      alert("Erro ao alterar senha. Verifique as permissões de Admin API do Supabase.\nDetalhe: " + authError.message);
+      setLoading(false);
+      return;
     }
+
+    // 2. O PULO DO GATO: Atualiza o perfil para forçar o usuário a trocar a senha no próximo login
+    const { error: profileError } = await supabaseAdmin
+      .from('perfis')
+      .update({ precisa_trocar_senha: true })
+      .eq('user_id', modalSenha.userId);
+
+    if (profileError) {
+       console.warn("Senha alterada, mas falha ao marcar aviso de troca obrigatória.", profileError);
+    }
+
+    alert(`Senha do usuário ${modalSenha.email} redefinida com sucesso! Ele será obrigado a alterá-la no próximo login.`);
+    setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' });
+    
+    // Atualiza a lista para refletir a mudança
+    buscarUsuarios();
+    
     setLoading(false);
   }
 
@@ -370,7 +387,7 @@ export default function ConfiguracoesPage() {
                     </select>
                     
                     <button 
-                      onClick={() => setModalSenha({ aberto: false, userId: user.user_id, email: user.email, novaSenha: '' })}
+                      onClick={() => setModalSenha({ aberto: true, userId: user.user_id, email: user.email, novaSenha: '' })}
                       className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
                     >
                       <KeyRound className="w-3.5 h-3.5" /> Senha

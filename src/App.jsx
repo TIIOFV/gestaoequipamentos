@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast' // 1. Importação da Lib
 import { AuthProvider } from './contexts/AuthContext'
 import ProtectedRoute from './routes/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
@@ -14,11 +15,22 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        {/* 2. O Toaster aqui, no topo, garante que ele funcione em QUALQUER página */}
+        <Toaster 
+          position="top-right" 
+          toastOptions={{
+            duration: 4000,
+            style: {
+              borderRadius: '12px',
+              fontWeight: '600',
+              fontSize: '14px',
+            },
+          }} 
+        />
+        
         <Routes>
-          {/* Rota Pública (Livre) */}
           <Route path="/login" element={<LoginPage />} />
           
-          {/* Rotas Protegidas (Exigem Login) */}
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<AppLayout />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
@@ -28,7 +40,6 @@ export default function App() {
               <Route path="agenda" element={<AgendaPage />} />
               <Route path="relatorios" element={<RelatoriosPage />} />
               <Route path="chamados" element={<ChamadosPage />} />
-              {/* Próximas telas entrarão aqui */}
             </Route>
           </Route>
           

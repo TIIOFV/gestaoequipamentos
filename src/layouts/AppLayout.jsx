@@ -3,9 +3,10 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { 
   LayoutDashboard, Monitor, Wrench, CalendarDays, 
-  FileText, Settings, LogOut, Bell, Menu, X, Loader2
+  FileText, Settings, LogOut, Bell, Menu, X, Loader2, Key
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import ModalAlterarSenha from '../components/ModalAlterarSenha'
 
 export default function AppLayout() {
   const location = useLocation()
@@ -16,12 +17,18 @@ export default function AppLayout() {
   const [showNotif, setShowNotif] = useState(false)
   const [alertas, setAlertas] = useState([])
   const [isVerifying, setIsVerifying] = useState(true)
+  
+  // Estado para o Modal Manual (quando o usuário clica)
+  const [modalSenhaAberto, setModalSenhaAberto] = useState(false)
 
   // ==========================================
-  // TRAVA DE SEGURANÇA BLINDADA E BLOQUEIO
+  // TRAVA DE SEGURANÇA E TROCA DE SENHA OBRIGATÓRIA
   // ==========================================
   const hasFullAccess = profile?.perfil === 'administrador' || profile?.perfil === 'analista'
   const isAgendaRoute = location.pathname.startsWith('/agenda')
+  
+  // A variável chave: Se o perfil diz que precisa trocar, travamos a tela.
+  const isTrocaSenhaObrigatoria = profile?.precisa_trocar_senha === true
 
   useEffect(() => {
     // 1. EXPULSA USUÁRIO BLOQUEADO
@@ -39,22 +46,26 @@ export default function AppLayout() {
   }, [profile])
 
   useEffect(() => {
-    if (!isVerifying && !hasFullAccess && !isAgendaRoute) {
+    // Se a troca de senha é obrigatória, não redirecionamos ele por falta de acesso ainda
+    if (!isVerifying && !hasFullAccess && !isAgendaRoute && !isTrocaSenhaObrigatoria) {
       navigate('/agenda', { replace: true })
     }
-  }, [isVerifying, hasFullAccess, isAgendaRoute, navigate])
+  }, [isVerifying, hasFullAccess, isAgendaRoute, isTrocaSenhaObrigatoria, navigate])
 
   useEffect(() => {
-    if (profile && !profile.esta_bloqueado) buscarAlertas()
+    // Só busca alertas se o usuário NÃO estiver travado na troca de senha
+    if (profile && !profile.esta_bloqueado && !isTrocaSenhaObrigatoria) {
+      buscarAlertas()
+      
+      const canalNotificacoes = supabase
+        .channel('fluxo-alertas')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => buscarAlertas())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => buscarAlertas())
+        .subscribe();
 
-    const canalNotificacoes = supabase
-      .channel('fluxo-alertas')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => buscarAlertas())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => buscarAlertas())
-      .subscribe();
-
-    return () => { supabase.removeChannel(canalNotificacoes); };
-  }, [profile])
+      return () => { supabase.removeChannel(canalNotificacoes); };
+    }
+  }, [profile, isTrocaSenhaObrigatoria])
 
   const buscarAlertas = async () => {
     let novosAlertas = []
@@ -112,22 +123,14 @@ export default function AppLayout() {
 
   const isActive = (path) => location.pathname.includes(path)
 
-  // =======================================================
-  // CLIQUE DO SININHO: FORÇA A NAVEGAÇÃO MESMO NA MESMA ABA
-  // =======================================================
   const handleNotifClick = (e, path, targetId) => {
     e.preventDefault()
     setIsMobileMenuOpen(false)
-    
     const targetPath = !hasFullAccess ? '/agenda' : path
-    
-    // O pulo do gato: adicionamos Date.now() para o React Router achar que é um clique inédito
     const statePayload = targetId ? { openDetailsId: targetId, _t: Date.now() } : { _t: Date.now() }
-    
     navigate(targetPath, { state: statePayload })
   }
 
-  // Apenas para o Menu Lateral Principal: Faz o reset da tela se clicar no item atual
   const handleMainMenuClick = (e, path) => {
     setIsMobileMenuOpen(false)
     if (location.pathname === path) {
@@ -151,11 +154,12 @@ export default function AppLayout() {
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden transition-opacity" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
+      {/* SE O USUÁRIO ESTIVER TRAVADO NA TROCA DE SENHA, ESCONDEMOS O MENU LATERAL VISUALMENTE PARA ELE FOCAR NO MODAL */}
       <aside className={`
         fixed inset-y-0 left-0 w-64 bg-white border-r border-slate-200 flex flex-col shadow-2xl md:shadow-sm z-50 
         transform transition-transform duration-300 ease-in-out
         ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} 
-        md:relative md:translate-x-0
+        ${isTrocaSenhaObrigatoria ? 'md:hidden' : 'md:relative md:translate-x-0'}
       `}>
         
         <div className="h-16 md:h-20 flex items-center justify-between px-4 border-b border-slate-100 shrink-0">
@@ -246,15 +250,25 @@ export default function AppLayout() {
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-100 shrink-0">
-          <button onClick={handleLogout} className="flex items-center justify-center w-full px-4 py-2.5 text-sm font-bold text-slate-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100">
+        <div className="p-4 border-t border-slate-100 shrink-0 space-y-2">
+          <button 
+            onClick={() => setModalSenhaAberto(true)} 
+            className="flex items-center justify-center w-full px-4 py-2 text-sm font-bold text-slate-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100"
+          >
+            <Key className="w-4 h-4 mr-2" /> Alterar senha
+          </button>
+          
+          <button 
+            onClick={handleLogout} 
+            className="flex items-center justify-center w-full px-4 py-2 text-sm font-bold text-slate-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+          >
             <LogOut className="w-4 h-4 mr-2" /> Sair do sistema
           </button>
         </div>
       </aside>
 
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-        <header className="md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
+        <header className={`md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm ${isTrocaSenhaObrigatoria ? 'hidden' : ''}`}>
           <div className="flex items-center">
             <div className="w-8 h-8 bg-blue-800 text-white rounded md flex items-center justify-center font-bold text-xs mr-2">IOFV</div>
             <span className="font-bold text-slate-800 text-sm">GESTÃO</span>
@@ -267,14 +281,14 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto bg-slate-50/50">
+        <main className={`flex-1 overflow-auto bg-slate-50/50 ${isTrocaSenhaObrigatoria ? 'blur-sm pointer-events-none select-none' : ''}`}>
           <div className="p-4 md:p-8 max-w-7xl mx-auto h-full">
             {isVerifying ? (
                <div className="h-full flex flex-col items-center justify-center gap-3">
                  <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
                  <span className="text-sm font-bold text-slate-500">Autenticando acesso...</span>
                </div>
-            ) : (!hasFullAccess && !isAgendaRoute) ? (
+            ) : (!hasFullAccess && !isAgendaRoute && !isTrocaSenhaObrigatoria) ? (
                <div className="h-full flex flex-col items-center justify-center">
                  <span className="text-sm font-bold text-slate-400">Redirecionando para área permitida...</span>
                </div>
@@ -285,6 +299,19 @@ export default function AppLayout() {
         </main>
       </div>
       
+      {/* AQUI É ONDE A MÁGICA ACONTECE: 
+        Renderizamos o modal de duas formas:
+        1. Manual (quando o usuário clica no botão "Alterar Senha") -> modalSenhaAberto = true
+        2. Automático e Obrigatório (quando o banco diz que precisa) -> isTrocaSenhaObrigatoria = true
+      */}
+      {(modalSenhaAberto || isTrocaSenhaObrigatoria) && (
+        <ModalAlterarSenha 
+          isOpen={true} 
+          onClose={() => setModalSenhaAberto(false)} 
+          obrigatorio={isTrocaSenhaObrigatoria}
+          userId={profile?.user_id}
+        />
+      )}
     </div>
   )
 }
