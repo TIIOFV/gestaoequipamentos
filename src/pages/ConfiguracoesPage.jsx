@@ -94,43 +94,65 @@ export default function ConfiguracoesPage() {
 
     try {
       // =========================================================================
-      // A MARRETA DO DEV SÊNIOR: ESTRATÉGIA "TERRA ARRASADA" (BYPASS NO GATILHO)
+      // SOLUÇÃO DEFINITIVA: UPSERT BASEADO NO USER_ID
       // =========================================================================
       
-      // Passo A: Pausa intencional de 1.5 segundos para o banco de dados sincronizar 
-      // e o gatilho automático terminar de inserir o "analista" indesejado.
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Esperamos um tempo razoável para o gatilho agir (2 segundos para garantir)
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Passo B: Deletamos sem perguntar tudo que estiver vinculado a esse ID na tabela perfis.
-      await supabaseAdmin
+      // 2. Buscamos se o perfil já foi criado pelo gatilho
+      const { data: perfilExistente } = await supabaseAdmin
         .from('perfis')
-        .delete()
-        .eq('user_id', authData.user.id);
+        .select('id')
+        .eq('user_id', authData.user.id)
+        .maybeSingle()
 
-      // Passo C: Agora que o terreno está limpo, inserimos a NOSSA versão oficial.
-      const { error: profileError } = await supabaseAdmin
-        .from('perfis')
-        .insert([{ 
-          user_id: authData.user.id, 
-          email: novoUsuario.email,
-          nome: novoUsuario.nome, 
-          perfil: novoUsuario.perfil,
-          cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista',
-          esta_bloqueado: false
-        }])
+      if (perfilExistente) {
+        // Se o gatilho criou, nós apenas ATUALIZAMOS os dados para os corretos
+        const { error: updateError } = await supabaseAdmin
+          .from('perfis')
+          .update({
+            email: novoUsuario.email,
+            nome: novoUsuario.nome,
+            perfil: novoUsuario.perfil,
+            cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista'
+          })
+          .eq('id', perfilExistente.id)
+          
+          if(updateError) throw updateError;
 
-      if (profileError) {
-        // Rollback de segurança caso a inserção falhe
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-        alert('Erro ao salvar o perfil definitivo: ' + profileError.message)
       } else {
-        alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
-        setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
-        buscarUsuarios()
+        // Se por algum milagre o gatilho falhou ou não existe, nós INSERIMOS
+        const { error: insertError } = await supabaseAdmin
+          .from('perfis')
+          .insert([{ 
+            user_id: authData.user.id, 
+            email: novoUsuario.email,
+            nome: novoUsuario.nome, 
+            perfil: novoUsuario.perfil,
+            cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista',
+            esta_bloqueado: false
+          }])
+          
+          if(insertError) throw insertError;
       }
+
+      // Limpeza de duplicatas por segurança extrema (apaga tudo que não for o ID oficial)
+      if (perfilExistente) {
+         await supabaseAdmin
+          .from('perfis')
+          .delete()
+          .eq('user_id', authData.user.id)
+          .neq('id', perfilExistente.id);
+      }
+
+      alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
+      setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
+      buscarUsuarios()
 
     } catch (err) {
       console.error(err)
+      alert('Erro ao configurar o perfil: ' + err.message)
     } finally {
       setLoading(false)
     }
