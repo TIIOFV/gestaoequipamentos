@@ -69,7 +69,7 @@ export default function ConfiguracoesPage() {
       alert(`Erro ao atualizar: ${error.message}. Verifique se você tem permissão de Administrador no banco.`);
     } else {
       setUsuarios(usuarios.map(u => u.id === id ? { ...u, perfil: novoCargo } : u));
-      alert('Permissão updated com sucesso!');
+      alert('Permissão atualizada com sucesso!');
     }
     
     setLoading(false);
@@ -88,29 +88,64 @@ export default function ConfiguracoesPage() {
 
     if (authError) {
       alert('Erro ao criar conta no Auth: ' + authError.message)
-    } else {
-      // 2. INSERE o perfil usando supabaseAdmin para ignorar as restrições de RLS no banco
-      const { error: profileError } = await supabaseAdmin
-        .from('perfis')
-        .insert([{ 
-          user_id: authData.user.id, 
-          email: novoUsuario.email,
-          nome: novoUsuario.nome, 
-          perfil: novoUsuario.perfil,
-          cargo: 'Analista',
-          esta_bloqueado: false
-        }])
+      setLoading(false)
+      return
+    }
 
-      if (profileError) {
+    try {
+      // =========================================================================
+      // TRATAMENTO SÊNIOR ANTI-DUPLICIDADE: CHECA SE O GATILHO JÁ CRIOU O PERFIL
+      // =========================================================================
+      const { data: perfilExistente } = await supabaseAdmin
+        .from('perfis')
+        .select('id')
+        .eq('user_id', authData.user.id)
+        .maybeSingle()
+
+      let errorPerfis;
+
+      if (perfilExistente) {
+        // Se o gatilho automático já criou a linha, nós atualizamos ela com os dados reais
+        const { error } = await supabaseAdmin
+          .from('perfis')
+          .update({
+            email: novoUsuario.email,
+            nome: novoUsuario.nome, 
+            perfil: novoUsuario.perfil,
+            cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista'
+          })
+          .eq('id', perfilExistente.id)
+        errorPerfis = error;
+      } else {
+        // Se o gatilho não criou a tempo, fazemos a inserção padrão com segurança
+        const { error } = await supabaseAdmin
+          .from('perfis')
+          .insert([{ 
+            user_id: authData.user.id, 
+            email: novoUsuario.email,
+            nome: novoUsuario.nome, 
+            perfil: novoUsuario.perfil,
+            cargo: novoUsuario.perfil === 'administrador' ? 'Administrador' : 'Analista',
+            esta_bloqueado: false
+          }])
+        errorPerfis = error;
+      }
+
+      if (errorPerfis) {
+        // Rollback de segurança caso a inserção falhe
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id)
-        alert('Erro ao criar perfil na tabela pública: ' + profileError.message)
+        alert('Erro ao mapear tabela de perfis: ' + errorPerfis.message)
       } else {
         alert('Usuário ' + novoUsuario.nome + ' cadastrado com sucesso!')
         setNovoUsuario({ nome: '', email: '', senha: '', perfil: 'analista' })
         buscarUsuarios()
       }
+
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const toggleBloqueio = async (id, statusAtual, nome) => {
@@ -132,26 +167,29 @@ export default function ConfiguracoesPage() {
   }
 
   const handleExcluirUsuario = async (profileId, authUserId, nome) => {
-    if (!window.confirm(`ATENÇÃO CRÍTICA: Tem certeza que deseja EXCLUIR permanentemente ${nome}?`)) return
+    if (!window.confirm(`ATENÇÃO CRÍTICA: Tem certeza que deseja EXCLUIR permanentemente ${nome}? Isso removerá todos os perfis duplicados associados.`)) return
     
     setLoading(true)
     
-    const { error: profileError } = await supabase
+    // =========================================================================
+    // CORREÇÃO SÊNIOR: DELETA POR USER_ID PARA LIMPAR DUPLICATAS ANTIGAS E EVITAR TRAVAS FK
+    // =========================================================================
+    const { error: profileError } = await supabaseAdmin
       .from('perfis')
       .delete()
-      .eq('id', profileId)
+      .eq('user_id', authUserId) 
 
     if (profileError) {
-      alert('Erro ao remover perfil. Verifique se ele possui vínculos não resolvidos: ' + profileError.message)
+      alert('Erro ao remover registro de perfis: ' + profileError.message)
     } else {
       if (authUserId) {
         try {
            await supabaseAdmin.auth.admin.deleteUser(authUserId)
         } catch (e) {
-           console.warn('O perfil sumiu da tela, mas a credencial Auth precisa ser apagada manualmente no painel do Supabase.', e)
+           console.warn('O perfil sumiu da lista pública, mas houve uma restrição na exclusão da credencial Auth.', e)
         }
       }
-      alert('Usuário excluído permanentemente do sistema!')
+      alert('Usuário e todas as suas instâncias duplicadas foram removidas!')
       buscarUsuarios()
     }
     setLoading(false)
@@ -176,7 +214,7 @@ export default function ConfiguracoesPage() {
       alert(`Senha do usuário ${modalSenha.email} alterada com sucesso!`);
       setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' });
     }
-    setLoading(false); // CORRIGIDO: de loading(false) para setLoading(false)
+    setLoading(false);
   }
 
   // --- FUNÇÕES DAS OUTRAS ABAS ---
@@ -194,7 +232,7 @@ export default function ConfiguracoesPage() {
     }
     const { data, error } = await query
     if (!error) setDados(data || [])
-    setLoading(false) // CORRIGIDO: de loading(false) para setLoading(false)
+    setLoading(false)
   }
 
   const handleCadastrarItem = async (e) => {
@@ -346,7 +384,7 @@ export default function ConfiguracoesPage() {
                     </select>
                     
                     <button 
-                      onClick={() => setModalSenha({ aberto: true, userId: user.user_id, email: user.email, novaSenha: '' })}
+                      onClick={() => setModalSenha({ aberto: false, userId: user.user_id, email: user.email, novaSenha: '' })}
                       className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 px-3 py-2 md:py-1.5 text-xs font-medium text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-lg transition-colors whitespace-nowrap"
                     >
                       <KeyRound className="w-3.5 h-3.5" /> Senha
