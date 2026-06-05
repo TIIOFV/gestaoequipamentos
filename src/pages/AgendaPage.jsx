@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useModulo } from '../contexts/ModuloContext' // 1. Importação do contexto
 import { 
   ChevronLeft, ChevronRight, X, Plus, Calendar as CalendarIcon, 
   Filter, MapPin, Wrench, Clock, CheckCircle2, AlertTriangle, Target, ArrowRight 
@@ -10,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 export default function AgendaPage() {
   const navigate = useNavigate()
   const { profile } = useAuth()
+  const { moduloAtivo } = useModulo() // 2. Puxando o ambiente selecionado
   
   const [dataAtual, setDataAtual] = useState(new Date())
   const [chamadosAgenda, setChamadosAgenda] = useState([])
@@ -26,12 +28,13 @@ export default function AgendaPage() {
   })
   const [modalListaAnual, setModalListaAnual] = useState({ aberto: false, titulo: '', cor: '', lista: [] })
 
-  // SEGURANÇA: Somente se for explicitamente admin ou analista. Erros do banco = acesso negado.
   const canEdit = profile?.perfil === 'administrador' || profile?.perfil === 'analista'
 
+  // 3. Atualiza os dados apenas se o módulo estiver carregado e reage a trocas
   useEffect(() => {
+    if (!moduloAtivo) return;
     carregarDados()
-  }, [])
+  }, [moduloAtivo])
 
   useEffect(() => {
     calcularEstatisticasAnuais(dataAtual.getFullYear())
@@ -56,6 +59,7 @@ export default function AgendaPage() {
         aberto_por:aberto_por_id(nome),
         prestador:prestador_id(nome)
       `)
+      .eq('modulo', moduloAtivo) // 4. O segredo da separação: filtra as manutenções pelo ambiente
     
     if (chamados) setChamadosAgenda(chamados)
   }
@@ -150,7 +154,6 @@ export default function AgendaPage() {
   return (
     <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
       
-      {/* CABEÇALHO */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] flex items-center gap-3">
@@ -159,10 +162,10 @@ export default function AgendaPage() {
           <p className="text-sm md:text-base text-slate-500 mt-1">Acompanhamento e planejamento do cronograma.</p>
         </div>
 
-        {/* CONTROLE RIGOROSO DO BOTÃO AGENDAR */}
         {canEdit && (
           <button 
-            onClick={() => navigate('/chamados', { state: { action: 'novo' } })}
+            // 5. Corrigido: Rota dinâmica para criar novo chamado com base no módulo
+            onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { action: 'novo' } })}
             className="w-full md:w-auto bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
           >
             <Plus size={20} /> Agendar Manutenção
@@ -170,10 +173,8 @@ export default function AgendaPage() {
         )}
       </div>
 
-      {/* PAINEL DE ESTATÍSTICAS ANUAIS */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm mb-6 flex flex-col xl:flex-row gap-6 justify-between items-center">
         
-        {/* Controle Rápido de Ano e Filtro */}
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full xl:w-auto shrink-0">
           <div className="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
             <button onClick={() => mudarAno(-1)} className="p-1 hover:bg-white rounded-lg transition-colors"><ChevronLeft size={20}/></button>
@@ -194,7 +195,6 @@ export default function AgendaPage() {
           </div>
         </div>
 
-        {/* CAIXAS DE MÉTRICAS INTERATIVAS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 w-full">
           
           <div 
@@ -237,7 +237,6 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* LEGENDAS */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-6">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-3 w-full">
           <span className="px-2 md:px-3 py-2 bg-[#009e49] text-white text-[10px] md:text-xs font-bold rounded-lg text-center shadow-sm">Prev. Agendada</span>
@@ -252,7 +251,6 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* CALENDÁRIO GRID */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         
         <div className="flex flex-col sm:flex-row justify-between items-center p-4 md:p-6 border-b border-slate-100 bg-slate-50/50 gap-4">
@@ -316,9 +314,6 @@ export default function AgendaPage() {
         </div>
       </div>
 
-      {/* =========================================================
-          MODAL: LISTA DE ATIVIDADES DO DIA SELECIONADO
-          ========================================================= */}
       {diaSelecionado && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-2 md:p-4">
           <div className="bg-slate-50 rounded-2xl md:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] md:max-h-[85vh] flex flex-col animate-in zoom-in duration-200 relative overflow-hidden border border-slate-200">
@@ -416,10 +411,10 @@ export default function AgendaPage() {
                           </p>
                         </div>
                         
-                        {/* AQUI ESTÁ A CORREÇÃO: ENVIANDO O ID DO CHAMADO */}
                         {canEdit && (
                           <button 
-                            onClick={() => navigate('/chamados', { state: { openDetailsId: evento.id } })}
+                            // 6. Rota dinâmica no botão dentro do modal de eventos do dia
+                            onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { openDetailsId: evento.id } })}
                             className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-md w-full md:w-auto shrink-0"
                           >
                             Ir para OS completa <ArrowRight size={14} />
@@ -435,9 +430,6 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* =========================================================
-          MODAL: LISTA ANUAL (O CLIQUE DAS CAIXINHAS)
-          ========================================================= */}
       {modalListaAnual.aberto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col animate-in zoom-in duration-150 border border-slate-200 overflow-hidden">
@@ -494,10 +486,10 @@ export default function AgendaPage() {
                       </div>
                     </div>
                     
-                    {/* AQUI ESTÁ A CORREÇÃO: ENVIANDO O ID DO CHAMADO */}
                     {canEdit && (
                       <button 
-                        onClick={() => navigate('/chamados', { state: { openDetailsId: os.id } })}
+                        // 7. Rota dinâmica no botão dentro do modal de lista anual
+                        onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { openDetailsId: os.id } })}
                         className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition-all flex items-center justify-center gap-1 w-full sm:w-auto shrink-0"
                       >
                         Ir para OS <ArrowRight size={12} />

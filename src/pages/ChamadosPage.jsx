@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useModulo } from '../contexts/ModuloContext'
 import { 
   Plus, Search, ArrowLeft, CheckCircle2, AlertCircle, 
   X, Ticket, Clock, User, Edit, FileText, Calendar, Trash2,
   Paperclip, Image as ImageIcon, Filter, Wrench,
   Monitor, Building, Hash
 } from 'lucide-react'
-import toast from 'react-hot-toast' // 1. Importação do react-hot-toast
-import ModalConfirmacao from '../components/ModalConfirmacao' // 2. Importação do Modal
+import toast from 'react-hot-toast'
+import ModalConfirmacao from '../components/ModalConfirmacao'
 
 export default function ChamadosPage() {
   const location = useLocation()
+  const { moduloAtivo } = useModulo() 
   
   const [view, setView] = useState('lista')
   const [chamados, setChamados] = useState([])
@@ -26,7 +28,6 @@ export default function ChamadosPage() {
   const [loading, setLoading] = useState(true)
   const [usuarioAtual, setUsuarioAtual] = useState({ id: '', nome: 'Carregando...' })
 
-  // 3. Estado do Modal de Confirmação
   const [modalConfirm, setModalConfirm] = useState({
     isOpen: false,
     titulo: '',
@@ -58,8 +59,9 @@ export default function ChamadosPage() {
   const [formData, setFormData] = useState(estadoInicialForm)
 
   useEffect(() => {
+    if (!moduloAtivo) return;
     inicializarPagina()
-  }, [location.state])
+  }, [location.state, moduloAtivo])
 
   const inicializarPagina = async () => {
     setLoading(true)
@@ -91,9 +93,12 @@ export default function ChamadosPage() {
 
   const carregarAuxiliares = async () => {
     const [eq, st, pr] = await Promise.all([
-      supabase.from('equipamentos').select('id, nome, patrimonio').order('nome'),
+      // Equipamento é um vínculo de 1 pra 1, então usamos .eq
+      supabase.from('equipamentos').select('id, nome, patrimonio').eq('modulo', moduloAtivo).order('nome'),
+      // Status do chamado (Aberto/Concluído) é padrão do sistema, não precisa de filtro
       supabase.from('status_chamado').select('*').order('nome'),
-      supabase.from('prestadores').select('*').order('nome')
+      // Prestadores agora usa a lógica do Array, usamos .contains
+      supabase.from('prestadores').select('*').contains('modulo', [moduloAtivo]).order('nome')
     ])
     setAuxiliares({
       equipamentos: eq.data || [], status: st.data || [], prestadores: pr.data || []
@@ -104,6 +109,7 @@ export default function ChamadosPage() {
     const { data, error } = await supabase
       .from('chamados')
       .select(`*, equipamento:equipamento_id(nome, patrimonio), status:status_id(nome), prestador:prestador_id(nome), aberto_por:aberto_por_id(nome)`)
+      .eq('modulo', moduloAtivo) 
       .order('created_at', { ascending: false })
 
     if (!error) {
@@ -161,6 +167,7 @@ export default function ChamadosPage() {
     
     const payload = { 
       ...formData,
+      modulo: moduloAtivo, // Injeta o módulo ao salvar
       equipamento_id: formData.equipamento_id || null,
       status_id: formData.status_id || null,
       prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
@@ -189,7 +196,6 @@ export default function ChamadosPage() {
   }
 
   const handleExcluir = (id) => {
-    // 4. Substituição do window.confirm pelo Modal de Confirmação
     setModalConfirm({
       isOpen: true,
       titulo: 'Excluir Ordem de Serviço',
@@ -256,7 +262,6 @@ export default function ChamadosPage() {
   return (
     <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
       
-      {/* 5. Renderização do Modal de Confirmação */}
       <ModalConfirmacao
         isOpen={modalConfirm.isOpen}
         onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
@@ -312,7 +317,7 @@ export default function ChamadosPage() {
             {loading ? (
               <div className="text-center py-10 text-slate-500 font-medium">Carregando chamados...</div>
             ) : chamadosFiltrados.length === 0 ? (
-              <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum chamado encontrado com esses filtros.</div>
+              <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum chamado encontrado para este ambiente ou com esses filtros.</div>
             ) : chamadosFiltrados.map((ch) => {
               
               const temPDF = ch.anexos && ch.anexos.some(a => isPDF(a));
@@ -365,7 +370,6 @@ export default function ChamadosPage() {
         </div>
       )}
 
-      {/* DETALHES DA OS */}
       {view === 'detalhes' && chamadoSelecionado && (
         <div className="max-w-6xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
           
@@ -512,7 +516,6 @@ export default function ChamadosPage() {
         </div>
       )}
 
-      {/* FORMULÁRIO DE CADASTRO / EDIÇÃO */}
       {(view === 'novo' || view === 'editar') && (
         <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

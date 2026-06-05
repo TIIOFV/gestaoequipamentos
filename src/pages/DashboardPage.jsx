@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useModulo } from '../contexts/ModuloContext' // 1. Importado o contexto
 import { 
   Activity, Wrench, AlertTriangle, CheckCircle, 
   ArrowRight, Clock, MonitorPlay, Building2, 
@@ -13,6 +14,7 @@ import {
 
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const { moduloAtivo } = useModulo() // 2. Puxando o módulo atual
   const [loading, setLoading] = useState(true)
   
   const [unidades, setUnidades] = useState([])
@@ -52,31 +54,49 @@ export default function DashboardPage() {
   }, []);
 
   // =========================================================================
-  // CARREGAMENTO INICIAL E REAL-TIME (DASHBOARD VIVO)
+  // CARREGAMENTO INICIAL E REAL-TIME ISOLADO POR MÓDULO
   // =========================================================================
   useEffect(() => {
+    if (!moduloAtivo) return; // Aguarda o módulo estar disponível
+
     carregarPainel()
 
-    // Ouve mudanças em chamados e equipamentos para atualizar o dashboard na hora!
+    // 3. Websocket isolado pelo módulo
     const canalDashboard = supabase
-      .channel('dashboard-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => carregarPainel(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => carregarPainel(false))
+      .channel(`dashboard-updates-${moduloAtivo}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'chamados',
+        filter: `modulo=eq.${moduloAtivo}`
+      }, () => carregarPainel(false))
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'equipamentos',
+        filter: `modulo=eq.${moduloAtivo}`
+      }, () => carregarPainel(false))
       .subscribe();
 
     return () => { supabase.removeChannel(canalDashboard); };
-  }, [filtroUnidade])
+  }, [filtroUnidade, moduloAtivo]) // Recarrega se trocar de módulo ou unidade
 
-  // Aceita o parâmetro showLoading para não piscar a tela no real-time
   const carregarPainel = async (showLoading = true) => {
     if (showLoading) setLoading(true)
     
     const { data: uniData } = await supabase.from('unidades').select('id, nome').order('nome')
     if (uniData) setUnidades(uniData)
 
-    let eqQuery = supabase.from('equipamentos').select('id, nome, patrimonio, status_id, unidade_id, status:status_id(nome), unidade:unidade_id(nome), setor:setor_id(nome)')
-    let chQuery = supabase.from('chamados').select('*, status:status_id(nome), equipamento:equipamento_id(nome, patrimonio, unidade_id)')
+    // 4. Filtrando as consultas no banco pelo módulo atual
+    let eqQuery = supabase.from('equipamentos')
+      .select('id, nome, patrimonio, status_id, unidade_id, status:status_id(nome), unidade:unidade_id(nome), setor:setor_id(nome)')
+      .eq('modulo', moduloAtivo)
 
+    let chQuery = supabase.from('chamados')
+      .select('*, status:status_id(nome), equipamento:equipamento_id(nome, patrimonio, unidade_id)')
+      .eq('modulo', moduloAtivo)
+
+    // Mantém o filtro de unidade (prédio/local) em conjunto com o módulo
     if (filtroUnidade !== 'Todas') {
       eqQuery = eqQuery.eq('unidade_id', filtroUnidade)
       chQuery = chQuery.filter('equipamento.unidade_id', 'eq', filtroUnidade)
@@ -122,7 +142,6 @@ export default function DashboardPage() {
       inoperantes: listaInoperantes.length
     })
 
-    // Atualiza a lista de inoperantes do Modal caso ele esteja aberto
     setModalInoperantes(prev => ({ ...prev, lista: listaInoperantes }))
 
     const ultimos6Meses = []
@@ -132,7 +151,7 @@ export default function DashboardPage() {
         mesReal: d.getMonth(),
         anoReal: d.getFullYear(),
         name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(),
-        "OS Registradas": 0 // Alterado o nome para refletir a realidade
+        "OS Registradas": 0
       })
     }
 
@@ -143,7 +162,6 @@ export default function DashboardPage() {
       if (index !== -1) ultimos6Meses[index]["OS Registradas"]++
     })
 
-    // Cores padronizadas com o Tailwind UI
     const coresStatus = { 'Operante': '#10b981', 'Em Manutenção': '#f59e0b', 'Inoperante': '#ef4444', 'Sem Status': '#94a3b8' }
     const mapaStatus = equipamentos.reduce((acc, eq) => {
       const nome = eq.status?.nome || 'Sem Status'
@@ -163,7 +181,15 @@ export default function DashboardPage() {
     })
   }
 
-  if (loading) return <div className="flex h-full items-center justify-center text-slate-500 font-medium">Analisando dados do parque...</div>
+  // Define um nome bonito para mostrar no título do Dashboard
+  const nomeAmbiente = {
+    medicos: 'Equipamentos Médicos',
+    ti: 'Tecnologia da Informação',
+    infra: 'Nobreaks & Baterias',
+    manutencao: 'Manutenção Predial'
+  }[moduloAtivo] || 'Dashboard'
+
+  if (loading) return <div className="flex h-full items-center justify-center text-slate-500 font-medium">Analisando dados do ambiente...</div>
 
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-500 font-sans">
@@ -171,9 +197,9 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
-            <Activity className="text-blue-600" size={28} /> Dashboard Técnico
+            <Activity className="text-blue-600" size={28} /> {nomeAmbiente}
           </h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores em tempo real da Engenharia Clínica.</p>
+          <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores em tempo real do setor.</p>
         </div>
         
         <div className="flex items-center gap-3 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 w-full md:w-auto">
@@ -192,11 +218,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* KPIS INTERATIVOS */}
+      {/* KPIS INTERATIVOS COM ROTAS DINÂMICAS */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
         <KpiCard 
           titulo="Total de Equip." valor={kpis.totalEquip} icone={<MonitorPlay />} cor="slate" 
-          onClick={() => navigate('/equipamentos')}
+          onClick={() => navigate(`/${moduloAtivo}/equipamentos`)}
         />
         <KpiCard 
           titulo="Disponibilidade" valor={`${kpis.dispPercent}%`} icone={<CheckCircle />} 
@@ -204,7 +230,7 @@ export default function DashboardPage() {
         />
         <KpiCard 
           titulo="OS Abertas" valor={kpis.osAbertas} icone={<Wrench />} cor="blue" 
-          onClick={() => navigate('/chamados')}
+          onClick={() => navigate(`/${moduloAtivo}/chamados`)}
         />
         
         <div 
@@ -222,7 +248,7 @@ export default function DashboardPage() {
 
         <KpiCard 
           titulo="Concluídas no Mês" valor={kpis.concluidasMes} icone={<Activity />} cor="indigo" 
-          onClick={() => navigate('/chamados')}
+          onClick={() => navigate(`/${moduloAtivo}/chamados`)}
         />
       </div>
 
@@ -255,7 +281,7 @@ export default function DashboardPage() {
           <h3 className="font-bold text-slate-800 mb-2 flex items-center gap-2"><PieIcon size={18} className="text-emerald-500" /> Status do Parque</h3>
           <div className="flex-1 w-full min-h-0 relative">
             {graficos.statusParque.length === 0 ? (
-               <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-medium">Nenhum equipamento</div>
+               <div className="absolute inset-0 flex items-center justify-center text-slate-400 text-sm font-medium">Nenhum equipamento neste ambiente</div>
             ) : (
               <ResponsiveContainer width="99%" height="100%">
                 <PieChart>
@@ -278,7 +304,8 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden flex flex-col">
           <div className="bg-red-50/50 p-5 border-b border-red-100 flex justify-between items-center">
             <h3 className="font-bold text-red-800 flex items-center gap-2"><AlertTriangle size={18} className="text-red-600" /> OS Atrasadas</h3>
-            <button onClick={() => navigate('/chamados')} className="text-xs font-bold text-red-600 hover:text-red-800 hover:underline px-2 py-1 rounded transition-colors">Resolver pendências</button>
+            {/* ROTAS DINÂMICAS NAS LISTAS */}
+            <button onClick={() => navigate(`/${moduloAtivo}/chamados`)} className="text-xs font-bold text-red-600 hover:text-red-800 hover:underline px-2 py-1 rounded transition-colors">Resolver pendências</button>
           </div>
           <div className="divide-y divide-slate-100 flex-1">
             {listas.atrasadas.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">Nenhuma OS em atraso! 🎉</div> : listas.atrasadas.map(ch => (
@@ -290,7 +317,7 @@ export default function DashboardPage() {
                     <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Previsão era {new Date(ch.data_prevista).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</p>
                   </div>
                 </div>
-                <button onClick={() => navigate('/chamados', { state: { openDetailsId: ch.id } })} className="p-2 hover:bg-white rounded-full transition-colors"><ArrowRight size={16} className="text-slate-300 hover:text-red-500" /></button>
+                <button onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { openDetailsId: ch.id } })} className="p-2 hover:bg-white rounded-full transition-colors"><ArrowRight size={16} className="text-slate-300 hover:text-red-500" /></button>
               </div>
             ))}
           </div>
@@ -299,7 +326,7 @@ export default function DashboardPage() {
         <div className="bg-white rounded-2xl border border-blue-200 shadow-sm overflow-hidden flex flex-col">
           <div className="bg-blue-50/50 p-5 border-b border-blue-100 flex justify-between items-center">
             <h3 className="font-bold text-blue-800 flex items-center gap-2"><CalendarClock size={18} className="text-blue-600" /> Próximas na Agenda</h3>
-            <button onClick={() => navigate('/agenda')} className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline px-2 py-1 rounded transition-colors">Ver Agenda Completa</button>
+            <button onClick={() => navigate(`/${moduloAtivo}/agenda`)} className="text-xs font-bold text-blue-600 hover:text-blue-800 hover:underline px-2 py-1 rounded transition-colors">Ver Agenda Completa</button>
           </div>
           <div className="divide-y divide-slate-100 flex-1">
             {listas.proximas.length === 0 ? <div className="p-8 text-center text-slate-400 text-sm">Nenhum agendamento futuro no sistema.</div> : listas.proximas.map(ch => (
@@ -311,14 +338,13 @@ export default function DashboardPage() {
                     <p className="text-xs text-slate-500">{ch.tipo_intervencao} • Agendado: {new Date(ch.data_prevista).toLocaleDateString('pt-BR', {timeZone:'UTC'})}</p>
                   </div>
                 </div>
-                <button onClick={() => navigate('/chamados', { state: { openDetailsId: ch.id } })} className="p-2 hover:bg-white rounded-full transition-colors"><ArrowRight size={16} className="text-slate-300 hover:text-blue-500" /></button>
+                <button onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { openDetailsId: ch.id } })} className="p-2 hover:bg-white rounded-full transition-colors"><ArrowRight size={16} className="text-slate-300 hover:text-blue-500" /></button>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* MODAL INOPERANTES */}
       {modalInoperantes.aberto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in duration-150 border border-slate-200">
@@ -352,7 +378,7 @@ export default function DashboardPage() {
                     <button 
                       onClick={() => {
                         setModalInoperantes(prev => ({ ...prev, aberto: false }));
-                        navigate('/equipamentos', { state: { openDetailsId: eq.id } });
+                        navigate(`/${moduloAtivo}/equipamentos`, { state: { openDetailsId: eq.id } }); // NAVEGAÇÃO CORRETA AQUI TAMBÉM
                       }}
                       className="text-xs font-bold text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg border border-red-200 transition-all flex items-center gap-1.5 shadow-sm whitespace-nowrap ml-4"
                     >

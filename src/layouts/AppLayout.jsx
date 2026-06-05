@@ -3,32 +3,41 @@ import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { 
   LayoutDashboard, Monitor, Wrench, CalendarDays, 
-  FileText, Settings, LogOut, Bell, Menu, X, Loader2, Key
+  FileText, Settings, LogOut, Bell, Menu, X, Loader2, Key, ArrowLeftRight
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useModulo } from '../contexts/ModuloContext'
 import ModalAlterarSenha from '../components/ModalAlterarSenha'
 
 export default function AppLayout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { profile } = useAuth()
+  const { profile, signOut } = useAuth()
+  const { moduloAtivo, limparModulo } = useModulo()
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [showNotif, setShowNotif] = useState(false)
   const [alertas, setAlertas] = useState([])
   const [isVerifying, setIsVerifying] = useState(true)
   
-  // Estado para o Modal Manual (quando o usuário clica)
   const [modalSenhaAberto, setModalSenhaAberto] = useState(false)
 
   // ==========================================
   // TRAVA DE SEGURANÇA E TROCA DE SENHA OBRIGATÓRIA
   // ==========================================
   const hasFullAccess = profile?.perfil === 'administrador' || profile?.perfil === 'analista'
-  const isAgendaRoute = location.pathname.startsWith('/agenda')
+  const isAgendaRoute = location.pathname.includes('/agenda')
   
   // A variável chave: Se o perfil diz que precisa trocar, travamos a tela.
   const isTrocaSenhaObrigatoria = profile?.precisa_trocar_senha === true
+
+  // Dicionário para o card de módulo
+  const nomesModulos = {
+    medicos: 'Equipamentos Médicos',
+    ti: 'Tecnologia da Informação',
+    infra: 'Nobreaks & Baterias',
+    manutencao: 'Manutenção Predial'
+  }
 
   useEffect(() => {
     // 1. EXPULSA USUÁRIO BLOQUEADO
@@ -47,47 +56,59 @@ export default function AppLayout() {
 
   useEffect(() => {
     // Se a troca de senha é obrigatória, não redirecionamos ele por falta de acesso ainda
-    if (!isVerifying && !hasFullAccess && !isAgendaRoute && !isTrocaSenhaObrigatoria) {
-      navigate('/agenda', { replace: true })
+    if (!isVerifying && !hasFullAccess && !isAgendaRoute && !isTrocaSenhaObrigatoria && moduloAtivo) {
+      navigate(`/${moduloAtivo}/agenda`, { replace: true })
     }
-  }, [isVerifying, hasFullAccess, isAgendaRoute, isTrocaSenhaObrigatoria, navigate])
+  }, [isVerifying, hasFullAccess, isAgendaRoute, isTrocaSenhaObrigatoria, navigate, moduloAtivo])
 
+  // Atualizado para reagir às mudanças do módulo
   useEffect(() => {
-    // Só busca alertas se o usuário NÃO estiver travado na troca de senha
+    if (!moduloAtivo) return; // Aguarda o ambiente ser carregado
+
     if (profile && !profile.esta_bloqueado && !isTrocaSenhaObrigatoria) {
       buscarAlertas()
       
       const canalNotificacoes = supabase
-        .channel('fluxo-alertas')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados' }, () => buscarAlertas())
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => buscarAlertas())
+        .channel(`fluxo-alertas-${moduloAtivo}`)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'chamados', filter: `modulo=eq.${moduloAtivo}` }, () => buscarAlertas())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos', filter: `modulo=eq.${moduloAtivo}` }, () => buscarAlertas())
         .subscribe();
 
       return () => { supabase.removeChannel(canalNotificacoes); };
     }
-  }, [profile, isTrocaSenhaObrigatoria])
+  }, [profile, isTrocaSenhaObrigatoria, moduloAtivo])
 
   const buscarAlertas = async () => {
     let novosAlertas = []
     try {
-      const { data: semEtiqueta } = await supabase.from('equipamentos').select('id, nome, patrimonio').eq('possui_etiqueta', false)
+      // Filtro de Módulo aplicado
+      const { data: semEtiqueta } = await supabase.from('equipamentos')
+        .select('id, nome, patrimonio')
+        .eq('possui_etiqueta', false)
+        .eq('modulo', moduloAtivo)
+
       if (semEtiqueta) {
         semEtiqueta.forEach(eq => {
           novosAlertas.push({
             id: `eq-${eq.id}`, tipo: 'etiqueta',
             texto: `${eq.nome} (${eq.patrimonio || 'Sem Patr.'}) está sem etiqueta.`,
-            link: '/equipamentos', targetId: eq.id
+            link: `/${moduloAtivo}/equipamentos`, targetId: eq.id
           })
         })
       }
 
-      const { data: semPatrimonio } = await supabase.from('equipamentos').select('id, nome').eq('sem_patrimonio', true)
+      // Filtro de Módulo aplicado
+      const { data: semPatrimonio } = await supabase.from('equipamentos')
+        .select('id, nome')
+        .eq('sem_patrimonio', true)
+        .eq('modulo', moduloAtivo)
+
       if (semPatrimonio) {
         semPatrimonio.forEach(eq => {
           novosAlertas.push({
             id: `pat-${eq.id}`, tipo: 'patrimonio',
             texto: `URGENTE: ${eq.nome} aguardando colagem de patrimônio.`,
-            link: '/equipamentos', targetId: eq.id
+            link: `/${moduloAtivo}/equipamentos`, targetId: eq.id
           })
         })
       }
@@ -95,8 +116,12 @@ export default function AppLayout() {
       const hoje = new Date().toISOString().split('T')[0]
       const { data: statusConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').maybeSingle()
 
-      let query = supabase.from('chamados').select('id, tipo_intervencao, data_prevista, equipamento:equipamento_id(nome)')
-        .in('tipo_intervencao', ['Calibração', 'Preventiva', 'Qualificação']).lte('data_prevista', hoje)
+      // Filtro de Módulo aplicado
+      let query = supabase.from('chamados')
+        .select('id, tipo_intervencao, data_prevista, equipamento:equipamento_id(nome)')
+        .in('tipo_intervencao', ['Calibração', 'Preventiva', 'Qualificação'])
+        .lte('data_prevista', hoje)
+        .eq('modulo', moduloAtivo)
 
       if (statusConcluido) query = query.neq('status_id', statusConcluido.id)
 
@@ -106,7 +131,7 @@ export default function AppLayout() {
           novosAlertas.push({
             id: `ch-${ch.id}`, tipo: 'manutencao',
             texto: `${ch.tipo_intervencao} PENDENTE: ${ch.equipamento?.nome} (${new Date(ch.data_prevista).toLocaleDateString('pt-BR', {timeZone: 'UTC'})})`,
-            link: '/chamados'
+            link: `/${moduloAtivo}/chamados`
           })
         })
       }
@@ -116,9 +141,26 @@ export default function AppLayout() {
     }
   }
 
+  // Bloco blindado para garantir que o usuário consiga sair do sistema
   const handleLogout = async () => {
-    await supabase.auth.signOut()
-    navigate('/login', { replace: true })
+    try {
+      limparModulo() 
+      if (signOut) {
+        await signOut()
+      } else {
+        await supabase.auth.signOut()
+      }
+    } catch (error) {
+      console.error('Erro silencioso no logout:', error)
+    } finally {
+      // O finally garante que o redirecionamento aconteça de qualquer jeito
+      navigate('/login', { replace: true })
+    }
+  }
+
+  const handleTrocarModulo = () => {
+    limparModulo()
+    navigate('/modulos')
   }
 
   const isActive = (path) => location.pathname.includes(path)
@@ -126,7 +168,7 @@ export default function AppLayout() {
   const handleNotifClick = (e, path, targetId) => {
     e.preventDefault()
     setIsMobileMenuOpen(false)
-    const targetPath = !hasFullAccess ? '/agenda' : path
+    const targetPath = !hasFullAccess ? `/${moduloAtivo}/agenda` : path
     const statePayload = targetId ? { openDetailsId: targetId, _t: Date.now() } : { _t: Date.now() }
     navigate(targetPath, { state: statePayload })
   }
@@ -140,11 +182,11 @@ export default function AppLayout() {
   }
 
   const menuItems = [
-    { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['administrador', 'analista'] },
-    { path: '/equipamentos', name: 'Equipamentos', icon: Monitor, roles: ['administrador', 'analista'] },
-    { path: '/chamados', name: 'Chamados', icon: Wrench, roles: ['administrador', 'analista'] },
-    { path: '/agenda', name: 'Agenda', icon: CalendarDays, roles: ['administrador', 'analista', 'visualizador'] },
-    { path: '/relatorios', name: 'Relatórios', icon: FileText, roles: ['administrador', 'analista'] },
+    { path: `/${moduloAtivo}/dashboard`, name: 'Dashboard', icon: LayoutDashboard, roles: ['administrador', 'analista'] },
+    { path: `/${moduloAtivo}/equipamentos`, name: 'Equipamentos', icon: Monitor, roles: ['administrador', 'analista'] },
+    { path: `/${moduloAtivo}/chamados`, name: 'Chamados', icon: Wrench, roles: ['administrador', 'analista'] },
+    { path: `/${moduloAtivo}/agenda`, name: 'Agenda', icon: CalendarDays, roles: ['administrador', 'analista', 'visualizador'] },
+    { path: `/${moduloAtivo}/relatorios`, name: 'Relatórios', icon: FileText, roles: ['administrador', 'analista'] },
   ]
 
   return (
@@ -169,7 +211,7 @@ export default function AppLayout() {
             </div>
             <div>
               <h1 className="font-bold text-slate-800 leading-tight">IOFV - GESTÃO</h1>
-              <p className="text-[10px] md:text-xs text-slate-500">Gestão de Equipamentos</p>
+              <p className="text-[10px] md:text-xs text-slate-500">Sistema Integrado</p>
             </div>
           </div>
           <button className="md:hidden text-slate-500 hover:text-slate-800" onClick={() => setIsMobileMenuOpen(false)}>
@@ -177,7 +219,26 @@ export default function AppLayout() {
           </button>
         </div>
 
-        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 shrink-0">
+        {/* INDICADOR DE MÓDULO */}
+        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50">
+          <div 
+            onClick={handleTrocarModulo} 
+            className="bg-white border border-slate-200 rounded-xl p-2.5 flex items-center justify-between group cursor-pointer hover:border-blue-300 hover:shadow-sm transition-all"
+            title="Trocar de ambiente"
+          >
+            <div className="overflow-hidden">
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Ambiente Atual</p>
+              <p className="font-bold text-slate-700 text-xs truncate">
+                {nomesModulos[moduloAtivo] || 'Carregando...'}
+              </p>
+            </div>
+            <div className="w-6 h-6 rounded bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors shrink-0">
+              <ArrowLeftRight size={14} />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-b border-slate-100 shrink-0">
           <p className="font-semibold text-slate-800 truncate">
             {isVerifying ? 'Carregando perfil...' : (profile?.nome || 'Visualizador (Sem Perfil)')}
           </p>
@@ -224,7 +285,7 @@ export default function AppLayout() {
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1.5 custom-scrollbar">
           {menuItems.filter(item => {
-            if (!hasFullAccess) return item.path === '/agenda';
+            if (!hasFullAccess) return item.path.includes('/agenda');
             return item.roles.includes(profile?.perfil);
           }).map((item) => {
             const Icon = item.icon
@@ -241,10 +302,11 @@ export default function AppLayout() {
             )
           })}
 
-          {hasFullAccess && (
+          {/* EXCLUSIVO PARA ADMINISTRADORES */}
+          {profile?.perfil === 'administrador' && (
             <div className="pt-4 mt-4 border-t border-slate-100">
-              <Link to="/configuracoes" onClick={(e) => handleMainMenuClick(e, '/configuracoes')} className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/configuracoes') ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
-                <Settings className="w-5 h-5 mr-3 text-slate-400" /> Configurações
+              <Link to={`/${moduloAtivo}/configuracoes`} onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/configuracoes`)} className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/configuracoes') ? 'bg-blue-50 text-blue-700 shadow-sm border border-blue-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}>
+                <Settings className="w-5 h-5 mr-3 text-slate-400" /> Configurações Gerais
               </Link>
             </div>
           )}
@@ -299,11 +361,6 @@ export default function AppLayout() {
         </main>
       </div>
       
-      {/* AQUI É ONDE A MÁGICA ACONTECE: 
-        Renderizamos o modal de duas formas:
-        1. Manual (quando o usuário clica no botão "Alterar Senha") -> modalSenhaAberto = true
-        2. Automático e Obrigatório (quando o banco diz que precisa) -> isTrocaSenhaObrigatoria = true
-      */}
       {(modalSenhaAberto || isTrocaSenhaObrigatoria) && (
         <ModalAlterarSenha 
           isOpen={true} 

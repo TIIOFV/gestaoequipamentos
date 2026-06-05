@@ -40,8 +40,8 @@ export default function LoginPage() {
         setError('ACESSO BLOQUEADO: Contate o administrador do sistema.')
         await supabase.auth.signOut()
       } else {
-        // Tudo certo e liberado!
-        navigate('/dashboard')
+        // Tudo certo e liberado! O redirecionamento agora aponta para a seleção de módulos
+        navigate('/modulos')
       }
     }
     

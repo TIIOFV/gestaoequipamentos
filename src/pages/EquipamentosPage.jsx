@@ -1,17 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useModulo } from '../contexts/ModuloContext'
 import { 
   Plus, Search, ArrowLeft, Image as ImageIcon, 
   CheckCircle2, AlertCircle, X, Edit, FileText, Wrench, Calendar, Clock, User, Trash2, Upload, Copy,
   Images, AlertTriangle, Filter, Factory
 } from 'lucide-react'
-import toast from 'react-hot-toast' // 1. Importação do react-hot-toast
-import ModalConfirmacao from '../components/ModalConfirmacao' // 2. Importação do Modal de Confirmação
+import toast from 'react-hot-toast'
+import ModalConfirmacao from '../components/ModalConfirmacao'
 
 export default function EquipamentosPage() {
   const navigate = useNavigate()
   const location = useLocation() 
+  
+  // 1. PUXANDO O MÓDULO ATUAL DO CONTEXTO
+  const { moduloAtivo } = useModulo()
   
   const [view, setView] = useState('lista')
   const [scrollPosition, setScrollPosition] = useState(0) 
@@ -29,7 +33,6 @@ export default function EquipamentosPage() {
   
   const [loading, setLoading] = useState(true)
 
-  // 3. Estado do Modal de Confirmação
   const [modalConfirm, setModalConfirm] = useState({
     isOpen: false,
     titulo: '',
@@ -60,16 +63,24 @@ export default function EquipamentosPage() {
   const [formData, setFormData] = useState(estadoInicialForm)
 
   useEffect(() => {
+    if (!moduloAtivo) return; // Aguarda o módulo ser carregado
+
     buscarEquipamentos()
     carregarAuxiliares()
 
+    // FILTRO EM TEMPO REAL: Só escuta atualizações do módulo ativo
     const canalEquipamentos = supabase
-      .channel('lista-viva')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'equipamentos' }, () => buscarEquipamentos())
+      .channel(`lista-viva-eq-${moduloAtivo}`)
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'equipamentos',
+        filter: `modulo=eq.${moduloAtivo}` 
+      }, () => buscarEquipamentos())
       .subscribe();
 
     return () => { supabase.removeChannel(canalEquipamentos); };
-  }, [])
+  }, [moduloAtivo]) // Recarrega se o módulo mudar
 
   useEffect(() => {
     if (equipamentos.length > 0 && location.state?.openDetailsId) {
@@ -80,12 +91,14 @@ export default function EquipamentosPage() {
   }, [equipamentos, location.state]);
 
   const carregarAuxiliares = async () => {
+    // AQUI ESTÁ A CORREÇÃO SÊNIOR: .contains('modulo', [moduloAtivo])
+    // Garante que só os itens liberados para este módulo apareçam nos Selects!
     const [fab, pres, uni, set, sta] = await Promise.all([
-      supabase.from('fabricantes').select('*').order('nome'),
-      supabase.from('prestadores').select('*').order('nome'),
-      supabase.from('unidades').select('*').order('nome'),
-      supabase.from('setores').select('*').order('nome'),
-      supabase.from('status_equipamento').select('*').order('nome')
+      supabase.from('fabricantes').select('*').contains('modulo', [moduloAtivo]).order('nome'),
+      supabase.from('prestadores').select('*').contains('modulo', [moduloAtivo]).order('nome'),
+      supabase.from('unidades').select('*').contains('modulo', [moduloAtivo]).order('nome'),
+      supabase.from('setores').select('*').contains('modulo', [moduloAtivo]).order('nome'),
+      supabase.from('status_equipamento').select('*').contains('modulo', [moduloAtivo]).order('nome')
     ])
     setAuxiliares({
       fabricantes: fab.data || [], prestadores: pres.data || [],
@@ -102,6 +115,7 @@ export default function EquipamentosPage() {
         fabricante:fabricante_id(nome), prestador:prestador_id(nome),
         unidade:unidade_id(nome), setor:setor_id(nome), status:status_id(nome)
       `)
+      .eq('modulo', moduloAtivo) // Puxa só os do ambiente atual
       .order('nome')
 
     if (!error) setEquipamentos(data)
@@ -197,6 +211,7 @@ export default function EquipamentosPage() {
 
       const payload = { 
         ...formData, 
+        modulo: moduloAtivo, // SALVANDO O EQUIPAMENTO NO MÓDULO CORRETO
         imagem_url: urlImagemFinal,
         fabricante_id: formData.fabricante_id === "" ? null : formData.fabricante_id,
         prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
@@ -224,7 +239,7 @@ export default function EquipamentosPage() {
       }
 
       // =========================================================================
-      // SOLUÇÃO: LÓGICA INTELIGENTE DE OS AUTOMÁTICA (EVITA DUPLICIDADE)
+      // LÓGICA INTELIGENTE DE OS AUTOMÁTICA
       // =========================================================================
       const { data: authData } = await supabase.auth.getUser()
       let perfilId = null;
@@ -250,10 +265,15 @@ export default function EquipamentosPage() {
         } else {
           const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
           await supabase.from('chamados').insert([{
-            equipamento_id: equipamentoId, tipo_intervencao: 'Preventiva', data_abertura: payload.data_ultima_calibracao,
-            data_prevista: payload.data_ultima_calibracao, data_conclusao: payload.data_ultima_calibracao,
+            equipamento_id: equipamentoId, 
+            modulo: moduloAtivo, 
+            tipo_intervencao: 'Preventiva', 
+            data_abertura: payload.data_ultima_calibracao,
+            data_prevista: payload.data_ultima_calibracao, 
+            data_conclusao: payload.data_ultima_calibracao,
             descricao: `Registro de Manutenção Preventiva/Calibração realizada anteriormente. (Lançamento automático)`,
-            status_id: stConcluido?.id, aberto_por_id: perfilId
+            status_id: stConcluido?.id, 
+            aberto_por_id: perfilId
           }]);
         }
       }
@@ -273,9 +293,14 @@ export default function EquipamentosPage() {
         } else {
           const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
           await supabase.from('chamados').insert([{
-            equipamento_id: equipamentoId, tipo_intervencao: 'Preventiva', data_abertura: new Date().toISOString(),
-            data_prevista: payload.data_proxima_calibracao, descricao: `Manutenção Preventiva / Calibração programada.`,
-            status_id: stAberto?.id, aberto_por_id: perfilId
+            equipamento_id: equipamentoId, 
+            modulo: moduloAtivo, 
+            tipo_intervencao: 'Preventiva', 
+            data_abertura: new Date().toISOString(),
+            data_prevista: payload.data_proxima_calibracao, 
+            descricao: `Manutenção Preventiva / Calibração programada.`,
+            status_id: stAberto?.id, 
+            aberto_por_id: perfilId
           }]);
         }
       }
@@ -292,11 +317,10 @@ export default function EquipamentosPage() {
   }
 
   const handleExcluir = (id) => {
-    // 4. Substituição do window.confirm pelo Modal de Confirmação
     setModalConfirm({
       isOpen: true,
       titulo: 'Excluir Equipamento',
-      mensagem: 'CUIDADO: Tem certeza que deseja excluir este equipamento? Se ele possuir um histórico de Ordens de Serviço, o sistema bloqueará a exclusão para evitar perda de dados médicos.',
+      mensagem: 'CUIDADO: Tem certeza que deseja excluir este equipamento? Se ele possuir um histórico de Ordens de Serviço, o sistema bloqueará a exclusão para evitar perda de dados.',
       textoConfirmar: 'Sim, Excluir',
       onConfirm: async () => {
         setLoading(true)
@@ -399,7 +423,6 @@ export default function EquipamentosPage() {
   return (
     <div className="relative min-h-full font-sans pb-10">
       
-      {/* 5. Renderização do Modal de Confirmação */}
       <ModalConfirmacao
         isOpen={modalConfirm.isOpen}
         onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
@@ -409,7 +432,6 @@ export default function EquipamentosPage() {
         textoConfirmar={modalConfirm.textoConfirmar}
       />
 
-      {/* TELA DE LISTA */}
       {view === 'lista' && (
         <div className="space-y-6 animate-in fade-in duration-500">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -477,7 +499,7 @@ export default function EquipamentosPage() {
             {loading ? (
               <div className="text-center py-10 text-slate-500 font-medium">Carregando inventário...</div>
             ) : equipamentosFiltrados.length === 0 ? (
-              <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum equipamento encontrado para este filtro.</div>
+              <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum equipamento encontrado para este ambiente.</div>
             ) : equipamentosFiltrados.map((eq) => {
               
               const statusCalib = chimneysCalibracao(eq.data_proxima_calibracao);
@@ -558,7 +580,6 @@ export default function EquipamentosPage() {
         </div>
       )}
 
-      {/* TELA DE DETALHES */}
       {view === 'detalhes' && equipSelecionado && (
         <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -574,7 +595,7 @@ export default function EquipamentosPage() {
               <button onClick={() => iniciarEdicao(equipSelecionado)} className="px-5 py-2.5 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl transition-colors flex items-center gap-2 shadow-sm">
                 <Edit size={16} /> Editar
               </button>
-              <button onClick={() => navigate('/chamados', { state: { action: 'novo', equipamentoId: equipSelecionado.id } })} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2">
+              <button onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { action: 'novo', equipamentoId: equipSelecionado.id } })} className="px-5 py-2.5 text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2">
                 <Wrench size={16} /> Registrar manutenção
               </button>
             </div>
@@ -750,7 +771,6 @@ export default function EquipamentosPage() {
         </div>
       )}
 
-      {/* FORMULÁRIO DE CADASTRO / EDIÇÃO */}
       {(view === 'novo' || view === 'editar') && (
         <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
           <div className="flex items-center justify-between">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useModulo } from '../contexts/ModuloContext' // 1. Importação do contexto
 import { 
   Calendar as CalendarIcon, Filter, FileText, 
   Printer, Loader2, MapPin, Wrench, User, ArrowRightLeft,
@@ -7,6 +8,7 @@ import {
 } from 'lucide-react'
 
 export default function RelatoriosPage() {
+  const { moduloAtivo } = useModulo() // 2. Puxando o ambiente atual
   const [loading, setLoading] = useState(false)
   const [dadosBrutos, setDadosBrutos] = useState([])
   const [auxiliares, setAuxiliares] = useState({ unidades: [] })
@@ -31,10 +33,14 @@ export default function RelatoriosPage() {
 
   useEffect(() => { carregarAuxiliares() }, [])
   
-  // Refaz a busca e a filtragem toda vez que qualquer filtro mudar
-  useEffect(() => { gerarRelatorio() }, [
+  // 3. Atualiza se o módulo ou qualquer filtro mudar (com proteção)
+  useEffect(() => { 
+    if (!moduloAtivo) return;
+    gerarRelatorio() 
+  }, [
     periodoInicial, periodoFinal, filtroUnidade, 
-    filtroStatusOs, filtroPatrimonio, filtroEtiqueta, filtroCalibracao
+    filtroStatusOs, filtroPatrimonio, filtroEtiqueta, filtroCalibracao,
+    moduloAtivo
   ])
 
   const carregarAuxiliares = async () => {
@@ -46,7 +52,6 @@ export default function RelatoriosPage() {
     setLoading(true)
     const fimAjustado = `${periodoFinal}T23:59:59.999Z`
 
-    // CORREÇÃO APLICADA: 'unidade_id' foi removido como campo solto e integrado direto no agrupamento 'unidade:unidade_id(id, nome)'
     let query = supabase
       .from('chamados')
       .select(`
@@ -61,6 +66,7 @@ export default function RelatoriosPage() {
           setor:setor_id(id, nome)
         )
       `)
+      .eq('modulo', moduloAtivo) // 4. O segredo da separação: filtra pelo ambiente
       .gte('data_abertura', `${periodoInicial}T00:00:00.000Z`)
       .lte('data_abertura', fimAjustado)
       .order('data_abertura', { ascending: false })
@@ -75,7 +81,7 @@ export default function RelatoriosPage() {
 
     let chamadosFiltrados = data || []
 
-    // 1. Filtro Unidade (Ajustado para ler do objeto agrupado)
+    // 1. Filtro Unidade 
     if (filtroUnidade !== 'Todas') {
       chamadosFiltrados = chamadosFiltrados.filter(ch => ch.equipamento?.unidade?.id === filtroUnidade)
     }
@@ -138,6 +144,14 @@ export default function RelatoriosPage() {
     window.print()
     document.body.removeChild(printContainer)
   }
+
+  // Define o título de impressão baseado no ambiente
+  const nomeAmbienteImpressao = {
+    medicos: 'Engenharia Clínica',
+    ti: 'Tecnologia da Informação',
+    infra: 'Infraestrutura e Nobreaks',
+    manutencao: 'Manutenção Predial'
+  }[moduloAtivo] || 'Relatório Analítico'
 
   return (
     <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
@@ -256,7 +270,8 @@ export default function RelatoriosPage() {
         
         <div className="border-b-2 border-slate-800 pb-4 mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
           <div>
-            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">Engenharia Clínica IOFV</h2>
+            {/* 5. NOME INTELIGENTE NO PDF */}
+            <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight uppercase">{nomeAmbienteImpressao} IOFV</h2>
             <p className="text-slate-600 font-medium mt-1 text-xs md:text-sm">Relatório Analítico Consolidado</p>
             <p className="text-[10px] md:text-xs text-blue-700 font-bold mt-2 bg-blue-50 inline-block px-2 py-1 rounded">
               Filtros: {getResumoFiltros()}
