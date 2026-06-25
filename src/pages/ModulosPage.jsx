@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { Stethoscope, Monitor, BatteryCharging, Wrench, ArrowRight, Loader2, AlertTriangle } from 'lucide-react'
+import { Stethoscope, Monitor, BatteryCharging, Wrench, ArrowRight, Loader2, AlertTriangle, Printer } from 'lucide-react'
 import { useModulo } from '../contexts/ModuloContext'
 
 export default function ModulosPage() {
@@ -26,7 +26,7 @@ export default function ModulosPage() {
     {
       id: 'ti',
       nome: 'Tecnologia da Informação',
-      descricao: 'Inventário de computadores, servidores e infraestrutura de rede.',
+      descricao: 'Inventário de computadores, servidores e rede.',
       icone: Monitor,
       cor: 'bg-blue-500',
       corBg: 'bg-blue-50',
@@ -36,7 +36,7 @@ export default function ModulosPage() {
     {
       id: 'infra',
       nome: 'Nobreaks & Baterias',
-      descricao: 'Controle de autonomia, vida útil e manutenções elétricas.',
+      descricao: 'Controle de autonomia, vida útil e manutenções.',
       icone: BatteryCharging,
       cor: 'bg-amber-500',
       corBg: 'bg-amber-50',
@@ -46,12 +46,22 @@ export default function ModulosPage() {
     {
       id: 'manutencao',
       nome: 'Manutenção Predial',
-      descricao: 'Ar condicionado, mobiliário e infraestrutura geral do IOFV.',
+      descricao: 'Ar condicionado, mobiliário e infraestrutura geral.',
       icone: Wrench,
       cor: 'bg-slate-700',
       corBg: 'bg-slate-50',
       corBorder: 'border-slate-200',
       corHover: 'hover:border-slate-400 shadow-slate-900/5'
+    },
+    { 
+      id: 'impressoras', 
+      nome: 'Impressoras & Copiadoras', 
+      descricao: 'Gestão de impressoras, toners e comodatos.', 
+      icone: Printer,
+      cor: 'bg-purple-500', 
+      corBg: 'bg-purple-50',
+      corBorder: 'border-purple-100',
+      corHover: 'hover:border-purple-400 shadow-purple-900/5'
     }
   ]
 
@@ -61,11 +71,9 @@ export default function ModulosPage() {
 
   const buscarPermissoes = async () => {
     try {
-      // 1. Pega o ID do usuário logado
       const { data: userData, error: userError } = await supabase.auth.getUser()
       if (userError) throw userError
 
-      // 2. Busca a lista de acessos dele na tabela perfis
       const { data: perfilData, error: perfilError } = await supabase
         .from('perfis')
         .select('modulos_acesso')
@@ -76,20 +84,17 @@ export default function ModulosPage() {
 
       const acessos = perfilData.modulos_acesso || []
 
-      // 3. A MÁGICA: Se tiver apenas 1 acesso, pula a tela automaticamente!
       if (acessos.length === 1) {
         selecionarModulo(acessos[0])
         navigate(`/${acessos[0]}/dashboard`, { replace: true })
         return
       }
 
-      // Se tiver mais de 1 (ou nenhum), guarda no estado para renderizar a tela
       setModulosPermitidos(acessos)
     } catch (error) {
       console.error('Erro ao buscar permissões:', error)
       setErro('Não foi possível carregar suas permissões de acesso.')
     } finally {
-      // Só tira o loading se não redirecionou automaticamente
       setLoading(false)
     }
   }
@@ -99,7 +104,6 @@ export default function ModulosPage() {
     navigate(`/${idModulo}/dashboard`)
   }
 
-  // Filtra os cards para mostrar APENAS os que o usuário tem acesso
   const modulosVisiveis = todosModulos.filter(mod => modulosPermitidos.includes(mod.id))
 
   if (loading) {
@@ -118,7 +122,8 @@ export default function ModulosPage() {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-200 rounded-full blur-[120px] opacity-50 mix-blend-multiply pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-200 rounded-full blur-[120px] opacity-50 mix-blend-multiply pointer-events-none"></div>
 
-      <div className="max-w-5xl w-full relative z-10">
+      {/* AQUI FOI ALTERADO DE max-w-5xl PARA max-w-7xl PARA CABER 5 COLUNAS */}
+      <div className="max-w-7xl w-full relative z-10">
         <div className="text-center mb-10 md:mb-14">
           <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm border border-slate-100 mb-6">
             <span className="font-black text-2xl tracking-tight text-blue-900">IOFV</span>
@@ -142,27 +147,27 @@ export default function ModulosPage() {
             <p>Seu usuário não possui permissão para acessar nenhum setor do sistema no momento. Contate o administrador.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 xl:gap-5 justify-center">
             {modulosVisiveis.map((mod) => {
               const Icone = mod.icone
               return (
                 <button
                   key={mod.id}
                   onClick={() => handleSelecionarModulo(mod.id)}
-                  className={`group flex flex-col items-start p-6 md:p-8 bg-white rounded-3xl border-2 ${mod.corBorder} ${mod.corHover} shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-left relative overflow-hidden`}
+                  className={`group flex flex-col items-start p-5 xl:p-6 bg-white rounded-3xl border-2 ${mod.corBorder} ${mod.corHover} shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 text-left relative overflow-hidden`}
                 >
                   <div className={`absolute top-0 left-0 w-full h-1.5 ${mod.cor}`}></div>
                   
-                  <div className={`w-14 h-14 rounded-2xl ${mod.corBg} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300`}>
-                    <Icone className={mod.cor.replace('bg-', 'text-')} size={28} strokeWidth={2.5} />
+                  <div className={`w-12 h-12 xl:w-14 xl:h-14 rounded-2xl ${mod.corBg} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
+                    <Icone className={mod.cor.replace('bg-', 'text-')} size={26} strokeWidth={2.5} />
                   </div>
                   
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">{mod.nome}</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed mb-6 flex-1">
+                  <h3 className="text-lg xl:text-xl font-bold text-slate-800 mb-2 leading-tight">{mod.nome}</h3>
+                  <p className="text-xs xl:text-sm text-slate-500 leading-relaxed mb-6 flex-1">
                     {mod.descricao}
                   </p>
                   
-                  <div className="mt-auto flex items-center text-sm font-bold text-slate-400 group-hover:text-slate-800 transition-colors">
+                  <div className="mt-auto flex items-center text-xs xl:text-sm font-bold text-slate-400 group-hover:text-slate-800 transition-colors">
                     Acessar painel <ArrowRight size={16} className="ml-2 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300" />
                   </div>
                 </button>
