@@ -1,21 +1,28 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
-import { ArrowLeft, Factory } from 'lucide-react'
+import { ArrowLeft, Factory, Activity } from 'lucide-react'
 import toast from 'react-hot-toast'
 import FormImagens from './components/FormImagens'
 
 export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, onVoltar, onSucesso }) {
+  const inicial = formDataInicial || {};
   const { moduloAtivo } = useModulo()
   const [loading, setLoading] = useState(false)
-  const [formData, setFormData] = useState({ ...formDataInicial, tipo_impressora: formDataInicial.tipo_impressora || '' })
+  
+  const [formData, setFormData] = useState({ 
+    ...inicial, 
+    tipo_impressora: inicial.tipo_impressora || '',
+    registro_anvisa: inicial.registro_anvisa || '' // <-- ESTADO DA ANVISA MANTIDO
+  })
   
   // O estado das imagens sobe para cá para o form conseguir salvar a imagem principal
   const [arquivoImagem, setArquivoImagem] = useState(null)
-  const [previewImagem, setPreviewImagem] = useState(formDataInicial.imagem_url || null)
+  const [previewImagem, setPreviewImagem] = useState(inicial.imagem_url || null)
 
   const handleSalvar = async (e) => {
     e.preventDefault()
+    if (!formData) return;
     setLoading(true)
     try {
       // 1. Upload da Foto de Capa (se houver uma nova)
@@ -32,6 +39,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
       // 2. Preparar dados
       const payload = { 
         ...formData, modulo: moduloAtivo, imagem_url: urlImagemFinal,
+        registro_anvisa: formData.registro_anvisa || null,
         fabricante_id: formData.fabricante_id === "" ? null : formData.fabricante_id,
         prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
         unidade_id: formData.unidade_id === "" ? null : formData.unidade_id,
@@ -45,16 +53,15 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         tipo_impressora: formData.tipo_impressora || null
       }
       
-      // LIMPEZA DE SEGURANÇA: Remove campos que são apenas para visualização e não existem na tabela equipamentos
+      // LIMPEZA DE SEGURANÇA: Remove campos que são apenas para visualização
       delete payload.desconhece_fabricacao;
-      delete payload.fabricante; // Remove o objeto do fabricante
-      delete payload.prestador;  // Remove o objeto do prestador
-      delete payload.unidade;    // Remove o objeto da unidade
-      delete payload.setor;      // Remove o objeto do setor
-      delete payload.status;     // Remove o objeto do status
+      delete payload.fabricante; 
+      delete payload.prestador;  
+      delete payload.unidade;    
+      delete payload.setor;      
+      delete payload.status;     
       
       const isNovo = !payload.id;
-      if (isNovo) delete payload.id;
       if (isNovo) delete payload.id;
       
       // 3. Salvar no Banco
@@ -68,7 +75,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         if (dbError) throw dbError
       }
 
-      // 4. Lógica de OS Automáticas (Bloqueadas para TI e Impressoras)
+      // 4. Lógica de OS Automáticas Perpétuas (Sem sobrescrever o histórico)
       if (!['ti', 'impressoras'].includes(moduloAtivo)) {
         const { data: authData } = await supabase.auth.getUser()
         let perfilId = null;
@@ -77,23 +84,68 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
            if (perfilData) perfilId = perfilData.id;
         }
 
+        // --- HISTÓRICO DE CALIBRAÇÕES PASSADAS ---
         if (payload.data_ultima_calibracao) {
-          const { data: osPassada } = await supabase.from('chamados').select('id').eq('equipamento_id', equipamentoId).ilike('descricao', '%(Lançamento automático)%').maybeSingle();
-          if (osPassada) {
-            await supabase.from('chamados').update({ data_abertura: payload.data_ultima_calibracao, data_prevista: payload.data_ultima_calibracao, data_conclusao: payload.data_ultima_calibracao }).eq('id', osPassada.id);
-          } else {
+          // Busca se JÁ EXISTE uma OS automática concluída nesta exata data
+          const { data: osMesmaData } = await supabase
+            .from('chamados')
+            .select('id')
+            .eq('equipamento_id', equipamentoId)
+            .eq('data_conclusao', payload.data_ultima_calibracao)
+            .ilike('descricao', '%(Lançamento automático)%')
+            .maybeSingle();
+
+          // Se não existir, insere uma nova (Mantendo as antigas intactas)
+          if (!osMesmaData) {
             const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
-            await supabase.from('chamados').insert([{ equipamento_id: equipamentoId, modulo: moduloAtivo, tipo_intervencao: 'Preventiva', data_abertura: payload.data_ultima_calibracao, data_prevista: payload.data_ultima_calibracao, data_conclusao: payload.data_ultima_calibracao, descricao: `Registro de Manutenção Preventiva/Calibração realizada anteriormente. (Lançamento automático)`, status_id: stConcluido?.id, aberto_por_id: perfilId }]);
+            
+            await supabase.from('chamados').insert([{ 
+              equipamento_id: equipamentoId, 
+              modulo: moduloAtivo, 
+              tipo_intervencao: 'Preventiva', 
+              data_abertura: payload.data_ultima_calibracao, 
+              data_prevista: payload.data_ultima_calibracao, 
+              data_conclusao: payload.data_ultima_calibracao, 
+              descricao: `Registro de Manutenção Preventiva/Calibração realizada em ${new Date(payload.data_ultima_calibracao).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}. (Lançamento automático)`, 
+              status_id: stConcluido?.id, 
+              aberto_por_id: perfilId 
+            }]);
           }
         }
 
+        // --- GERENCIAMENTO DE CALIBRAÇÃO FUTURA ---
         if (payload.data_proxima_calibracao) {
-          const { data: osFutura } = await supabase.from('chamados').select('id').eq('equipamento_id', equipamentoId).ilike('descricao', '%programada.%').maybeSingle();
+          // Pega o ID de "Concluído" para não mexer em OS que já foram finalizadas
+          const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
+          
+          let queryFutura = supabase
+            .from('chamados')
+            .select('id')
+            .eq('equipamento_id', equipamentoId)
+            .ilike('descricao', '%programada.%');
+            
+          if (stConcluido?.id) {
+             queryFutura = queryFutura.neq('status_id', stConcluido.id); // Ignora as concluídas
+          }
+          
+          const { data: osFutura } = await queryFutura.maybeSingle();
+
           if (osFutura) {
+            // Se já existe uma OS aberta avisando do futuro, apenas atualiza a data dela
             await supabase.from('chamados').update({ data_prevista: payload.data_proxima_calibracao }).eq('id', osFutura.id);
           } else {
+            // Se não existe, cria o alerta futuro
             const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
-            await supabase.from('chamados').insert([{ equipamento_id: equipamentoId, modulo: moduloAtivo, tipo_intervencao: 'Preventiva', data_abertura: new Date().toISOString(), data_prevista: payload.data_proxima_calibracao, descricao: `Manutenção Preventiva / Calibração programada.`, status_id: stAberto?.id, aberto_por_id: perfilId }]);
+            await supabase.from('chamados').insert([{ 
+              equipamento_id: equipamentoId, 
+              modulo: moduloAtivo, 
+              tipo_intervencao: 'Preventiva', 
+              data_abertura: new Date().toISOString(), 
+              data_prevista: payload.data_proxima_calibracao, 
+              descricao: `Manutenção Preventiva / Calibração programada.`, 
+              status_id: stAberto?.id, 
+              aberto_por_id: perfilId 
+            }]);
           }
         }
       }
@@ -149,12 +201,27 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
               </div>
               <input required={!formData.sem_patrimonio} disabled={formData.sem_patrimonio} value={formData.patrimonio} onChange={e => setFormData({...formData, patrimonio: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-red-50/30 disabled:text-red-600 disabled:font-bold" />
             </div>
+
+            {moduloAtivo === 'medicos' && (
+              <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 shadow-sm">
+                <label className="block text-sm font-bold text-emerald-800 mb-1 flex items-center gap-2">
+                  <Activity size={16} /> Registro ANVISA
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="Ex: 80111110000"
+                  value={formData.registro_anvisa} 
+                  onChange={e => setFormData({...formData, registro_anvisa: e.target.value})} 
+                  className="w-full px-4 py-2 rounded-lg border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-white" 
+                />
+              </div>
+            )}
             
             <div><label className="block text-sm font-bold text-slate-700 mb-2">Modelo</label><input value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Fabricante</label><select value={formData.fabricante_id} onChange={e => setFormData({...formData, fabricante_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliaresGlobais.fabricantes.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></div>
+            <div><label className="block text-sm font-bold text-slate-700 mb-2">Fabricante</label><select value={formData.fabricante_id} onChange={e => setFormData({...formData, fabricante_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais?.fabricantes || []).map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></div>
             
             {!isModuloTecnologia && (
-              <div><label className="block text-sm font-bold text-slate-700 mb-2">Prestador (Assistência)</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliaresGlobais.prestadores.map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></div>
+              <div><label className="block text-sm font-bold text-slate-700 mb-2">Prestador (Assistência)</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais.prestadores || []).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></div>
             )}
             
             {moduloAtivo === 'impressoras' && (
@@ -197,9 +264,9 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-slate-100 pt-6">
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Unidade</label><select required value={formData.unidade_id} onChange={e => setFormData({...formData, unidade_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliaresGlobais.unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select></div>
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Setor</label><select required value={formData.setor_id} onChange={e => setFormData({...formData, setor_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliaresGlobais.setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></div>
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Status</label><select required value={formData.status_id} onChange={e => setFormData({...formData, status_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliaresGlobais.status.map(st => <option key={st.id} value={st.id}>{st.nome}</option>)}</select></div>
+            <div><label className="block text-sm font-bold text-slate-700 mb-2">Unidade</label><select required value={formData.unidade_id} onChange={e => setFormData({...formData, unidade_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais.unidades || []).map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select></div>
+            <div><label className="block text-sm font-bold text-slate-700 mb-2">Setor</label><select required value={formData.setor_id} onChange={e => setFormData({...formData, setor_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais.setores || []).map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></div>
+            <div><label className="block text-sm font-bold text-slate-700 mb-2">Status</label><select required value={formData.status_id || ''} onChange={e => setFormData({...formData, status_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais?.status || []).map(st => (<option key={st.id} value={st.id}>{st.nome}</option>))}</select></div>
           </div>
 
           {!isModuloTecnologia && (

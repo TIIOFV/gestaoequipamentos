@@ -1,98 +1,141 @@
 import { useState, useEffect } from 'react'
-import { BarChart, Printer, Plus, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
+import { Printer, Trash2, X, Plus, CalendarDays, FileText, Tag, Receipt } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function DetalheBilhetagem({ equipamento }) {
   const [leituras, setLeituras] = useState([])
-  const [isModalLeituraOpen, setIsModalLeituraOpen] = useState(false)
-  const [formLeitura, setFormLeitura] = useState({
-    mes_referencia: new Date().toISOString().slice(0, 7),
-    contador_pb: '', contador_cor: '', contador_etiquetas: '', contador_pulseiras: '', custo_total: ''
+  const [loading, setLoading] = useState(true)
+  const [modalAberto, setModalAberto] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+
+  // Estado alinhado com as suas colunas do Supabase
+  const [formData, setFormData] = useState({
+    mes_referencia: new Date().toISOString().slice(0, 7), // YYYY-MM
+    contador_pb: '',
+    contador_cor: '',
+    contador_etiquetas: '',
+    contador_pulseiras: '',
+    custo_total: ''
   })
 
-  useEffect(() => {
-    if (equipamento?.id) buscarLeituras()
-  }, [equipamento])
+  // Lógica para mostrar apenas os campos relevantes ao tipo de impressora
+  const tipo = equipamento?.tipo_impressora?.toLowerCase() || ''
+  const isColorida = tipo.includes('colorida') || tipo.includes('multifuncional')
+  const isTermica = tipo.includes('térmica') || tipo.includes('termica') || tipo.includes('etiqueta')
 
-  const buscarLeituras = async () => {
-    const { data } = await supabase
-      .from('leituras_impressoras')
-      .select('*, registrado_por:registrado_por_id(nome)')
-      .eq('equipamento_id', equipamento.id)
-      .order('mes_referencia', { ascending: false })
-    if (data) setLeituras(data)
+  useEffect(() => {
+    if (equipamento?.id) carregarLeituras()
+  }, [equipamento?.id])
+
+  const carregarLeituras = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('leituras_impressoras')
+        .select('*')
+        .eq('equipamento_id', equipamento.id)
+        .order('mes_referencia', { ascending: false })
+
+      if (error) throw error
+      setLeituras(data || [])
+    } catch (error) {
+      toast.error("Erro ao carregar leituras.")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleSalvarLeitura = async (e) => {
+  const handleSalvar = async (e) => {
     e.preventDefault()
+    setSalvando(true)
+    
     try {
-      toast.loading('A registrar leitura...', { id: 'salvar-leitura' })
-      const { data: authData } = await supabase.auth.getUser()
-      let perfilId = null
-      if (authData?.user?.id) {
-         const { data: perfilData } = await supabase.from('perfis').select('id').eq('user_id', authData.user.id).maybeSingle()
-         if (perfilData) perfilId = perfilData.id
-      }
+      // Ajustando a data para o primeiro dia do mês de referência para o tipo 'date' do banco
+      const dataReferencia = `${formData.mes_referencia}-01`
 
-      const dataRef = `${formLeitura.mes_referencia}-01`
       const payload = {
-        equipamento_id: equipamento.id, mes_referencia: dataRef,
-        contador_pb: parseInt(formLeitura.contador_pb) || 0,
-        contador_cor: parseInt(formLeitura.contador_cor) || 0,
-        contador_etiquetas: parseInt(formLeitura.contador_etiquetas) || 0,
-        contador_pulseiras: parseInt(formLeitura.contador_pulseiras) || 0,
-        custo_total: parseFloat(formLeitura.custo_total) || 0,
-        registrado_por_id: perfilId
+        equipamento_id: equipamento.id,
+        mes_referencia: dataReferencia,
+        contador_pb: parseInt(formData.contador_pb) || 0,
+        contador_cor: parseInt(formData.contador_cor) || 0,
+        contador_etiquetas: parseInt(formData.contador_etiquetas) || 0,
+        contador_pulseiras: parseInt(formData.contador_pulseiras) || 0,
+        custo_total: parseFloat(formData.custo_total) || 0
       }
 
       const { error } = await supabase.from('leituras_impressoras').insert([payload])
       if (error) throw error
 
-      toast.success('Leitura registada!', { id: 'salvar-leitura' })
-      setIsModalLeituraOpen(false)
-      setFormLeitura({ mes_referencia: new Date().toISOString().slice(0, 7), contador_pb: '', contador_cor: '', contador_etiquetas: '', contador_pulseiras: '', custo_total: '' })
-      buscarLeituras()
-    } catch (error) { toast.error('Erro ao registar leitura.', { id: 'salvar-leitura' }) }
+      toast.success('Fechamento registado com sucesso!')
+      setModalAberto(false)
+      setFormData({ mes_referencia: new Date().toISOString().slice(0, 7), contador_pb: '', contador_cor: '', contador_etiquetas: '', contador_pulseiras: '', custo_total: '' })
+      carregarLeituras()
+    } catch (error) {
+      toast.error('Erro ao salvar: ' + error.message)
+    } finally {
+      setSalvando(false)
+    }
+  }
+
+  const handleExcluir = async (id) => {
+    if (!window.confirm('Excluir este fechamento?')) return
+    try {
+      const { error } = await supabase.from('leituras_impressoras').delete().eq('id', id)
+      if (error) throw error
+      toast.success('Excluído!')
+      carregarLeituras()
+    } catch (error) {
+      toast.error('Erro ao excluir.')
+    }
   }
 
   return (
-    <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm border-t-4 border-t-purple-500 mt-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-          <BarChart className="text-purple-600" size={20} /> Controle de Bilhetagem (Leituras)
+          <Printer className="text-blue-600" size={20} /> 
+          Histórico de Volume (Fechamento Geral)
         </h3>
-        <button onClick={() => setIsModalLeituraOpen(true)} className="bg-purple-100 text-purple-700 hover:bg-purple-200 px-4 py-2 rounded-lg font-bold text-sm transition-colors flex items-center gap-2">
-          <Plus size={16} /> Lançar Leitura
+        <button onClick={() => setModalAberto(true)} className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold py-2 px-4 rounded-xl flex items-center gap-2 transition-colors text-sm">
+          <Plus size={16} /> Lançar Mês
         </button>
       </div>
 
-      {leituras.length === 0 ? (
-        <div className="text-center py-8 bg-slate-50 rounded-xl border border-slate-200 border-dashed">
-          <Printer className="mx-auto text-slate-300 mb-2" size={32} />
-          <h4 className="text-slate-600 font-bold">Nenhuma leitura registada</h4>
-          <p className="text-sm text-slate-500">Comece a registar o volume impresso mês a mês.</p>
+      {loading ? (
+        <div className="animate-pulse h-20 bg-slate-100 rounded-xl w-full"></div>
+      ) : leituras.length === 0 ? (
+        <div className="text-center py-10 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+          <Printer size={40} className="mx-auto text-slate-300 mb-3" />
+          <p className="text-slate-500 font-medium">Nenhum fechamento registado para esta impressora.</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-slate-200">
-          <table className="w-full text-left text-sm text-slate-600">
-            <thead className="bg-slate-50 text-slate-800 font-bold border-b border-slate-200">
+        <div className="overflow-x-auto bg-white border border-slate-200 rounded-xl">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
               <tr>
-                <th className="p-4">Mês/Ano</th><th className="p-4">P&B</th><th className="p-4">Colorida</th>
-                <th className="p-4">Etiquetas</th><th className="p-4">Pulseiras</th>
-                <th className="p-4">Custo Faturado</th><th className="p-4">Registado por</th>
+                <th className="px-4 py-3 font-bold">Mês Referência</th>
+                {!isTermica && <th className="px-4 py-3 font-bold text-center">Págs P&B</th>}
+                {isColorida && <th className="px-4 py-3 font-bold text-center text-rose-600">Págs Cor</th>}
+                {isTermica && <th className="px-4 py-3 font-bold text-center text-emerald-600">Etiquetas/Pulseiras</th>}
+                <th className="px-4 py-3 font-bold text-center text-emerald-700">Custo (R$)</th>
+                <th className="px-4 py-3 text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {leituras.map((leitura) => (
                 <tr key={leitura.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="p-4 font-bold text-slate-800">{new Date(leitura.mes_referencia).toLocaleDateString('pt-BR', { month: 'short', year: 'numeric', timeZone: 'UTC' }).toUpperCase()}</td>
-                  <td className="p-4">{leitura.contador_pb > 0 ? leitura.contador_pb.toLocaleString('pt-BR') : '-'}</td>
-                  <td className="p-4">{leitura.contador_cor > 0 ? leitura.contador_cor.toLocaleString('pt-BR') : '-'}</td>
-                  <td className="p-4">{leitura.contador_etiquetas > 0 ? leitura.contador_etiquetas.toLocaleString('pt-BR') : '-'}</td>
-                  <td className="p-4">{leitura.contador_pulseiras > 0 ? leitura.contador_pulseiras.toLocaleString('pt-BR') : '-'}</td>
-                  <td className="p-4 font-bold text-red-600">{leitura.custo_total > 0 ? `R$ ${leitura.custo_total.toFixed(2).replace('.', ',')}` : '-'}</td>
-                  <td className="p-4 text-xs">{leitura.registrado_por?.nome || 'Sistema'}</td>
+                  <td className="px-4 py-3 font-bold text-slate-700">
+                    {new Date(leitura.mes_referencia).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
+                  </td>
+                  {!isTermica && <td className="px-4 py-3 text-center font-medium text-slate-600">{leitura.contador_pb || 0}</td>}
+                  {isColorida && <td className="px-4 py-3 text-center font-bold text-rose-600 bg-rose-50/50">{leitura.contador_cor || 0}</td>}
+                  {isTermica && <td className="px-4 py-3 text-center font-bold text-emerald-600">{(leitura.contador_etiquetas || 0) + (leitura.contador_pulseiras || 0)}</td>}
+                  <td className="px-4 py-3 text-center font-bold text-emerald-700 bg-emerald-50/50">
+                    {leitura.custo_total ? `R$ ${leitura.custo_total.toFixed(2)}` : '-'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => handleExcluir(leitura.id)} className="text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -100,39 +143,61 @@ export default function DetalheBilhetagem({ equipamento }) {
         </div>
       )}
 
-      {isModalLeituraOpen && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-8 animate-in zoom-in duration-200 relative border border-slate-200">
-            <button onClick={() => setIsModalLeituraOpen(false)} className="absolute top-6 right-6 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600 transition-colors"><X size={20} /></button>
-            <h2 className="text-2xl font-bold text-slate-800 mb-2">Lançar Leitura</h2>
+      {/* MODAL DE LANÇAMENTO */}
+      {modalAberto && (
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-lg text-slate-800">Fechamento do Equipamento</h3>
+              <button onClick={() => setModalAberto(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+            </div>
             
-            <form onSubmit={handleSalvarLeitura} className="space-y-4 mt-6">
+            <form onSubmit={handleSalvar} className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-1">Mês de Referência</label>
-                <input type="month" required value={formLeitura.mes_referencia} onChange={(e) => setFormLeitura({...formLeitura, mes_referencia: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50" />
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                {(!equipamento.tipo_impressora || equipamento.tipo_impressora.includes('Monocromática') || equipamento.tipo_impressora.includes('Colorida') || equipamento.tipo_impressora.includes('Multifuncional')) && (
-                  <div><label className="block text-sm font-bold text-slate-700 mb-1">Páginas P&B</label><input type="number" min="0" value={formLeitura.contador_pb} onChange={(e) => setFormLeitura({...formLeitura, contador_pb: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" /></div>
-                )}
-                {(!equipamento.tipo_impressora || equipamento.tipo_impressora.includes('Colorida') || equipamento.tipo_impressora.includes('Multifuncional')) && (
-                  <div><label className="block text-sm font-bold text-purple-700 mb-1">Páginas Coloridas</label><input type="number" min="0" value={formLeitura.contador_cor} onChange={(e) => setFormLeitura({...formLeitura, contador_cor: e.target.value})} className="w-full p-3 rounded-xl border border-purple-200 bg-purple-50/50" /></div>
-                )}
-                {(!equipamento.tipo_impressora || equipamento.tipo_impressora.includes('Etiquetas')) && (
-                  <div><label className="block text-sm font-bold text-slate-700 mb-1">Qtd. Etiquetas</label><input type="number" min="0" value={formLeitura.contador_etiquetas} onChange={(e) => setFormLeitura({...formLeitura, contador_etiquetas: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" /></div>
-                )}
-                {(!equipamento.tipo_impressora || equipamento.tipo_impressora.includes('Pulseiras')) && (
-                  <div><label className="block text-sm font-bold text-slate-700 mb-1">Qtd. Pulseiras</label><input type="number" min="0" value={formLeitura.contador_pulseiras} onChange={(e) => setFormLeitura({...formLeitura, contador_pulseiras: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200" /></div>
-                )}
+                <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><CalendarDays size={14}/> Mês de Referência</label>
+                <input required type="month" value={formData.mes_referencia} onChange={e => setFormData({...formData, mes_referencia: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 font-bold" />
               </div>
 
+              {!isTermica && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><FileText size={14}/> Total P&B</label>
+                    <input type="number" min="0" placeholder="0" value={formData.contador_pb} onChange={e => setFormData({...formData, contador_pb: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  
+                  {isColorida && (
+                    <div>
+                      <label className="block text-sm font-bold text-rose-600 mb-1 flex items-center gap-2"><FileText size={14}/> Total Cor</label>
+                      <input type="number" min="0" placeholder="0" value={formData.contador_cor} onChange={e => setFormData({...formData, contador_cor: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-rose-200 outline-none focus:ring-2 focus:ring-rose-500 bg-rose-50 text-rose-700" />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {isTermica && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><Tag size={14}/> Etiquetas</label>
+                    <input type="number" min="0" placeholder="0" value={formData.contador_etiquetas} onChange={e => setFormData({...formData, contador_etiquetas: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1 flex items-center gap-2"><Tag size={14}/> Pulseiras</label>
+                    <input type="number" min="0" placeholder="0" value={formData.contador_pulseiras} onChange={e => setFormData({...formData, contador_pulseiras: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+                </div>
+              )}
+
               <div>
-                <label className="block text-sm font-bold text-red-700 mb-1 mt-2">Custo Faturado no Mês (R$)</label>
-                <input type="number" step="0.01" min="0" value={formLeitura.custo_total} onChange={(e) => setFormLeitura({...formLeitura, custo_total: e.target.value})} className="w-full p-3 rounded-xl border border-red-200 bg-red-50" />
+                <label className="block text-sm font-bold text-emerald-700 mb-1 flex items-center gap-2"><Receipt size={14}/> Custo Total do Mês (R$)</label>
+                <input type="number" step="0.01" min="0" placeholder="0.00" value={formData.custo_total} onChange={e => setFormData({...formData, custo_total: e.target.value})} className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50 text-emerald-800 font-bold" />
               </div>
 
-              <button type="submit" className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl shadow-md mt-6">Salvar Leitura</button>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={() => setModalAberto(false)} className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">Cancelar</button>
+                <button type="submit" disabled={salvando} className="flex-1 bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 rounded-xl transition-colors disabled:opacity-70">
+                  {salvando ? 'A guardar...' : 'Salvar Fechamento'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

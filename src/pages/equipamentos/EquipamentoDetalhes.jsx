@@ -1,18 +1,22 @@
-import { ArrowLeft, Edit, Wrench, FileText, CheckCircle2, AlertTriangle, Factory, Image as ImageIcon, Calendar, Clock, Images } from 'lucide-react'
+import { ArrowLeft, Edit, Wrench, FileText, CheckCircle2, AlertTriangle, Factory, Image as ImageIcon, Images, Activity } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useModulo } from '../../contexts/ModuloContext'
 
-// IMPORTANDO OS NOVOS COMPONENTES
+// IMPORTANDO OS COMPONENTES
 import DetalheBilhetagem from './components/DetalheBilhetagem'
 import DetalheHistorico from './components/DetalheHistorico'
 
 export default function EquipamentoDetalhes({ equipamento, historico, onVoltar, onEditar }) {
   const navigate = useNavigate()
   const { moduloAtivo } = useModulo()
+  
+  // Blindagem contra objetos nulos
+  if (!equipamento) return <div className="p-10 text-center text-slate-500">Equipamento não encontrado.</div>;
+
   const isModuloTecnologia = ['ti', 'impressoras'].includes(moduloAtivo)
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
+    <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500 p-4">
       
       {/* CABEÇALHO */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -50,6 +54,14 @@ export default function EquipamentoDetalhes({ equipamento, historico, onVoltar, 
             <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Modelo</span><span className="font-medium">{equipamento.modelo || '-'}</span></div>
             <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Fabricante</span><span className="font-medium">{equipamento.fabricante?.nome || '-'}</span></div>
             
+            {/* NOVO: REGISTRO ANVISA (VIGILÂNCIA SANITÁRIA) */}
+            {moduloAtivo === 'medicos' && (
+              <div className="flex flex-col border-b border-emerald-50 pb-2 md:col-span-2">
+                <span className="text-emerald-700 font-bold mb-1 flex items-center gap-1"><Activity size={14} /> Registro ANVISA</span>
+                <span className="font-black text-slate-800 text-base">{equipamento.registro_anvisa || 'Não informado'}</span>
+              </div>
+            )}
+
             {moduloAtivo === 'impressoras' && (
                <div className="flex flex-col border-b border-slate-50 pb-2 md:col-span-2"><span className="text-purple-600 font-bold mb-1">Tipo de Impressora</span><span className="font-black text-slate-800">{equipamento.tipo_impressora || 'Não definido'}</span></div>
             )}
@@ -83,9 +95,18 @@ export default function EquipamentoDetalhes({ equipamento, historico, onVoltar, 
         )}
       </div>
 
-      {/* RENDERIZA OS NOVOS COMPONENTES ISOLADOS! */}
-      {moduloAtivo === 'impressoras' && <DetalheBilhetagem equipamento={equipamento} />}
-      <DetalheHistorico historico={historico} />
+      {/* RENDERIZAÇÃO ISOLADA DAS EXTENSÕES */}
+      <div className="grid grid-cols-1 gap-6">
+        {moduloAtivo === 'impressoras' && (
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+             <DetalheBilhetagem equipamento={equipamento} />
+          </div>
+        )}
+        
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
+           <DetalheHistorico historico={historico || []} equipamento={equipamento} />
+        </div>
+      </div>
       
     </div>
   )

@@ -20,8 +20,9 @@ const AppLayout = lazy(() => import('./layouts/AppLayout'))
 const EquipamentosPage = lazy(() => import('./pages/equipamentos/EquipamentosPage'))
 const ChamadosPage = lazy(() => import('./pages/chamados/ChamadosPage'))
 const AgendaPage = lazy(() => import('./pages/AgendaPage'))
-const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage'))
+const RelatoriosPage = lazy(() => import('./pages/relatorios/RelatoriosPage'))
 const ConfiguracoesPage = lazy(() => import('./pages/configuracoes/ConfiguracoesPage'))
+const BilhetagemPage = lazy(() => import('./pages/impressoras/BilhetagemPage'))
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
                   <Route path="agenda" element={<AgendaPage />} />
                   <Route path="relatorios" element={<RelatoriosPage />} />
                   <Route path="chamados" element={<ChamadosPage />} />
+                  <Route path="bilhetagem" element={<BilhetagemPage />} />
                 </Route>
 
                 <Route path="/" element={<Navigate to="/modulos" replace />} />

@@ -2,10 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
-import { 
-  LayoutDashboard, Monitor, Wrench, CalendarDays, 
-  FileText, Settings, LogOut, Bell, X, Key, ArrowLeftRight
-} from 'lucide-react'
+import { LayoutDashboard, Monitor, Wrench, CalendarDays, FileText, Settings, LogOut, Bell, X, Key, ArrowLeftRight, Droplet} from 'lucide-react'
 
 export default function MenuSidebar({ 
   profile, 
@@ -178,6 +175,18 @@ export default function MenuSidebar({
             </Link>
           )
         })}
+
+        {/* --- ADICIONE AQUI O NOVO BOTÃO DE AUDITORIA --- */}
+        {moduloAtivo === 'impressoras' && hasFullAccess && (
+          <Link 
+            to={`/${moduloAtivo}/bilhetagem`} 
+            onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/bilhetagem`)} 
+            className={`flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/bilhetagem') ? 'bg-rose-50 text-rose-700 shadow-sm border border-rose-100/50' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`}
+          >
+            <Droplet className={`w-5 h-5 mr-3 ${isActive('/bilhetagem') ? 'text-rose-600' : 'text-slate-400'}`} /> Auditoria de Cor
+          </Link>
+        )}
+        {/* ----------------------------------------------- */}
 
         {profile?.perfil === 'administrador' && (
           <div className="pt-4 mt-4 border-t border-slate-100">
