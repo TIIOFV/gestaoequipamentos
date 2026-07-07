@@ -1,23 +1,34 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../../lib/supabase'
+import { useAuth } from '../../../../contexts/AuthContext'
 import { Plus, Search, Filter, Printer } from 'lucide-react'
 import { Skeleton } from '../../../../components/ui/Skeleton'
-import EquipamentoCard from '../EquipamentoCard' // Importando o seu Card original
+import EquipamentoCard from '../EquipamentoCard'
+import ModalConfirmacao from '../../../../components/ModalConfirmacao'
+import Paginacao from '../../../../components/Paginacao'
 import toast from 'react-hot-toast'
 
 export default function ImpressorasList({ setView, setEquipamentoSelecionado }) {
+  const { profile } = useAuth()
   const [equipamentos, setEquipamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
+  const [modalConfirm, setModalConfirm] = useState({ isOpen: false, idParaExcluir: null });
   
-  // Filtros limpos e focados em impressoras
   const [filtroUnidade, setFiltroUnidade] = useState('')
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
-  const [filtroPatrimonio, setFiltroPatrimonio] = useState('todos') // todos, sem-patrimonio, com-patrimonio
+  const [filtroPatrimonio, setFiltroPatrimonio] = useState('todos')
 
   const [unidades, setUnidades] = useState([])
   const [setores, setSetores] = useState([])
+
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const ITENS_POR_PAGINA = 15;
+
+  useEffect(() => {
+    setPaginaAtual(1);
+  }, [busca, filtroUnidade, filtroSetor, filtroStatus, filtroPatrimonio]);
 
   useEffect(() => {
     carregarDados()
@@ -27,7 +38,6 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
     setLoading(true)
     try {
       const [eqRes, unRes, setRes] = await Promise.all([
-        // Query corrigida (exatamente como funcionava antes)
         supabase.from('equipamentos').select(`*, unidade:unidade_id(nome), setor:setor_id(nome), status:status_id(nome)`).eq('modulo', 'impressoras').order('nome'),
         supabase.from('unidades').select('*').order('nome'),
         supabase.from('setores').select('*').order('nome')
@@ -60,13 +70,69 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
     return matchBusca && matchUnidade && matchSetor && matchStatus && matchPat
   })
 
-  // Funções temporárias para ações do Card
-  const handleDuplicar = () => toast('Função de duplicar impressora em breve', { icon: '🚧' })
-  const handleExcluir = () => toast('Função de excluir impressora em breve', { icon: '🚧' })
+  const handleDuplicar = (item) => {
+    const copia = { ...item };
+    delete copia.id;
+    delete copia.created_at;
+    copia.numero_serie = '';
+    copia.patrimonio = 'PENDENTE';
+    copia.sem_patrimonio = true;
+    copia.imagem_url = null;
+    copia.ip_mac_address = ''; 
+    setEquipamentoSelecionado(copia);
+    setView('novo');
+    toast.success('Molde copiado! Preencha N/S e Patrimônio da nova máquina.');
+  }
+
+  const handleExcluir = async (id) => {
+    setLoading(true)
+    try {
+      const { data: chamadosDoEq, error: errorChamados } = await supabase.from('chamados').select('id, anexos').eq('equipamento_id', id);
+      if (errorChamados) throw errorChamados;
+
+      if (chamadosDoEq?.length > 0) {
+        let todosOsAnexosPaths = [];
+        chamadosDoEq.forEach(ch => {
+          if (ch.anexos?.length > 0) ch.anexos.forEach(url => { const partes = url.split('/equipamentos/'); if (partes[1]) todosOsAnexosPaths.push(partes[1]); });
+        });
+        if (todosOsAnexosPaths.length > 0) await supabase.storage.from('equipamentos').remove(todosOsAnexosPaths);
+        await supabase.from('chamados').delete().in('id', chamadosDoEq.map(ch => ch.id));
+      }
+
+      const eqAtual = equipamentos.find(e => e.id === id);
+      
+      if (eqAtual) {
+        await supabase.from('logs_auditoria').insert([{
+          usuario_nome: profile?.nome || 'Usuário Desconhecido',
+          acao: 'EXCLUSÃO EM CASCATA',
+          modulo: 'impressoras',
+          detalhes: `Excluiu a impressora: ${eqAtual.nome} (Patrimônio: ${eqAtual.patrimonio || 'S/N'}) e todo o seu histórico.`
+        }]);
+      }
+
+      if (eqAtual?.imagem_url) {
+         const partesEq = eqAtual.imagem_url.split('/equipamentos/');
+         if (partesEq[1]) await supabase.storage.from('equipamentos').remove([partesEq[1]]);
+      }
+
+      await supabase.from('equipamentos').delete().eq('id', id);
+      toast.success('Impressora excluída permanentemente!');
+      carregarDados();
+    } catch (error) { toast.error('Erro na exclusão: ' + error.message); } 
+    finally { setLoading(false); setModalConfirm({ isOpen: false, idParaExcluir: null }); }
+  }
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* CABEÇALHO DA LISTA */}
+      <ModalConfirmacao 
+        isOpen={modalConfirm.isOpen} 
+        onClose={() => setModalConfirm({ isOpen: false, idParaExcluir: null })}
+        onConfirm={() => handleExcluir(modalConfirm.idParaExcluir)}
+        titulo="Apagar Impressora"
+        mensagem="CUIDADO: Esta ação apagará a impressora, todo o histórico de OS e fotos definitivamente."
+        textoConfirmar="Excluir Tudo"
+      />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
@@ -79,7 +145,6 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
         </button>
       </div>
 
-      {/* FILTROS INTELIGENTES */}
       <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <div className="relative w-full">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
@@ -96,23 +161,9 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
           <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1 shrink-0">
             <Filter size={14}/> Filtros:
           </span>
-          
-          <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0">
-            <option value="">Todas as unidades</option>
-            {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
-          </select>
-
-          <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0">
-            <option value="">Todos os setores</option>
-            {setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
-          </select>
-
-          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0">
-            <option value="">Todos os status</option>
-            <option value="ATIVO">Ativo</option>
-            <option value="MANUTENCAO">Em Manutenção</option>
-            <option value="RESERVA">Reserva Técnica</option>
-          </select>
+          <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todas as unidades</option>{unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>
+          <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os setores</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select>
+          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os status</option><option value="ATIVO">Ativo</option><option value="MANUTENCAO">Em Manutenção</option><option value="RESERVA">Reserva Técnica</option></select>
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100 text-xs">
@@ -122,7 +173,6 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
         </div>
       </div>
 
-      {/* LISTA DE CARDS RESPONSIVA COM SKELETON */}
       <div className="grid grid-cols-1 gap-4 min-w-0 w-full">
         {loading ? (
           [1, 2, 3].map(i => (
@@ -136,20 +186,30 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
           ))
         ) : dadosFiltrados.length === 0 ? (
           <div className="text-center py-12 text-slate-500 font-medium bg-white rounded-2xl border border-slate-200 shadow-sm">
-            Nenhuma impressora encontrada para os critérios selecionados.
+            Nenhuma impressora encontrada.
           </div>
         ) : (
-          dadosFiltrados.map(item => (
-            <EquipamentoCard 
-              key={item.id} 
-              eq={item}  // <-- A CORREÇÃO DE OURO QUE FEZ O ECRÃ VOLTAR À VIDA
-              moduloAtivo="impressoras"
-              onVerDetalhes={() => { setEquipamentoSelecionado(item); setView('detalhes'); }}
-              onEditar={() => { setEquipamentoSelecionado(item); setView('editar'); }}
-              onDuplicar={handleDuplicar}
-              onExcluir={handleExcluir}
+          <>
+            {dadosFiltrados
+              .slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
+              .map(item => (
+                <EquipamentoCard 
+                  key={item.id} 
+                  eq={item}  
+                  moduloAtivo="impressoras"
+                  onVerDetalhes={() => { setEquipamentoSelecionado(item); setView('detalhes'); }}
+                  onEditar={() => { setEquipamentoSelecionado(item); setView('editar'); }}
+                  onDuplicar={() => handleDuplicar(item)}
+                  onExcluir={() => setModalConfirm({ isOpen: true, idParaExcluir: item.id })}
+                />
+            ))}
+            <Paginacao 
+              paginaAtual={paginaAtual} 
+              totalItens={dadosFiltrados.length} 
+              itensPorPagina={ITENS_POR_PAGINA} 
+              setPaginaAtual={setPaginaAtual} 
             />
-          ))
+          </>
         )}
       </div>
     </div>

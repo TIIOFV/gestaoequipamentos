@@ -28,7 +28,6 @@ export default function MenuSidebar({
     impressoras: 'Impressoras & Copiadoras'
   }
 
-  // Lógica isolada de Notificações
   useEffect(() => {
     if (!moduloAtivo) return;
 
@@ -176,7 +175,6 @@ export default function MenuSidebar({
           )
         })}
 
-        {/* --- ADICIONE AQUI O NOVO BOTÃO DE AUDITORIA --- */}
         {moduloAtivo === 'impressoras' && hasFullAccess && (
           <Link 
             to={`/${moduloAtivo}/bilhetagem`} 
@@ -186,7 +184,6 @@ export default function MenuSidebar({
             <Droplet className={`w-5 h-5 mr-3 ${isActive('/bilhetagem') ? 'text-rose-600' : 'text-slate-400'}`} /> Auditoria de Cor
           </Link>
         )}
-        {/* ----------------------------------------------- */}
 
         {profile?.perfil === 'administrador' && (
           <div className="pt-4 mt-4 border-t border-slate-100">
@@ -204,6 +201,9 @@ export default function MenuSidebar({
         <button onClick={handleLogout} className="flex items-center justify-center w-full px-4 py-2 text-sm font-bold text-slate-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100">
           <LogOut className="w-4 h-4 mr-2" /> Sair do sistema
         </button>
+        <div className="pt-2 text-center">
+          <span className="text-[10px] font-bold text-slate-400 tracking-wider">RELEASE v1.20.0</span>
+        </div>
       </div>
     </aside>
   )

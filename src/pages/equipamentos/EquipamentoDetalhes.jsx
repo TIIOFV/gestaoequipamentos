@@ -1,16 +1,45 @@
-import { ArrowLeft, Edit, Wrench, FileText, CheckCircle2, AlertTriangle, Factory, Image as ImageIcon, Images, Activity } from 'lucide-react'
+import { useState, useEffect } from 'react' // Adicionado useState, useEffect
 import { useNavigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase' // Verifique se o caminho do supabase está correto
 import { useModulo } from '../../contexts/ModuloContext'
+import { ArrowLeft, Edit, Wrench, FileText, CheckCircle2, AlertTriangle, Factory, Image as ImageIcon, Images, Activity } from 'lucide-react'
 
-// IMPORTANDO OS COMPONENTES
+// Importação das listas específicas
 import DetalheBilhetagem from './components/DetalheBilhetagem'
 import DetalheHistorico from './components/DetalheHistorico'
 
-export default function EquipamentoDetalhes({ equipamento, historico, onVoltar, onEditar }) {
+export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar }) {
   const navigate = useNavigate()
   const { moduloAtivo } = useModulo()
   
-  // Blindagem contra objetos nulos
+  // ESTADO PARA O HISTÓRICO CARREGADO INTERNAMENTE
+  const [historicoLocal, setHistoricoLocal] = useState([])
+  const [loadingHistorico, setLoadingHistorico] = useState(true)
+
+  // EFETUAR A BUSCA QUANDO O EQUIPAMENTO MUDAR
+  useEffect(() => {
+    if (equipamento?.id) {
+      buscarHistorico();
+    }
+  }, [equipamento?.id]);
+
+  const buscarHistorico = async () => {
+    setLoadingHistorico(true);
+    const { data, error } = await supabase
+      .from('chamados')
+      .select(`
+        *,
+        status:status_id(nome),
+        aberto_por:aberto_por_id(nome),
+        prestador:prestador_id(nome)
+      `)
+      .eq('equipamento_id', equipamento.id)
+      .order('data_abertura', { ascending: false });
+
+    if (data) setHistoricoLocal(data);
+    setLoadingHistorico(false);
+  };
+
   if (!equipamento) return <div className="p-10 text-center text-slate-500">Equipamento não encontrado.</div>;
 
   const isModuloTecnologia = ['ti', 'impressoras'].includes(moduloAtivo)
@@ -54,7 +83,6 @@ export default function EquipamentoDetalhes({ equipamento, historico, onVoltar, 
             <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Modelo</span><span className="font-medium">{equipamento.modelo || '-'}</span></div>
             <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-500 font-semibold mb-1">Fabricante</span><span className="font-medium">{equipamento.fabricante?.nome || '-'}</span></div>
             
-            {/* NOVO: REGISTRO ANVISA (VIGILÂNCIA SANITÁRIA) */}
             {moduloAtivo === 'medicos' && (
               <div className="flex flex-col border-b border-emerald-50 pb-2 md:col-span-2">
                 <span className="text-emerald-700 font-bold mb-1 flex items-center gap-1"><Activity size={14} /> Registro ANVISA</span>
@@ -82,17 +110,6 @@ export default function EquipamentoDetalhes({ equipamento, historico, onVoltar, 
           <span className="text-slate-500 font-semibold block mb-3">Observações adicionais:</span>
           <p className="text-slate-700 bg-slate-50 p-5 rounded-xl border min-h-[80px]">{equipamento.observacoes || 'Nenhuma observação.'}</p>
         </div>
-
-        {equipamento.fotos_adicionais?.length > 0 && (
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center gap-2"><Images className="text-blue-600" size={18} /> Galeria ({equipamento.fotos_adicionais.length})</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {equipamento.fotos_adicionais.map((foto, index) => (
-                <a key={index} href={foto} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-xl overflow-hidden border"><img src={foto} className="w-full h-full object-cover hover:scale-105 transition-transform" /></a>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* RENDERIZAÇÃO ISOLADA DAS EXTENSÕES */}
@@ -104,10 +121,10 @@ export default function EquipamentoDetalhes({ equipamento, historico, onVoltar, 
         )}
         
         <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-           <DetalheHistorico historico={historico || []} equipamento={equipamento} />
+           {/* AGORA PASSAMOS O HISTÓRICO CARREGADO LOCALMENTE */}
+           <DetalheHistorico historico={historicoLocal} equipamento={equipamento} />
         </div>
       </div>
-      
     </div>
   )
 }
