@@ -16,6 +16,7 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
     id: null, equipamento_id: equipamentoIdNovo || '', tipo_intervencao: 'Corretiva',
     status_id: '', prestador_id: '', protocolo_externo: '',
     descricao: '', data_abertura: getDataHoraAtual(), data_prevista: '',
+    data_conclusao_manual: '', // <-- NOVO: Permite setar a data real no passado
     aberto_por_id: usuarioAtual?.id || '', anexos: [] 
   }
 
@@ -27,7 +28,9 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
         id: chamadoInicial.id, equipamento_id: chamadoInicial.equipamento_id || '', tipo_intervencao: chamadoInicial.tipo_intervencao || 'Corretiva',
         status_id: chamadoInicial.status_id || '', prestador_id: chamadoInicial.prestador_id || '', protocolo_externo: chamadoInicial.protocolo_externo || '',
         descricao: chamadoInicial.descricao || '', data_abertura: chamadoInicial.data_abertura ? new Date(chamadoInicial.data_abertura).toISOString().slice(0, 16) : getDataHoraAtual(),
-        data_prevista: chamadoInicial.data_prevista || '', aberto_por_id: chamadoInicial.aberto_por_id || usuarioAtual?.id, anexos: chamadoInicial.anexos || []
+        data_prevista: chamadoInicial.data_prevista || '', 
+        data_conclusao_manual: chamadoInicial.data_conclusao ? chamadoInicial.data_conclusao.split('T')[0] : '', // Extrai só YYYY-MM-DD
+        aberto_por_id: chamadoInicial.aberto_por_id || usuarioAtual?.id, anexos: chamadoInicial.anexos || []
       })
     }
   }, [view, chamadoInicial, usuarioAtual])
@@ -66,6 +69,9 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
     e.preventDefault()
     setLoading(true)
     
+    const statusSelecionado = auxiliares.status.find(s => s.id === formData.status_id)
+    const isConcluido = statusSelecionado?.nome === 'Concluído'
+
     const payload = { 
       ...formData, modulo: moduloAtivo,
       equipamento_id: formData.equipamento_id || null, status_id: formData.status_id || null,
@@ -74,11 +80,27 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
       data_prevista: formData.data_prevista === "" ? null : formData.data_prevista
     }
 
-    if (view === 'novo') delete payload.id
-    const statusSelecionado = auxiliares.status.find(s => s.id === payload.status_id)
-    if (statusSelecionado?.nome === 'Concluído' && view === 'editar') {
-      payload.data_conclusao = new Date().toISOString()
+    // --- NOVA LÓGICA DE DATA DE CONCLUSÃO SEGURO ---
+    delete payload.data_conclusao_manual; // Remove variável temporária do formulário
+    
+    if (isConcluido) {
+      if (formData.data_conclusao_manual) {
+        // Se o utilizador digitou uma data de conclusão (retroativa ou não), usa ela.
+        payload.data_conclusao = formData.data_conclusao_manual;
+      } else if (view === 'novo') {
+        // Se está a criar agora já como concluído e não digitou data, usa hoje.
+        payload.data_conclusao = new Date().toISOString();
+      } else if (view === 'editar' && !chamadoInicial.data_conclusao) {
+        // Se está a editar, mudou para concluído agora e não tinha data antes, usa hoje.
+        payload.data_conclusao = new Date().toISOString();
+      }
+      // NOTA: Se está a editar, e JÁ TINHA data_conclusao salva (do sistema automático), NÃO FAZ NADA e ela não será esmagada.
+    } else {
+      // Se mudou para Pendente/Aberto, limpa a data de conclusão
+      payload.data_conclusao = null; 
     }
+
+    if (view === 'novo') delete payload.id
 
     const query = view === 'novo' ? supabase.from('chamados').insert([payload]) : supabase.from('chamados').update(payload).eq('id', formData.id)
     const { error } = await query
@@ -92,6 +114,9 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
     }
   }
 
+  // Verifica se o status selecionado é "Concluído" para mostrar o campo de data retroativa
+  const mostrarDataConclusao = auxiliares.status.find(s => s.id === formData.status_id)?.nome === 'Concluído'
+
   return (
     <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -104,6 +129,7 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
 
       <form onSubmit={handleSalvar} className="space-y-4 md:space-y-6">
         <div className="bg-white p-5 md:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-4 md:space-y-6">
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Equipamento</label><select required value={formData.equipamento_id} onChange={e => setFormData({...formData, equipamento_id: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione o equipamento...</option>{auxiliares.equipamentos.map(eq => <option key={eq.id} value={eq.id}>{eq.nome} (Pat: {eq.patrimonio})</option>)}</select></div>
             <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Status atual</label><select required value={formData.status_id} onChange={e => setFormData({...formData, status_id: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.status.map(st => <option key={st.id} value={st.id}>{st.nome}</option>)}</select></div>
@@ -111,7 +137,13 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-5 bg-blue-50/50 border border-blue-100 rounded-xl">
             <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Tipo de Intervenção</label><select value={formData.tipo_intervencao} onChange={e => setFormData({...formData, tipo_intervencao: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="Corretiva">Corretiva</option><option value="Preventiva">Preventiva</option><option value="Calibração">Calibração</option><option value="Qualificação">Qualificação</option></select></div>
-            <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Data Prevista (Agendamento)</label><input type="date" value={formData.data_prevista} onChange={e => setFormData({...formData, data_prevista: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" /><p className="text-[10px] md:text-xs text-slate-500 mt-1 md:mt-1.5">Deixe em branco se for registro imediato.</p></div>
+            
+            {/* RENDERIZA DATA PREVISTA OU DATA CONCLUSÃO DEPENDENDO DO STATUS */}
+            {!mostrarDataConclusao ? (
+              <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Data Prevista (Agendamento)</label><input type="date" value={formData.data_prevista} onChange={e => setFormData({...formData, data_prevista: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" /><p className="text-[10px] md:text-xs text-slate-500 mt-1 md:mt-1.5">Deixe em branco se for registro imediato.</p></div>
+            ) : (
+              <div><label className="block text-xs md:text-sm font-bold text-emerald-700 mb-1.5 md:mb-2">Data Real da Conclusão (Opcional)</label><input type="date" value={formData.data_conclusao_manual} onChange={e => setFormData({...formData, data_conclusao_manual: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50 text-emerald-900 font-medium" /><p className="text-[10px] md:text-xs text-emerald-600/70 mt-1 md:mt-1.5">Preencha caso o serviço tenha sido feito em dia anterior.</p></div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">

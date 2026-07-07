@@ -1,5 +1,13 @@
 import { MapPin, Wrench, User, Activity } from 'lucide-react'
 
+// Função auxiliar à prova de bugs de fuso horário
+const formatDataSegura = (dataString) => {
+  if (!dataString) return '-';
+  const apenasData = dataString.split('T')[0];
+  const [ano, mes, dia] = apenasData.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
 export default function TabelaRelatorio({ dadosBrutos, moduloAtivo, nomeAmbienteImpressao, resumoFiltros, filtrosTexto }) {
   return (
     <div id="relatorio-impresso" className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6 lg:p-8 overflow-hidden">
@@ -35,17 +43,21 @@ export default function TabelaRelatorio({ dadosBrutos, moduloAtivo, nomeAmbiente
             </thead>
             <tbody className="divide-y divide-slate-200">
               {dadosBrutos.map((os) => {
+                
+                // LÓGICA DE DATA CORRIGIDA
                 let tituloData = 'Aberto:'
-                let valorData = new Date(os.data_abertura).toLocaleDateString('pt-BR')
+                let valorData = formatDataSegura(os.data_abertura)
                 let corData = 'text-slate-800'
 
+                // Se o chamado foi concluído e existe uma data de conclusão, priorizamos ela!
                 if (os.status?.nome === 'Concluído' && os.data_conclusao) {
                   tituloData = 'Concluído:'
-                  valorData = new Date(os.data_conclusao).toLocaleDateString('pt-BR')
+                  valorData = formatDataSegura(os.data_conclusao)
                   corData = 'text-emerald-700'
                 } else if (os.data_prevista && os.status?.nome !== 'Concluído') {
+                  // Se não foi concluído ainda, mas tem data prevista (agendada)
                   tituloData = 'Agendado:'
-                  valorData = new Date(os.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+                  valorData = formatDataSegura(os.data_prevista)
                   corData = 'text-blue-700'
                 }
 

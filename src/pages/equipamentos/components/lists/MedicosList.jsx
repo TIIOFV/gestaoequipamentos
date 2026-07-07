@@ -4,11 +4,13 @@ import { Plus, Search, Filter, Activity, AlertTriangle, CheckCircle2 } from 'luc
 import { Skeleton } from '../../../../components/ui/Skeleton'
 import EquipamentoCard from '../EquipamentoCard'
 import toast from 'react-hot-toast'
+import ModalConfirmacao from '../../../../components/ModalConfirmacao'
 
 export default function MedicosList({ setView, setEquipamentoSelecionado }) {
   const [equipamentos, setEquipamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
+  const [modalConfirm, setModalConfirm] = useState({ isOpen: false, idParaExcluir: null });
   
   // Filtros Críticos para Engenharia Clínica
   const [filtroUnidade, setFiltroUnidade] = useState('')
@@ -78,8 +80,44 @@ export default function MedicosList({ setView, setEquipamentoSelecionado }) {
     return data < hoje ? 'atrasada' : 'em_dia';
   }
 
+  const handleExcluir = async (id) => {
+    setLoading(true)
+    try {
+      const { data: chamadosDoEq, error: errorChamados } = await supabase.from('chamados').select('id, anexos').eq('equipamento_id', id);
+      if (errorChamados) throw errorChamados;
+
+      if (chamadosDoEq?.length > 0) {
+        let todosOsAnexosPaths = [];
+        chamadosDoEq.forEach(ch => {
+          if (ch.anexos?.length > 0) ch.anexos.forEach(url => { const partes = url.split('/equipamentos/'); if (partes[1]) todosOsAnexosPaths.push(partes[1]); });
+        });
+        if (todosOsAnexosPaths.length > 0) await supabase.storage.from('equipamentos').remove(todosOsAnexosPaths);
+        await supabase.from('chamados').delete().in('id', chamadosDoEq.map(ch => ch.id));
+      }
+
+      const eqAtual = equipamentos.find(e => e.id === id);
+      if (eqAtual?.imagem_url) {
+         const partesEq = eqAtual.imagem_url.split('/equipamentos/');
+         if (partesEq[1]) await supabase.storage.from('equipamentos').remove([partesEq[1]]);
+      }
+
+      await supabase.from('equipamentos').delete().eq('id', id);
+      toast.success('Equipamento excluído!');
+      carregarDados();
+    } catch (error) { toast.error('Erro na exclusão: ' + error.message); } 
+    finally { setLoading(false); setModalConfirm({ isOpen: false, idParaExcluir: null }); }
+  }
+
   return (
     <div className="space-y-4 md:space-y-6">
+      <ModalConfirmacao 
+        isOpen={modalConfirm.isOpen} 
+        onClose={() => setModalConfirm({ isOpen: false, idParaExcluir: null })}
+        onConfirm={() => handleExcluir(modalConfirm.idParaExcluir)}
+        titulo="Apagar Equipamento"
+        mensagem="CUIDADO: Esta ação apagará TUDO (Histórico, Fotos, Laudos) definitivamente."
+        textoConfirmar="Excluir Tudo"
+      />
       {/* CABEÇALHO */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -172,7 +210,7 @@ export default function MedicosList({ setView, setEquipamentoSelecionado }) {
               onVerDetalhes={() => { setEquipamentoSelecionado(item); setView('detalhes'); }}
               onEditar={() => { setEquipamentoSelecionado(item); setView('editar'); }}
               onDuplicar={() => toast('Função de duplicar em breve', { icon: '🚧' })}
-              onExcluir={() => toast('Função de excluir em breve', { icon: '🚧' })}
+              onExcluir={() => setModalConfirm({ isOpen: true, idParaExcluir: item.id })}
             />
           ))
         )}

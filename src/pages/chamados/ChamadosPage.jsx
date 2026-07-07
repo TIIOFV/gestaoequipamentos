@@ -90,18 +90,46 @@ export default function ChamadosPage() {
     setModalConfirm({
       isOpen: true,
       titulo: 'Excluir Ordem de Serviço',
-      mensagem: 'Tem certeza que deseja excluir esta OS? Esta ação apagará definitivamente este registro do histórico do equipamento.',
-      textoConfirmar: 'Sim, Excluir OS',
+      mensagem: 'Tem certeza que deseja excluir esta OS e TODOS os seus anexos? Esta ação apagará definitivamente os arquivos do servidor e o registro do histórico.',
+      textoConfirmar: 'Sim, Excluir OS e Arquivos',
       onConfirm: async () => {
         setLoading(true)
-        const { error } = await supabase.from('chamados').delete().eq('id', id)
-        if (error) toast.error('Erro ao excluir: ' + error.message)
-        else {
-          toast.success('Ordem de Serviço excluída com sucesso!')
+        try {
+          // 1. BUSCAR OS ANEXOS ANTES DE APAGAR O REGISTRO
+          const { data: chamadoParaApagar, error: fetchError } = await supabase
+            .from('chamados')
+            .select('anexos')
+            .eq('id', id)
+            .single();
+            
+          if (fetchError) throw fetchError;
+
+          // 2. SE HOUVER ANEXOS, APAGAR DO STORAGE PRIMEIRO
+          if (chamadoParaApagar && chamadoParaApagar.anexos && chamadoParaApagar.anexos.length > 0) {
+            // Extrai apenas o nome do arquivo da URL completa do Supabase
+            const pathsParaRemover = chamadoParaApagar.anexos.map(url => {
+              const partes = url.split('/equipamentos/');
+              return partes[1]; // Ex: 'os_anexo_12345.pdf'
+            }).filter(Boolean);
+
+            if (pathsParaRemover.length > 0) {
+              const { error: storageError } = await supabase.storage.from('equipamentos').remove(pathsParaRemover);
+              if (storageError) console.error('Erro ao limpar arquivos órfãos:', storageError);
+            }
+          }
+
+          // 3. DEPOIS DE LIMPAR OS ARQUIVOS, APAGA O REGISTRO DO BANCO
+          const { error: deleteError } = await supabase.from('chamados').delete().eq('id', id);
+          if (deleteError) throw deleteError;
+
+          toast.success('Ordem de Serviço e anexos excluídos com sucesso!')
           voltarParaLista()
           buscarChamados()
+        } catch (error) {
+          toast.error('Erro ao excluir: ' + error.message)
+        } finally {
+          setLoading(false)
         }
-        setLoading(false)
       }
     });
   }

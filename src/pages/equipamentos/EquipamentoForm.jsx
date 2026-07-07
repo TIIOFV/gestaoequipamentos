@@ -13,10 +13,9 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
   const [formData, setFormData] = useState({ 
     ...inicial, 
     tipo_impressora: inicial.tipo_impressora || '',
-    registro_anvisa: inicial.registro_anvisa || '' // <-- ESTADO DA ANVISA MANTIDO
+    registro_anvisa: inicial.registro_anvisa || '' 
   })
   
-  // O estado das imagens sobe para cá para o form conseguir salvar a imagem principal
   const [arquivoImagem, setArquivoImagem] = useState(null)
   const [previewImagem, setPreviewImagem] = useState(inicial.imagem_url || null)
 
@@ -53,7 +52,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         tipo_impressora: formData.tipo_impressora || null
       }
       
-      // LIMPEZA DE SEGURANÇA: Remove campos que são apenas para visualização
+      // LIMPEZA DE SEGURANÇA
       delete payload.desconhece_fabricacao;
       delete payload.fabricante; 
       delete payload.prestador;  
@@ -75,7 +74,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         if (dbError) throw dbError
       }
 
-      // 4. Lógica de OS Automáticas Perpétuas (Sem sobrescrever o histórico)
+      // 4. Lógica de OS Automáticas Perpétuas (AGORA COM PRESTADOR E SEM DUPLICAR)
       if (!['ti', 'impressoras'].includes(moduloAtivo)) {
         const { data: authData } = await supabase.auth.getUser()
         let perfilId = null;
@@ -86,18 +85,20 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
 
         // --- HISTÓRICO DE CALIBRAÇÕES PASSADAS ---
         if (payload.data_ultima_calibracao) {
-          // Busca se JÁ EXISTE uma OS automática concluída nesta exata data
+          // Busca por tipo de intervenção e data exata, não mais por texto de descrição
           const { data: osMesmaData } = await supabase
             .from('chamados')
             .select('id')
             .eq('equipamento_id', equipamentoId)
             .eq('data_conclusao', payload.data_ultima_calibracao)
-            .ilike('descricao', '%(Lançamento automático)%')
+            .in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação'])
             .maybeSingle();
 
-          // Se não existir, insere uma nova (Mantendo as antigas intactas)
           if (!osMesmaData) {
             const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
+            
+            // Corrige o formato visual da data para a descrição
+            const dataBr = payload.data_ultima_calibracao.split('-').reverse().join('/');
             
             await supabase.from('chamados').insert([{ 
               equipamento_id: equipamentoId, 
@@ -106,23 +107,23 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
               data_abertura: payload.data_ultima_calibracao, 
               data_prevista: payload.data_ultima_calibracao, 
               data_conclusao: payload.data_ultima_calibracao, 
-              descricao: `Registro de Manutenção Preventiva/Calibração realizada em ${new Date(payload.data_ultima_calibracao).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}. (Lançamento automático)`, 
+              descricao: `Registro de Manutenção Preventiva/Calibração realizada em ${dataBr}. (Lançamento automático)`, 
               status_id: stConcluido?.id, 
-              aberto_por_id: perfilId 
+              aberto_por_id: perfilId,
+              prestador_id: payload.prestador_id // <-- PRESTADOR VINCULADO
             }]);
           }
         }
 
         // --- GERENCIAMENTO DE CALIBRAÇÃO FUTURA ---
         if (payload.data_proxima_calibracao) {
-          // Pega o ID de "Concluído" para não mexer em OS que já foram finalizadas
           const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
           
           let queryFutura = supabase
             .from('chamados')
             .select('id')
             .eq('equipamento_id', equipamentoId)
-            .ilike('descricao', '%programada.%');
+            .in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação']);
             
           if (stConcluido?.id) {
              queryFutura = queryFutura.neq('status_id', stConcluido.id); // Ignora as concluídas
@@ -131,11 +132,14 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           const { data: osFutura } = await queryFutura.maybeSingle();
 
           if (osFutura) {
-            // Se já existe uma OS aberta avisando do futuro, apenas atualiza a data dela
-            await supabase.from('chamados').update({ data_prevista: payload.data_proxima_calibracao }).eq('id', osFutura.id);
+            // Atualiza data E o prestador, caso tenha mudado a assistência técnica
+            await supabase.from('chamados').update({ 
+              data_prevista: payload.data_proxima_calibracao,
+              prestador_id: payload.prestador_id // <-- PRESTADOR VINCULADO
+            }).eq('id', osFutura.id);
           } else {
-            // Se não existe, cria o alerta futuro
             const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
+            
             await supabase.from('chamados').insert([{ 
               equipamento_id: equipamentoId, 
               modulo: moduloAtivo, 
@@ -144,7 +148,8 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
               data_prevista: payload.data_proxima_calibracao, 
               descricao: `Manutenção Preventiva / Calibração programada.`, 
               status_id: stAberto?.id, 
-              aberto_por_id: perfilId 
+              aberto_por_id: perfilId,
+              prestador_id: payload.prestador_id // <-- PRESTADOR VINCULADO
             }]);
           }
         }
@@ -168,7 +173,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
       <form onSubmit={handleSalvar} className="space-y-6">
         <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
           
-          {/* COMPONENTE ISOLADO DAS IMAGENS */}
           <FormImagens 
             formData={formData} setFormData={setFormData}
             arquivoImagem={arquivoImagem} setArquivoImagem={setArquivoImagem}

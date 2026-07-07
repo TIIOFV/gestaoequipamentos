@@ -1,5 +1,13 @@
 import { useState } from 'react'
-import { Plus, Search, Filter, Clock, Calendar, Wrench, Paperclip, FileText } from 'lucide-react'
+import { Plus, Search, Filter, Clock, Calendar, Wrench, Paperclip, FileText, CheckCircle2 } from 'lucide-react'
+
+// Função auxiliar antibug de fuso horário
+const formatDataSegura = (dataString) => {
+  if (!dataString) return '-';
+  const apenasData = dataString.split('T')[0];
+  const [ano, mes, dia] = apenasData.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
 
 export default function ChamadosList({ chamados, loading, auxiliares, setView, setChamadoSelecionado }) {
   const [busca, setBusca] = useState('')
@@ -64,6 +72,25 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
           <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum chamado encontrado.</div>
         ) : chamadosFiltrados.map((ch) => {
           const temPDF = ch.anexos && ch.anexos.some(a => isPDF(a));
+          
+          // --- NOVA LÓGICA INTELIGENTE DE DATAS ---
+          let tituloData = 'Aberto:'
+          let valorData = formatDataSegura(ch.data_abertura)
+          let corData = 'text-slate-500'
+          let IconeData = Clock
+
+          if (ch.status?.nome === 'Concluído' && ch.data_conclusao) {
+            tituloData = 'Concluído:'
+            valorData = formatDataSegura(ch.data_conclusao)
+            corData = 'text-emerald-600'
+            IconeData = CheckCircle2
+          } else if (ch.data_prevista && ch.status?.nome !== 'Concluído') {
+            tituloData = 'Agendado:'
+            valorData = formatDataSegura(ch.data_prevista)
+            corData = 'text-blue-600'
+            IconeData = Calendar
+          }
+
           return (
             <div key={ch.id} className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-4 items-start md:items-center justify-between group">
               <div className="flex-1 w-full">
@@ -80,8 +107,12 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
                 </div>
                 <p className="text-slate-500 text-xs md:text-sm line-clamp-2 md:line-clamp-1 mt-1">{ch.descricao}</p>
                 <div className="flex flex-wrap items-center gap-3 md:gap-4 mt-3 text-[11px] md:text-xs font-medium text-slate-400">
-                  <div className="flex items-center gap-1"><Clock size={12} /> Aberto: {new Date(ch.data_abertura).toLocaleDateString('pt-BR')}</div>
-                  {ch.data_prevista && <div className="flex items-center gap-1 text-blue-600"><Calendar size={12} /> Agendado: {new Date(ch.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>}
+                  
+                  {/* DATA RENDERIZADA DINAMICAMENTE */}
+                  <div className={`flex items-center gap-1 ${corData}`}>
+                    <IconeData size={12} /> {tituloData} {valorData}
+                  </div>
+                  
                   <div className="flex items-center gap-1"><Wrench size={12} /> {ch.prestador?.nome || 'Interno'}</div>
                 </div>
               </div>
