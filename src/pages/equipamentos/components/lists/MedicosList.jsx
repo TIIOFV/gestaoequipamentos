@@ -7,9 +7,16 @@ import EquipamentoCard from '../EquipamentoCard'
 import toast from 'react-hot-toast'
 import ModalConfirmacao from '../../../../components/ModalConfirmacao'
 import Paginacao from '../../../../components/Paginacao'
+// 1. IMPORTAÇÕES ADICIONADAS
+import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function MedicosList({ setView, setEquipamentoSelecionado }) {
   const { profile } = useAuth()
+  
+  // 2. INSTANCIAMENTO
+  const location = useLocation()
+  const navigate = useNavigate()
+  
   const [equipamentos, setEquipamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
@@ -34,6 +41,18 @@ export default function MedicosList({ setView, setEquipamentoSelecionado }) {
   useEffect(() => {
     carregarDados()
   }, [])
+
+  // 🚨 3. O BLOCO SEGURO DE ESCUTA DE NOTIFICAÇÕES
+  useEffect(() => {
+    if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
+      const eqAlerta = equipamentos.find(e => e.id === location.state.openDetailsId);
+      if (eqAlerta) {
+        navigate(location.pathname, { replace: true, state: {} });
+        setEquipamentoSelecionado(eqAlerta);
+        setView('detalhes');
+      }
+    }
+  }, [loading, equipamentos, location.state, navigate, setView, setEquipamentoSelecionado]);
 
   const carregarDados = async () => {
     setLoading(true)

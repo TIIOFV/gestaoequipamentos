@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
 
@@ -11,7 +11,10 @@ import PadraoList from './components/lists/PadraoList'
 import EquipamentoDetalhes from './EquipamentoDetalhes'
 import EquipamentoForm from './EquipamentoForm'
 
+import { useLocation } from 'react-router-dom'
+
 export default function EquipamentosPage() {
+  const location = useLocation()
   const { moduloAtivo } = useModulo()
   const [view, setView] = useState('lista')
   const [equipamentoSelecionado, setEquipamentoSelecionado] = useState(null)
@@ -20,6 +23,29 @@ export default function EquipamentosPage() {
   const [auxiliares, setAuxiliares] = useState({ 
     fabricantes: [], unidades: [], setores: [], status: [], prestadores: [] 
   });
+
+  // 🚨 REFERÊNCIA PARA CORRIGIR O BUG DO "PISCA PISCA"
+  const lastClickRef = useRef(null);
+
+  useEffect(() => {
+    const idAlvo = location.state?.openDetailsId;
+    const clickTimestamp = location.state?._t;
+
+    if (idAlvo) {
+      // Verifica se é um clique NOVO (timestamp diferente) 
+      // ou se estamos presos na tela de detalhes de OUTRO equipamento
+      if (clickTimestamp !== lastClickRef.current || (view === 'detalhes' && equipamentoSelecionado?.id !== idAlvo)) {
+        
+        lastClickRef.current = clickTimestamp; // Atualiza a memória para não repetir
+        
+        // Se não estivermos na lista, forçamos a volta para que a lista possa caçar a nova máquina!
+        if (view !== 'lista') {
+          setView('lista');
+          setEquipamentoSelecionado(null);
+        }
+      }
+    }
+  }, [location.state, view, equipamentoSelecionado]);
 
   useEffect(() => {
     async function carregarAuxiliares() {
@@ -33,7 +59,6 @@ export default function EquipamentosPage() {
       ]);
 
       // 2. Filtramos cada um pelo moduloAtivo
-      // Assumindo que a sua tabela de configurações salva os módulos permitidos numa coluna tipo Array chamada 'modulo'
       const filtrarPorModulo = (lista) => 
         lista.filter(item => !item.modulo || item.modulo.includes(moduloAtivo));
 
@@ -41,12 +66,12 @@ export default function EquipamentosPage() {
         fabricantes: filtrarPorModulo(f.data || []),
         unidades: filtrarPorModulo(u.data || []),
         setores: filtrarPorModulo(s.data || []),
-        status: st.data || [], // Status geralmente é global, mantemos todos
+        status: st.data || [], 
         prestadores: filtrarPorModulo(p.data || [])
       });
     }
     carregarAuxiliares();
-  }, [moduloAtivo]); // Adicionámos [moduloAtivo] aqui para recarregar ao trocar de módulo
+  }, [moduloAtivo]); 
 
   const voltarParaLista = () => {
     setView('lista')
@@ -55,9 +80,8 @@ export default function EquipamentosPage() {
 
   // Renderização condicional
   if (view === 'detalhes' && equipamentoSelecionado) {
-    // Verificação de segurança: se o objeto não tiver nome, mostramos um loading ou erro
     if (!equipamentoSelecionado.nome) {
-        return <div className="p-10 text-center">Carregando detalhes...</div>;
+        return <div className="p-10 text-center text-slate-500 font-medium">Carregando detalhes...</div>;
     }
     
     return (
@@ -74,8 +98,8 @@ export default function EquipamentosPage() {
     return (
       <EquipamentoForm 
         view={view} 
-        formDataInicial={equipamentoSelecionado} // Nome esperado pelo seu form
-        auxiliaresGlobais={auxiliares}            // AQUI ESTÁ O QUE FALTAVA
+        formDataInicial={equipamentoSelecionado} 
+        auxiliaresGlobais={auxiliares}            
         moduloAtivo={moduloAtivo}
         onVoltar={voltarParaLista} 
         onSucesso={voltarParaLista} 

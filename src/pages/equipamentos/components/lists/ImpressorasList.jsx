@@ -7,9 +7,13 @@ import EquipamentoCard from '../EquipamentoCard'
 import ModalConfirmacao from '../../../../components/ModalConfirmacao'
 import Paginacao from '../../../../components/Paginacao'
 import toast from 'react-hot-toast'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function ImpressorasList({ setView, setEquipamentoSelecionado }) {
   const { profile } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  
   const [equipamentos, setEquipamentos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
@@ -33,6 +37,21 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
   useEffect(() => {
     carregarDados()
   }, [])
+
+  // 🚨 O ÚNICO OUVINTE DE NOTIFICAÇÕES (Corrigido)
+  useEffect(() => {
+    if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
+      const eqAlerta = equipamentos.find(e => e.id === location.state.openDetailsId);
+      if (eqAlerta) {
+        // 1. Limpamos o estado na memória do React Router PRIMEIRO
+        navigate(location.pathname, { replace: true, state: {} });
+        
+        // 2. Trocamos a tela
+        setEquipamentoSelecionado(eqAlerta);
+        setView('detalhes');
+      }
+    }
+  }, [loading, equipamentos, location.state, navigate, setView, setEquipamentoSelecionado]);
 
   const carregarDados = async () => {
     setLoading(true)

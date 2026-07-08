@@ -23,6 +23,7 @@ const AgendaPage = lazy(() => import('./pages/agenda/AgendaPage'))
 const RelatoriosPage = lazy(() => import('./pages/relatorios/RelatoriosPage'))
 const ConfiguracoesPage = lazy(() => import('./pages/configuracoes/ConfiguracoesPage'))
 const BilhetagemPage = lazy(() => import('./pages/impressoras/BilhetagemPage'))
+const ReleasesPage = lazy(() => import('./pages/releases/ReleasesPage'))
 
 export default function App() {
   return (
@@ -48,7 +49,7 @@ export default function App() {
               
               <Route element={<ProtectedRoute />}>
                 <Route path="/modulos" element={<ModulosPage />} />
-
+                <Route path="/:modulo/releases" element={<ReleasesPage />} />
                 <Route path="/:moduloId" element={<AppLayout />}>
                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<DashboardPage />} />
