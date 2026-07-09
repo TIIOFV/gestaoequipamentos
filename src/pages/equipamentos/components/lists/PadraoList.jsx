@@ -7,13 +7,11 @@ import EquipamentoCard from '../EquipamentoCard'
 import ModalConfirmacao from '../../../../components/ModalConfirmacao'
 import Paginacao from '../../../../components/Paginacao'
 import toast from 'react-hot-toast'
-// 1. IMPORTAÇÕES DE ROTA ADICIONADAS
 import { useLocation, useNavigate } from 'react-router-dom'
 
 export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecionado }) {
   const { profile } = useAuth()
   
-  // 2. INSTANCIAMENTO
   const location = useLocation()
   const navigate = useNavigate()
   
@@ -25,6 +23,7 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
   const [filtroUnidade, setFiltroUnidade] = useState('')
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
+  const [statusLista, setStatusLista] = useState([])
 
   const [unidades, setUnidades] = useState([])
   const [setores, setSetores] = useState([])
@@ -51,7 +50,7 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
     carregarDados()
   }, [moduloAtivo]) 
 
-  // 🚨 3. O BLOCO SEGURO DE ESCUTA DE NOTIFICAÇÕES
+  // O BLOCO SEGURO DE ESCUTA DE NOTIFICAÇÕES
   useEffect(() => {
     if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
       const eqAlerta = equipamentos.find(e => e.id === location.state.openDetailsId);
@@ -66,17 +65,17 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
   const carregarDados = async () => {
     setLoading(true)
     try {
-      const [eqRes, unRes, setRes] = await Promise.all([
-        supabase.from('equipamentos').select(`*, unidade:unidade_id(nome), setor:setor_id(nome)`).eq('modulo', moduloAtivo).order('nome'),
+      const [eqRes, unRes, setRes, stRes] = await Promise.all([
+        supabase.from('equipamentos').select(`*, unidade:unidade_id(nome), setor:setor_id(nome), status:status_id(nome), fabricante:fabricante_id(nome)`).eq('modulo', moduloAtivo).order('nome'),
         supabase.from('unidades').select('*').order('nome'),
-        supabase.from('setores').select('*').order('nome')
+        supabase.from('setores').select('*').order('nome'),
+        supabase.from('status_equipamento').select('*').order('nome')
       ])
 
       setEquipamentos(eqRes.data || [])
       setUnidades(unRes.data || [])
-      
-      const setoresFiltrados = (setRes.data || []).filter(s => s.modulo && s.modulo.includes(moduloAtivo))
-      setSetores(setoresFiltrados)
+      setSetores((setRes.data || []).filter(s => s.modulo && s.modulo.includes(moduloAtivo)))
+      setStatusLista((stRes.data || []).filter(s => !s.modulo || s.modulo.includes(moduloAtivo)))
     } catch (err) {
       toast.error('Erro ao carregar os equipamentos.')
     } finally {
@@ -90,9 +89,12 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
                        (item.numero_serie || '').toLowerCase().includes(termo) ||
                        (item.patrimonio || '').toLowerCase().includes(termo)
 
-    const matchUnidade = filtroUnidade === '' || item.unidade_id === filtroUnidade
-    const matchSetor = filtroSetor === '' || item.setor_id === filtroSetor
-    const matchStatus = filtroStatus === '' || item.status === filtroStatus
+    const matchUnidade = filtroUnidade === '' || String(item.unidade_id) === String(filtroUnidade)
+    const matchSetor = filtroSetor === '' || String(item.setor_id) === String(filtroSetor)
+    
+    // CORREÇÃO AQUI: Verifica o nome do status ignorando maiúsculas
+    const statusLimpo = item.status?.nome?.toLowerCase().trim() || ''
+    const matchStatus = filtroStatus === '' || statusLimpo === filtroStatus.toLowerCase().trim()
     
     return matchBusca && matchUnidade && matchSetor && matchStatus
   })
@@ -190,7 +192,7 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
           </span>
           <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todas as unidades</option>{unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>
           <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os setores</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select>
-          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os status</option><option value="ATIVO">Ativo</option><option value="MANUTENCAO">Em Manutenção</option><option value="INATIVO">Inativo / Baixa</option></select>
+          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os status</option>{statusLista.map(st => <option key={st.id} value={st.nome}>{st.nome}</option>)}</select>
         </div>
       </div>
 

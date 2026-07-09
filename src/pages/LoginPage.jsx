@@ -74,7 +74,7 @@ export default function LoginPage() {
               </div>
               <input
                 type="email"
-                placeholder="E-mail corporativo (@iofv.com)"
+                placeholder="E-mail corporativo (@dominio.com)"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-11 pr-4 py-3.5 bg-slate-50/50 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all outline-none text-slate-700 font-medium placeholder:text-slate-400"
@@ -121,7 +121,7 @@ export default function LoginPage() {
       <div className="mt-8 md:mt-12 flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity relative z-10">
         <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold tracking-[0.2em] uppercase">
           <ShieldCheck size={12} className="text-blue-500" />
-          Desenvolvido por Pedro Oliveira - IOFV
+          Desenvolvido por Pedro Oliveira - v.1.23.0
         </div>
       </div>
     </div>

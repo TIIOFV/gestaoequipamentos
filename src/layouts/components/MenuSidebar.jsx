@@ -99,6 +99,7 @@ export default function MenuSidebar({
   const handleNotifClick = (e, path, targetId) => {
     e.preventDefault(); setIsMobileMenuOpen(false);
     const targetPath = !hasFullAccess ? `/${moduloAtivo}/agenda` : path;
+    
     const statePayload = targetId ? { openDetailsId: targetId, _t: Date.now() } : { _t: Date.now() };
     navigate(targetPath, { state: statePayload });
   }
@@ -152,7 +153,7 @@ export default function MenuSidebar({
         <p className="font-semibold text-slate-800 truncate text-sm">{profile ? profile.nome : 'Carregando...'}</p>
         {profile && (
           <span className={`inline-flex items-center px-2 py-0.5 mt-0.5 rounded-md text-[10px] font-bold capitalize ${hasFullAccess ? 'bg-blue-100 text-blue-800' : 'bg-slate-200 text-slate-700'}`}>
-            {hasFullAccess ? profile.perfil : 'Visualizador Restrito'}
+            {hasFullAccess ? profile.perfil : 'Usuário'}
           </span>
         )}
       </div>

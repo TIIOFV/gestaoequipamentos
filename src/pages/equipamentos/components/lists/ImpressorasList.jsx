@@ -22,6 +22,7 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
   const [filtroUnidade, setFiltroUnidade] = useState('')
   const [filtroSetor, setFiltroSetor] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
+  const [statusLista, setStatusLista] = useState([])
   const [filtroPatrimonio, setFiltroPatrimonio] = useState('todos')
 
   const [unidades, setUnidades] = useState([])
@@ -38,33 +39,32 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
     carregarDados()
   }, [])
 
-  // 🚨 O ÚNICO OUVINTE DE NOTIFICAÇÕES (Corrigido)
   useEffect(() => {
     if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
       const eqAlerta = equipamentos.find(e => e.id === location.state.openDetailsId);
       if (eqAlerta) {
-        // 1. Limpamos o estado na memória do React Router PRIMEIRO
         navigate(location.pathname, { replace: true, state: {} });
-        
-        // 2. Trocamos a tela
         setEquipamentoSelecionado(eqAlerta);
         setView('detalhes');
       }
     }
   }, [loading, equipamentos, location.state, navigate, setView, setEquipamentoSelecionado]);
 
+  // CORREÇÃO: Função carregarDados limpa e sem duplicações
   const carregarDados = async () => {
     setLoading(true)
     try {
-      const [eqRes, unRes, setRes] = await Promise.all([
-        supabase.from('equipamentos').select(`*, unidade:unidade_id(nome), setor:setor_id(nome), status:status_id(nome)`).eq('modulo', 'impressoras').order('nome'),
+      const [eqRes, unRes, setRes, stRes] = await Promise.all([
+        supabase.from('equipamentos').select(`*, unidade:unidade_id(nome), setor:setor_id(nome), status:status_id(nome), fabricante:fabricante_id(nome)`).eq('modulo', 'impressoras').order('nome'),
         supabase.from('unidades').select('*').order('nome'),
-        supabase.from('setores').select('*').order('nome')
+        supabase.from('setores').select('*').order('nome'),
+        supabase.from('status_equipamento').select('*').order('nome')
       ])
 
       setEquipamentos(eqRes.data || [])
       setUnidades(unRes.data || [])
       setSetores(setRes.data || [])
+      setStatusLista((stRes.data || []).filter(s => !s.modulo || s.modulo.includes('impressoras')))
     } catch (err) {
       toast.error('Erro ao carregar dados do parque de impressão.')
     } finally {
@@ -78,9 +78,11 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
                        (item.numero_serie || '').toLowerCase().includes(termo) ||
                        (item.patrimonio || '').toLowerCase().includes(termo)
 
-    const matchUnidade = filtroUnidade === '' || item.unidade_id === filtroUnidade
-    const matchSetor = filtroSetor === '' || item.setor_id === filtroSetor
-    const matchStatus = filtroStatus === '' || item.status === filtroStatus
+    const matchUnidade = filtroUnidade === '' || String(item.unidade_id) === String(filtroUnidade)
+    const matchSetor = filtroSetor === '' || String(item.setor_id) === String(filtroSetor)
+    
+    const statusLimpo = item.status?.nome?.toLowerCase().trim() || ''
+    const matchStatus = filtroStatus === '' || statusLimpo === filtroStatus.toLowerCase().trim()
     
     let matchPat = true
     if (filtroPatrimonio === 'sem-patrimonio') matchPat = !item.patrimonio || item.patrimonio === 'PENDENTE'
@@ -182,7 +184,10 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
           </span>
           <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todas as unidades</option>{unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>
           <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os setores</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select>
-          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os status</option><option value="ATIVO">Ativo</option><option value="MANUTENCAO">Em Manutenção</option><option value="RESERVA">Reserva Técnica</option></select>
+          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0">
+            <option value="">Todos os status</option>
+            {statusLista.map(st => <option key={st.id} value={st.nome}>{st.nome}</option>)}
+          </select>
         </div>
 
         <div className="flex flex-wrap gap-2 pt-1 border-t border-slate-100 text-xs">

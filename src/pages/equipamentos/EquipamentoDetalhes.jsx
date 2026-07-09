@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react' // Adicionado useState, useEffect
+import { useState, useEffect } from 'react' 
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../../lib/supabase' // Verifique se o caminho do supabase está correto
+import { supabase } from '../../lib/supabase' 
 import { useModulo } from '../../contexts/ModuloContext'
 import { ArrowLeft, Edit, Wrench, FileText, CheckCircle2, AlertTriangle, Factory, Image as ImageIcon, Images, Activity } from 'lucide-react'
 
@@ -121,7 +121,6 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
         )}
         
         <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm">
-           {/* AGORA PASSAMOS O HISTÓRICO CARREGADO LOCALMENTE */}
            <DetalheHistorico historico={historicoLocal} equipamento={equipamento} />
         </div>
       </div>
