@@ -39,12 +39,38 @@ export default function EquipamentoCard({
         </div>
 
         <div className="bg-slate-50/80 rounded-xl p-4 md:p-5 grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 border border-slate-100 shadow-sm">
-          <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Série</span><span className="font-bold text-slate-800 text-sm truncate" title={eq.numero_serie}>{eq.numero_serie || '-'}</span></div>
-          <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Patrimônio</span><span className="font-bold text-slate-800 text-sm truncate" title={eq.patrimonio}>{eq.patrimonio || '-'}</span></div>
-          <div className="flex flex-col"><span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Modelo</span><span className="font-bold text-slate-800 text-sm truncate" title={eq.modelo}>{eq.modelo || '-'}</span></div>
+          {/* Coluna 1: Série */}
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Série</span>
+            <span className="font-bold text-slate-800 text-sm truncate" title={eq.numero_serie}>{eq.numero_serie || '-'}</span>
+          </div>
+
+          {/* Coluna 2: Patrimônio */}
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Patrimônio</span>
+            <span className="font-bold text-slate-800 text-sm truncate" title={eq.patrimonio}>{eq.patrimonio || '-'}</span>
+          </div>
+
+          {/* Coluna 3: Modelo OU ANVISA (Lógica Condicional) */}
+          {moduloAtivo === 'medicos' ? (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-emerald-500 tracking-wider mb-1">Reg. ANVISA</span>
+              <span className="font-bold text-emerald-700 text-sm truncate" title={eq.registro_anvisa}>{eq.registro_anvisa || 'N/A'}</span>
+            </div>
+          ) : (
+            <div className="flex flex-col">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Modelo</span>
+              <span className="font-bold text-slate-800 text-sm truncate" title={eq.modelo}>{eq.modelo || '-'}</span>
+            </div>
+          )}
+
+          {/* Coluna 4 e 5: Local / Setor (Ocupa as 2 colunas restantes) */}
           <div className="flex flex-col col-span-2 lg:col-span-2">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Local / Setor</span>
-            <span className="font-bold text-blue-700 text-sm truncate" title={`${eq.unidade?.nome} ${eq.setor?.nome ? `- ${eq.setor?.nome}` : ''}`}>{eq.unidade?.nome} <span className="text-slate-500 font-medium">{eq.setor?.nome ? `(${eq.setor?.nome})` : ''}</span></span>
+            <span className="font-bold text-blue-700 text-sm truncate" title={`${eq.unidade?.nome} ${eq.setor?.nome ? `- ${eq.setor?.nome}` : ''}`}>
+              {eq.unidade?.nome} 
+              <span className="text-slate-500 font-medium">{eq.setor?.nome ? ` (${eq.setor?.nome})` : ''}</span>
+            </span>
           </div>
         </div>
 

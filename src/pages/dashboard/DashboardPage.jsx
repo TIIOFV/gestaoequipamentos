@@ -16,7 +16,8 @@ export default function DashboardPage() {
   const [filtroUnidade, setFiltroUnidade] = useState('Todas')
   const [modalInoperantes, setModalInoperantes] = useState({ aberto: false, lista: [] })
   
-  const [kpis, setKpis] = useState({ totalEquip: 0, dispPercent: 0, osAbertas: 0, osAtrasadas: 0, concluidasMes: 0, inoperantes: 0, paginasMes: 0, custoMes: 0 })
+  // Removido o custoMes
+  const [kpis, setKpis] = useState({ totalEquip: 0, dispPercent: 0, osAbertas: 0, osAtrasadas: 0, concluidasMes: 0, inoperantes: 0, paginasMes: 0 })
   const [graficos, setGraficos] = useState({ tendencia: [], statusParque: [], tendenciaImpressoes: [] })
   const [listas, setListas] = useState({ atrasadas: [], proximas: [] })
 
@@ -61,7 +62,6 @@ export default function DashboardPage() {
     const equipamentos = equipReq.data || []
     const chamados = (chamadosReq.data || []).filter(ch => ch.equipamento !== null)
 
-    // Busca dados exclusivos de bilhetagem se for módulo de impressoras
     let leituras = []
     if (moduloAtivo === 'impressoras' && equipamentos.length > 0) {
       const equipIds = equipamentos.map(e => e.id)
@@ -82,7 +82,6 @@ export default function DashboardPage() {
     const listaInoperantes = equipamentos.filter(eq => eq.status?.nome?.toLowerCase().includes('inoperante'))
     const osAbertas = chamados.filter(ch => ch.status?.nome !== 'Concluído')
     
-    // Corrigido: Usamos 'data_prevista' para comparar atrasos, garantindo foco no prazo real
     const osAtrasadas = osAbertas.filter(ch => {
       if (!ch.data_prevista) return false
       const prev = new Date(ch.data_prevista)
@@ -90,20 +89,48 @@ export default function DashboardPage() {
       return prev < hoje
     })
 
-    // Corrigido: O filtro de concluídas agora olha especificamente para o mês da data_conclusao
-    // Isso garante que lançamentos retroativos apareçam no mês correto da competência
     const concluidasMes = chamados.filter(ch => {
       if (ch.status?.nome !== 'Concluído' || !ch.data_conclusao) return false
       const conc = new Date(ch.data_conclusao)
-      // Forçamos a comparação UTC para evitar bug de fuso horário
       return conc.getUTCMonth() === mesAtual && conc.getUTCFullYear() === anoAtual
     })
 
-    // Processamento da Bilhetagem
-    let paginasMes = 0; let custoMes = 0; const ultimos6MesesImpressoes = [];
-    // ... (mantenha o seu código de processamento de leituras aqui, está correto)
+    // Processamento EXCLUSIVO para volume de impressões
+    let paginasMes = 0; 
+    const ultimos6MesesImpressoes = [];
+    
     if (moduloAtivo === 'impressoras') {
-      // ... (seu bloco de processamento de impressoras permanece igual)
+      // NOVA LÓGICA: Pegar o mês anterior para o KPI principal
+      const dataAnterior = new Date(anoAtual, mesAtual - 1, 1)
+      const stringMesAnteriorFormatada = `${dataAnterior.getFullYear()}-${String(dataAnterior.getMonth() + 1).padStart(2, '0')}-01`
+      
+      const leiturasMesAnterior = leituras.filter(l => l.mes_referencia === stringMesAnteriorFormatada)
+      leiturasMesAnterior.forEach(l => {
+        paginasMes += (l.contador_pb || 0) + (l.contador_cor || 0) + (l.contador_etiquetas || 0) + (l.contador_pulseiras || 0)
+      })
+
+      // Gráfico dos últimos 6 meses (Mantém igual)
+      for (let i = 5; i >= 0; i--) {
+        const d = new Date(anoAtual, mesAtual - i, 1)
+        const mesStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
+        const leiturasMes = leituras.filter(l => l.mes_referencia === mesStr)
+        
+        let pb = 0; let cor = 0; let etiquetas = 0; let pulseiras = 0;
+        leiturasMes.forEach(l => {
+          pb += l.contador_pb || 0
+          cor += l.contador_cor || 0
+          etiquetas += l.contador_etiquetas || 0
+          pulseiras += l.contador_pulseiras || 0
+        })
+
+        ultimos6MesesImpressoes.push({ 
+          name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(), 
+          "Páginas P&B": pb, 
+          "Páginas Cor": cor,
+          "Etiquetas": etiquetas,
+          "Pulseiras": pulseiras
+        })
+      }
     }
 
     setKpis({
@@ -113,13 +140,11 @@ export default function DashboardPage() {
       osAtrasadas: osAtrasadas.length, 
       concluidasMes: concluidasMes.length, 
       inoperantes: listaInoperantes.length, 
-      paginasMes, 
-      custoMes
+      paginasMes
     })
 
     setModalInoperantes(prev => ({ ...prev, lista: listaInoperantes }))
 
-    // Ajuste nos Gráficos: Focar na data real do serviço (data_conclusao ou data_abertura)
     const ultimos6Meses = []
     for (let i = 5; i >= 0; i--) {
       const d = new Date(anoAtual, mesAtual - i, 1)
@@ -127,7 +152,6 @@ export default function DashboardPage() {
     }
 
     chamados.forEach(ch => {
-      // Prioriza a data de conclusão, se não houver, usa a de abertura
       const dataRef = ch.data_conclusao ? new Date(ch.data_conclusao) : new Date(ch.data_abertura);
       if (!dataRef || isNaN(dataRef)) return;
       
@@ -135,7 +159,6 @@ export default function DashboardPage() {
       if (index !== -1) ultimos6Meses[index]["OS Registradas"]++
     })
 
-    // ... (seu código de coresStatus e setGraficos permanece igual)
     const coresStatus = { 'Operante': '#10b981', 'Em Manutenção': '#f59e0b', 'Inoperante': '#ef4444', 'Sem Status': '#94a3b8' }
     const mapaStatus = equipamentos.reduce((acc, eq) => {
       const nome = eq.status?.nome || 'Sem Status'
@@ -182,7 +205,6 @@ export default function DashboardPage() {
       <DashboardGraficos graficos={graficos} moduloAtivo={moduloAtivo} />
       <DashboardListas listas={listas} moduloAtivo={moduloAtivo} navigate={navigate} />
 
-      {/* MODAL INOPERANTES MANTIDO AQUI POR SIMPLICIDADE DO ESTADO */}
       {modalInoperantes.aberto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-in zoom-in duration-150 border border-slate-200">

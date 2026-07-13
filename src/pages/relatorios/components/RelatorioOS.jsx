@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { 
   Calendar as CalendarIcon, Filter, Layers, AlertTriangle, 
-  Tag, Clock, MapPin, Wrench, User, Activity, Loader2 
+  Tag, Clock, MapPin, Wrench, User, Activity, Loader2, FileSpreadsheet
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 
 // Função auxiliar à prova de bugs de fuso horário
@@ -140,6 +141,59 @@ export default function RelatorioOS({ moduloAtivo, nomeAmbiente, setBloquearImpr
     return ativos.length > 0 ? ativos.join(' | ') : 'Todas as intervenções do período'
   }
 
+  const exportarExcel = () => {
+    if (dadosBrutos.length === 0) {
+      toast.error('Não há dados para exportar.')
+      return
+    }
+
+    const dadosExcel = dadosBrutos.map(os => {
+      let dataReferencia = formatDataSegura(os.data_abertura)
+      let tipoData = 'Abertura'
+      if (os.status?.nome === 'Concluído' && os.data_conclusao) {
+        dataReferencia = formatDataSegura(os.data_conclusao)
+        tipoData = 'Conclusão'
+      } else if (os.data_prevista && os.status?.nome !== 'Concluído') {
+        dataReferencia = formatDataSegura(os.data_prevista)
+        tipoData = 'Agendado'
+      }
+
+      return {
+        'Data': dataReferencia,
+        'Referência': tipoData,
+        'Tipo de Intervenção': os.tipo_intervencao || '-',
+        'Status': os.status?.nome || 'Aberto',
+        'Equipamento': os.equipamento?.nome || 'Excluído',
+        'Patrimônio': os.equipamento?.sem_patrimonio ? 'PENDENTE' : (os.equipamento?.patrimonio || '-'),
+        'Número de Série': os.equipamento?.numero_serie || '-',
+        'Registro ANVISA': os.equipamento?.registro_anvisa || '-',
+        'Unidade': os.equipamento?.unidade?.nome || '-',
+        'Setor': os.equipamento?.setor?.nome || '-',
+        'Descrição do Serviço': os.descricao || '-',
+        'Prestador': os.prestador?.nome || 'Equipe Interna',
+        'Solicitante': os.aberto_por?.nome || '-',
+        'Protocolo Externo': os.protocolo_externo || '-'
+      }
+    })
+
+    const ws = XLSX.utils.json_to_sheet(dadosExcel, { origin: "A3" })
+
+    XLSX.utils.sheet_add_aoa(ws, [[`RELATÓRIO DE ORDENS DE SERVIÇO - ${nomeAmbiente.toUpperCase()}`]], { origin: "A1" })
+    XLSX.utils.sheet_add_aoa(ws, [[`Período: ${formatDataSegura(periodoInicial)} a ${formatDataSegura(periodoFinal)} | Total de OS: ${dadosBrutos.length}`]], { origin: "A2" })
+
+    ws['!cols'] = [ { wch: 12 }, { wch: 15 }, { wch: 18 }, { wch: 15 }, { wch: 35 }, { wch: 15 }, { wch: 20 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 55 }, { wch: 25 }, { wch: 25 }, { wch: 20 } ];
+
+    const totalColunas = Object.keys(dadosExcel[0]).length
+    const ultimaColuna = XLSX.utils.encode_col(totalColunas - 1)
+    ws['!autofilter'] = { ref: `A3:${ultimaColuna}${dadosExcel.length + 3}` }
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Ordens de Serviço')
+
+    const nomeArquivo = `OS_${nomeAmbiente.replace(/\s+/g, '_')}_${periodoInicial}_a_${periodoFinal}.xlsx`
+    XLSX.writeFile(wb, nomeArquivo)
+  }
+
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       
@@ -214,10 +268,20 @@ export default function RelatorioOS({ moduloAtivo, nomeAmbiente, setBloquearImpr
             <h2 className="text-xl md:text-2xl font-black text-slate-900 uppercase tracking-tight">{nomeAmbiente} - Relatório de Intervenções</h2>
             <p className="text-[10px] md:text-xs text-blue-700 font-bold mt-2 bg-blue-50 inline-block px-2 py-1 rounded">Filtros Ativos: {getResumoFiltros()}</p>
           </div>
-          <div className="w-full md:w-auto text-xs md:text-sm text-slate-700 bg-slate-50 border border-slate-200 p-3 rounded-lg">
-            <div><span className="font-bold">Período:</span> {formatDataSegura(periodoInicial)} a {formatDataSegura(periodoFinal)}</div>
-            <div className="mt-1"><span className="font-bold">Setor Gerado:</span> {filtroSetor === 'Todos' ? 'Todos os Setores' : auxiliares.setores.find(s => String(s.id) === String(filtroSetor))?.nome}</div>
-            <div className="mt-1"><span className="font-bold">Quantidade de OS:</span> {dadosBrutos.length} listadas</div>
+          <div className="w-full md:w-auto flex flex-col items-end gap-3">
+            <button
+              type="button"
+              onClick={exportarExcel}
+              disabled={dadosBrutos.length === 0}
+              className="no-print flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"
+            >
+              <FileSpreadsheet size={16} /> Excel
+            </button>
+            <div className="w-full text-xs md:text-sm text-slate-700 bg-slate-50 border border-slate-200 p-3 rounded-lg">
+              <div><span className="font-bold">Período:</span> {formatDataSegura(periodoInicial)} a {formatDataSegura(periodoFinal)}</div>
+              <div className="mt-1"><span className="font-bold">Setor Gerado:</span> {filtroSetor === 'Todos' ? 'Todos os Setores' : auxiliares.setores.find(s => String(s.id) === String(filtroSetor))?.nome}</div>
+              <div className="mt-1"><span className="font-bold">Quantidade de OS:</span> {dadosBrutos.length} listadas</div>
+            </div>
           </div>
         </div>
 

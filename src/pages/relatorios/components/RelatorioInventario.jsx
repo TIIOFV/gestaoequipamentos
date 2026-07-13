@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { Filter, Layers, Activity, Loader2, MapPin, Hash, ShieldAlert } from 'lucide-react'
+import { Filter, Layers, Activity, Loader2, MapPin, Hash, ShieldAlert, FileSpreadsheet } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 
 export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloquearImpressao }) {
@@ -76,6 +77,48 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
     }
   }
 
+  const exportarExcel = () => {
+    if (equipamentos.length === 0) {
+      toast.error('Não há dados para exportar.')
+      return
+    }
+
+    const dadosExcel = equipamentos.map(eq => ({
+      'Equipamento': eq.nome || '-',
+      'Fabricante': eq.fabricante?.nome || '-',
+      'Modelo': eq.modelo || '-',
+      'Patrimônio': eq.sem_patrimonio ? 'PENDENTE' : (eq.patrimonio || '-'),
+      'Número de Série': eq.numero_serie || '-',
+      'Registro ANVISA': eq.registro_anvisa || '-',
+      'Unidade': eq.unidade?.nome || '-',
+      'Setor': eq.setor?.nome || '-',
+      'Status': eq.status?.nome || 'Não Informado',
+      'Possui Etiqueta': eq.possui_etiqueta ? 'Sim' : 'Não',
+      'Próxima Calibração': eq.data_proxima_calibracao ? new Date(eq.data_proxima_calibracao).toLocaleDateString('pt-BR') : '-'
+    }))
+
+    // Inicia na linha 3
+    const ws = XLSX.utils.json_to_sheet(dadosExcel, { origin: "A3" })
+    
+    // Cabeçalho Profissional
+    XLSX.utils.sheet_add_aoa(ws, [[`INVENTÁRIO DO PARQUE TECNOLÓGICO - ${nomeAmbiente.toUpperCase()}`]], { origin: "A1" })
+    XLSX.utils.sheet_add_aoa(ws, [[`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')} | Total Listado: ${equipamentos.length} equipamentos`]], { origin: "A2" })
+
+    // Larguras das Colunas (Para não abrir espremido)
+    ws['!cols'] = [ { wch: 35 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 } ];
+
+    // Ativa Filtros a partir do cabeçalho da tabela (Linha 3)
+    const totalColunas = Object.keys(dadosExcel[0]).length
+    const ultimaColuna = XLSX.utils.encode_col(totalColunas - 1)
+    ws['!autofilter'] = { ref: `A3:${ultimaColuna}${dadosExcel.length + 3}` }
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventário')
+
+    const nomeArquivo = `Inventario_${nomeAmbiente.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    XLSX.writeFile(wb, nomeArquivo)
+  }
+
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       
@@ -104,6 +147,17 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
             <option value="Manutenção">Em Manutenção</option>
             <option value="Baixa">Baixados / Desativados</option>
           </select>
+        </div>
+
+        <div className="flex items-end">
+          <button
+            type="button"
+            onClick={exportarExcel}
+            disabled={equipamentos.length === 0}
+            className="no-print flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"
+          >
+            <FileSpreadsheet size={16} /> Excel
+          </button>
         </div>
       </div>
 
@@ -169,6 +223,13 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
                         <span className="font-bold text-slate-400">SÉRIE:</span> 
                         <span className="font-medium text-slate-800">{eq.numero_serie || '-'}</span>
                       </div>
+                      {eq.registro_anvisa && (
+                        <div className="flex items-center gap-1.5">
+                          <Activity size={12} className="text-emerald-500 shrink-0" />
+                          <span className="font-bold text-emerald-700">ANVISA:</span>
+                          <span className="font-medium text-emerald-800">{eq.registro_anvisa}</span>
+                        </div>
+                      )}
                     </td>
                     
                     {/* COLUNA 3: LOCALIZAÇÃO */}

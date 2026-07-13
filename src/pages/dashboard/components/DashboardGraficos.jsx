@@ -48,7 +48,7 @@ export default function DashboardGraficos({ graficos, moduloAtivo }) {
 
       {moduloAtivo === 'impressoras' && (
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col h-[350px] border-t-4 border-t-purple-500">
-          <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-6"><Printer size={18} className="text-purple-500" /> Volume de Impressões (Últimos 6 Meses)</h3>
+          <h3 className="font-bold text-slate-800 flex items-center gap-2 mb-6"><Printer size={18} className="text-purple-500" /> Volume de Impressões e Etiquetas (Últimos 6 Meses)</h3>
           <div className="flex-1 w-full min-h-0">
             <ResponsiveContainer width="99%" height="100%">
               <BarChart data={graficos.tendenciaImpressoes} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -57,8 +57,11 @@ export default function DashboardGraficos({ graficos, moduloAtivo }) {
                 <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#64748b'}} />
                 <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                 <Legend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
-                <Bar dataKey="Páginas P&B" stackId="a" fill="#334155" radius={[0, 0, 4, 4]} />
-                <Bar dataKey="Páginas Cor" stackId="a" fill="#c084fc" radius={[4, 4, 0, 0]} />
+                {/* Barras empilhadas (stackId="a" agrupa todas na mesma coluna) */}
+                <Bar dataKey="Páginas P&B" stackId="a" fill="#334155" />
+                <Bar dataKey="Páginas Cor" stackId="a" fill="#c084fc" />
+                <Bar dataKey="Etiquetas" stackId="a" fill="#10b981" />
+                <Bar dataKey="Pulseiras" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

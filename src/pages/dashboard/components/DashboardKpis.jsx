@@ -1,13 +1,10 @@
-import { Activity, Wrench, AlertTriangle, CheckCircle, MonitorPlay, FileText, DollarSign, ArrowRight } from 'lucide-react'
+import { Activity, Wrench, AlertTriangle, CheckCircle, MonitorPlay, FileText, ArrowRight } from 'lucide-react'
 
 export default function DashboardKpis({ kpis, moduloAtivo, navigate, setModalInoperantes }) {
   const isImpressoras = moduloAtivo === 'impressoras';
 
   return (
-    // Removido o grid, usado flex-wrap para quebrar linha automaticamente
-    // gap-3 garante o espaçamento entre cards
     <div className="flex flex-wrap gap-3">
-      {/* Definimos uma largura flexível (w-...) que se ajusta */}
       <div className="w-[calc(25%-9px)] min-w-[140px] flex-grow"><KpiCard titulo="Total de Equip." valor={kpis.totalEquip} icone={<MonitorPlay />} cor="slate" onClick={() => navigate(`/${moduloAtivo}/equipamentos`)} /></div>
       <div className="w-[calc(25%-9px)] min-w-[140px] flex-grow"><KpiCard titulo="Disponibilidade" valor={`${kpis.dispPercent}%`} icone={<CheckCircle />} cor={kpis.dispPercent > 90 ? 'emerald' : 'amber'} /></div>
       <div className="w-[calc(25%-9px)] min-w-[140px] flex-grow"><KpiCard titulo="OS Abertas" valor={kpis.osAbertas} icone={<Wrench />} cor="blue" onClick={() => navigate(`/${moduloAtivo}/chamados`)} /></div>
@@ -17,9 +14,9 @@ export default function DashboardKpis({ kpis, moduloAtivo, navigate, setModalIno
 
       {isImpressoras && (
         <>
-          <div className="w-[calc(33.3%-8px)] min-w-[140px] flex-grow"><KpiCard titulo="OS Concluídas" valor={kpis.concluidasMes} icone={<Activity />} cor="indigo" onClick={() => navigate(`/${moduloAtivo}/chamados`)} /></div>
-          <div className="w-[calc(33.3%-8px)] min-w-[140px] flex-grow"><KpiCard titulo="Páginas Mês" valor={kpis.paginasMes?.toLocaleString('pt-BR')} icone={<FileText />} cor="purple" /></div>
-          <div className="w-[calc(33.3%-8px)] min-w-[140px] flex-grow"><KpiCard titulo="Custo Fat." valor={`R$ ${kpis.custoMes?.toFixed(2).replace('.', ',')}`} icone={<DollarSign />} cor="emerald" /></div>
+          <div className="w-[calc(50%-6px)] min-w-[140px] flex-grow"><KpiCard titulo="OS Concluídas" valor={kpis.concluidasMes} icone={<Activity />} cor="indigo" onClick={() => navigate(`/${moduloAtivo}/chamados`)} /></div>
+          {/* Card de Volume ocupando mais espaço agora que o Custo saiu */}
+          <div className="w-[calc(50%-6px)] min-w-[140px] flex-grow"><KpiCard titulo="Volume (Mês Anterior)" valor={kpis.paginasMes?.toLocaleString('pt-BR')} icone={<FileText />} cor="purple" /></div>
         </>
       )}
       {!isImpressoras && <div className="w-[calc(25%-9px)] min-w-[140px] flex-grow"><KpiCard titulo="Concl. Mês" valor={kpis.concluidasMes} icone={<Activity />} cor="indigo" onClick={() => navigate(`/${moduloAtivo}/chamados`)} /></div>}
@@ -44,9 +41,7 @@ function KpiCard({ titulo, valor, icone, cor, pulse, onClick }) {
         <span className="scale-75 md:scale-90">{icone}</span>
       </div>
       <div className="min-w-0">
-        {/* Usando text-[9px] para garantir que o título nunca quebre a linha */}
         <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider truncate">{titulo}</p>
-        {/* Usando text-sm para o valor não ser maior que o container */}
         <h3 className="text-sm md:text-md font-black text-slate-800 leading-none truncate">{valor}</h3>
       </div>
     </div>
