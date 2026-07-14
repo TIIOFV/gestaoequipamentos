@@ -1,8 +1,67 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { Filter, Layers, Activity, Loader2, MapPin, Hash, ShieldAlert, FileSpreadsheet } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import { Filter, Layers, Activity, Loader2, MapPin, Hash, ShieldAlert, FileSpreadsheet, CheckSquare } from 'lucide-react'
+import * as XLSX from 'xlsx-js-style'
 import toast from 'react-hot-toast'
+
+// --- FUNÇÃO MESTRE DE ESTILIZAÇÃO (A mágica do Excel Premium) ---
+const aplicarEstilosExcel = (ws, totalLinhas, totalColunas) => {
+  // 1. Mesclar as duas primeiras linhas para o Título e Subtítulo
+  ws['!merges'] = [
+    { s: { r: 0, c: 0 }, e: { r: 0, c: totalColunas - 1 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: totalColunas - 1 } }
+  ];
+
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  
+  for (let R = range.s.r; R <= range.e.r; ++R) {
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+      if (!ws[cellAddress]) ws[cellAddress] = { t: 's', v: '' }; // Garante que a célula existe
+
+      // Linha 0 (Título Principal)
+      if (R === 0) {
+        ws[cellAddress].s = {
+          font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
+          fill: { fgColor: { rgb: "0F172A" } }, // Slate 900 (Azul muito escuro)
+          alignment: { horizontal: "center", vertical: "center" }
+        };
+      } 
+      // Linha 1 (Subtítulo / Data)
+      else if (R === 1) {
+        ws[cellAddress].s = {
+          font: { italic: true, color: { rgb: "475569" }, sz: 11 },
+          fill: { fgColor: { rgb: "F8FAFC" } }, // Slate 50 (Cinza gelo)
+          alignment: { horizontal: "center", vertical: "center" },
+          border: { bottom: { style: "medium", color: { rgb: "CBD5E1" } } }
+        };
+      } 
+      // Linha 2 (Cabeçalho das Colunas)
+      else if (R === 2) { 
+        ws[cellAddress].s = {
+          font: { bold: true, color: { rgb: "FFFFFF" } },
+          fill: { fgColor: { rgb: "2563EB" } }, // Azul do Sistema IOFV
+          alignment: { horizontal: "center", vertical: "center", wrapText: true },
+          border: { top: {style:'thin'}, bottom: {style:'thin'}, left: {style:'thin'}, right: {style:'thin'} }
+        };
+      } 
+      // Linhas de Dados Normais
+      else { 
+        ws[cellAddress].s = {
+          alignment: { horizontal: "center", vertical: "center", wrapText: true },
+          border: { top: {style:'thin', color: {rgb: "E2E8F0"}}, bottom: {style:'thin', color: {rgb: "E2E8F0"}}, left: {style:'thin', color: {rgb: "E2E8F0"}}, right: {style:'thin', color: {rgb: "E2E8F0"}} }
+        };
+      }
+    }
+  }
+
+  // 2. Aplicar o Filtro estritamente na Linha 3 (Index 2)
+  const ultimaColunaLetra = XLSX.utils.encode_col(totalColunas - 1);
+  ws['!autofilter'] = { ref: `A3:${ultimaColunaLetra}${totalLinhas + 3}` }; 
+
+  // 3. Congelar as linhas de cabeçalho (O título nunca some)
+  ws['!freeze'] = { xSplit: 0, ySplit: 3 };
+}
 
 export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloquearImpressao }) {
   const [loading, setLoading] = useState(false)
@@ -36,12 +95,13 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
       let query = supabase
         .from('equipamentos')
         .select(`
-          id, nome, patrimonio, numero_serie, modelo, registro_anvisa,
-          possui_etiqueta, sem_patrimonio, data_proxima_calibracao,
+          id, nome, patrimonio, numero_serie, modelo, registro_anvisa, periodicidade,
+          possui_etiqueta, sem_patrimonio, data_proxima_calibracao, data_ultima_calibracao,
           unidade:unidade_id(id, nome),
           setor:setor_id(id, nome),
           status:status_id(nome),
-          fabricante:fabricante_id(nome)
+          fabricante:fabricante_id(nome),
+          prestador:prestador_id(nome)
         `)
         .eq('modulo', moduloAtivo)
         .order('nome', { ascending: true })
@@ -51,16 +111,8 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
 
       let filtrados = data || []
 
-      // FILTROS BLINDADOS (Converte tudo para String para evitar falha entre Número e Texto)
-      if (filtroUnidade !== 'Todas') {
-        filtrados = filtrados.filter(e => String(e.unidade?.id) === String(filtroUnidade))
-      }
-      
-      if (filtroSetor !== 'Todos') {
-        filtrados = filtrados.filter(e => String(e.setor?.id) === String(filtroSetor))
-      }
-      
-      // FILTRO DE STATUS BLINDADO (Ignora maiúsculas e espaços)
+      if (filtroUnidade !== 'Todas') filtrados = filtrados.filter(e => String(e.unidade?.id) === String(filtroUnidade))
+      if (filtroSetor !== 'Todos') filtrados = filtrados.filter(e => String(e.setor?.id) === String(filtroSetor))
       if (filtroStatus !== 'Todos') {
         filtrados = filtrados.filter(e => {
           const statusDB = e.status?.nome || '';
@@ -71,17 +123,16 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
       setEquipamentos(filtrados)
     } catch (err) {
       toast.error('Erro ao buscar inventário.')
-      console.error(err)
     } finally {
       setLoading(false)
     }
   }
 
+  // ==========================================
+  // EXPORTAÇÃO PADRÃO
+  // ==========================================
   const exportarExcel = () => {
-    if (equipamentos.length === 0) {
-      toast.error('Não há dados para exportar.')
-      return
-    }
+    if (equipamentos.length === 0) return toast.error('Não há dados para exportar.')
 
     const dadosExcel = equipamentos.map(eq => ({
       'Equipamento': eq.nome || '-',
@@ -90,39 +141,73 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
       'Patrimônio': eq.sem_patrimonio ? 'PENDENTE' : (eq.patrimonio || '-'),
       'Número de Série': eq.numero_serie || '-',
       'Registro ANVISA': eq.registro_anvisa || '-',
+      'Periodicidade': eq.periodicidade || '-',
       'Unidade': eq.unidade?.nome || '-',
       'Setor': eq.setor?.nome || '-',
       'Status': eq.status?.nome || 'Não Informado',
       'Possui Etiqueta': eq.possui_etiqueta ? 'Sim' : 'Não',
-      'Próxima Calibração': eq.data_proxima_calibracao ? new Date(eq.data_proxima_calibracao).toLocaleDateString('pt-BR') : '-'
+      'Última Prev./Calib.': eq.data_ultima_calibracao ? new Date(eq.data_ultima_calibracao).toLocaleDateString('pt-BR') : '-',
+      'Próxima Prev./Calib.': eq.data_proxima_calibracao ? new Date(eq.data_proxima_calibracao).toLocaleDateString('pt-BR') : '-'
     }))
 
-    // Inicia na linha 3
+    // Inicia inserção a partir da linha 3 (A3)
     const ws = XLSX.utils.json_to_sheet(dadosExcel, { origin: "A3" })
-    
-    // Cabeçalho Profissional
     XLSX.utils.sheet_add_aoa(ws, [[`INVENTÁRIO DO PARQUE TECNOLÓGICO - ${nomeAmbiente.toUpperCase()}`]], { origin: "A1" })
     XLSX.utils.sheet_add_aoa(ws, [[`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')} | Total Listado: ${equipamentos.length} equipamentos`]], { origin: "A2" })
 
-    // Larguras das Colunas (Para não abrir espremido)
-    ws['!cols'] = [ { wch: 35 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 } ];
-
-    // Ativa Filtros a partir do cabeçalho da tabela (Linha 3)
-    const totalColunas = Object.keys(dadosExcel[0]).length
-    const ultimaColuna = XLSX.utils.encode_col(totalColunas - 1)
-    ws['!autofilter'] = { ref: `A3:${ultimaColuna}${dadosExcel.length + 3}` }
+    ws['!cols'] = [ { wch: 35 }, { wch: 20 }, { wch: 25 }, { wch: 18 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 25 }, { wch: 25 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 } ]
+    
+    // Aplica o design universal
+    aplicarEstilosExcel(ws, equipamentos.length, Object.keys(dadosExcel[0]).length);
 
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'Inventário')
+    XLSX.writeFile(wb, `Inventario_${nomeAmbiente.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  }
 
-    const nomeArquivo = `Inventario_${nomeAmbiente.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`
-    XLSX.writeFile(wb, nomeArquivo)
+  // ==========================================
+  // EXPORTAÇÃO EXCLUSIVA ONA
+  // ==========================================
+  const exportarExcelONA = () => {
+    if (equipamentos.length === 0) return toast.error('Não há dados para exportar.')
+
+    const dadosExcel = equipamentos.map(eq => ({
+      'NOME DO EQUIPAMENTO': eq.nome || '-',
+      'MODELO': eq.modelo || '-',
+      'Nº SÉRIE': eq.numero_serie || '-',
+      'FABRICANTE': eq.fabricante?.nome || '-',
+      'REGISTRO DA ANVISA': eq.registro_anvisa || '-',
+      'SETOR': eq.setor?.nome || '-',
+      'LOCALIZAÇÃO': eq.unidade?.nome || '-',
+      'PERIODICIDADE SUGERIDA': eq.periodicidade ? eq.periodicidade.toUpperCase() : '-',
+      'DATA PREVENTIVA REALIZADA': eq.data_ultima_calibracao ? new Date(eq.data_ultima_calibracao).toLocaleDateString('pt-BR') : '-',
+      'DATA PROXIMA PREVENTIVA': eq.data_proxima_calibracao ? new Date(eq.data_proxima_calibracao).toLocaleDateString('pt-BR') : '-',
+      'RESPONSÁVEL': eq.prestador?.nome || 'EQUIPE INTERNA'
+    }))
+
+    // Inicia inserção a partir da linha 3 (A3) para deixar espaço para os títulos
+    const ws = XLSX.utils.json_to_sheet(dadosExcel, { origin: "A3" });
+    
+    XLSX.utils.sheet_add_aoa(ws, [[`CONTROLE DE EQUIPAMENTOS`]], { origin: "A1" })
+    XLSX.utils.sheet_add_aoa(ws, [[`Data de Exportação: ${new Date().toLocaleDateString('pt-BR')} | Total Listado: ${equipamentos.length} equipamentos`]], { origin: "A2" })
+
+    ws['!cols'] = [
+      { wch: 35 }, { wch: 20 }, { wch: 20 }, { wch: 20 },
+      { wch: 20 }, { wch: 25 }, { wch: 25 }, { wch: 25 },
+      { wch: 25 }, { wch: 25 }, { wch: 25 }
+    ];
+
+    // Aplica o design universal
+    aplicarEstilosExcel(ws, equipamentos.length, Object.keys(dadosExcel[0]).length);
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Padrão_ONA');
+    XLSX.writeFile(wb, `Controle_Equipamentos_ONA_${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   return (
     <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
       
-      {/* AREA DE FILTROS */}
       <div className="no-print bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap gap-4">
         <div className="flex-1 min-w-[200px]">
           <label className="text-[11px] font-bold text-slate-500 uppercase flex items-center gap-2 mb-1.5"><Filter size={14}/> Unidade</label>
@@ -149,19 +234,17 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
           </select>
         </div>
 
-        <div className="flex items-end">
-          <button
-            type="button"
-            onClick={exportarExcel}
-            disabled={equipamentos.length === 0}
-            className="no-print flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"
-          >
-            <FileSpreadsheet size={16} /> Excel
+        <div className="flex items-end gap-3 w-full lg:w-auto mt-2 lg:mt-0">
+          <button type="button" onClick={exportarExcel} disabled={equipamentos.length === 0} className="flex-1 lg:flex-none justify-center no-print flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95">
+            <FileSpreadsheet size={16} /> Excel Padrão
+          </button>
+          
+          <button type="button" onClick={exportarExcelONA} disabled={equipamentos.length === 0} className="flex-1 lg:flex-none justify-center no-print flex items-center gap-2 bg-teal-800 hover:bg-teal-900 disabled:bg-slate-300 disabled:cursor-not-allowed text-teal-50 font-bold text-sm px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95 border border-teal-700">
+            <CheckSquare size={16} /> Molde ONA
           </button>
         </div>
       </div>
 
-      {/* TABELA DE IMPRESSÃO */}
       <div id="relatorio-impresso" className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
         <div className="border-b-2 border-slate-800 pb-4 mb-6 flex justify-between items-end">
           <div>
@@ -195,8 +278,6 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
 
                 return (
                   <tr key={eq.id} className="hover:bg-slate-50/50 transition-colors">
-                    
-                    {/* COLUNA 1: NOME E MODELO */}
                     <td className="py-4 px-4 align-top">
                       <div className="font-black text-slate-800 uppercase text-xs md:text-sm leading-tight">{eq.nome}</div>
                       <div className="text-[11px] text-slate-500 mt-1.5 flex items-center gap-1 flex-wrap">
@@ -207,7 +288,6 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
                       </div>
                     </td>
                     
-                    {/* COLUNA 2: PATRIMÔNIO E SÉRIE */}
                     <td className="py-4 px-4 align-top text-[11px] md:text-xs text-slate-600 space-y-1.5">
                       <div className="flex items-center gap-1.5">
                         <Hash size={12} className="text-slate-400 shrink-0" />
@@ -232,7 +312,6 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
                       )}
                     </td>
                     
-                    {/* COLUNA 3: LOCALIZAÇÃO */}
                     <td className="py-4 px-4 align-top text-[11px] md:text-xs text-slate-700">
                       <div className="font-bold text-blue-800 flex items-start gap-1.5 mb-1">
                         <MapPin size={12} className="mt-0.5 text-blue-500 shrink-0" />
@@ -241,7 +320,6 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
                       <div className="text-slate-500 ml-4">{eq.setor?.nome || 'Setor não vinculado'}</div>
                     </td>
                     
-                    {/* COLUNA 4: STATUS */}
                     <td className="py-4 px-4 align-top">
                       <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-1 rounded border ${
                         statusLimpo === 'ativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :

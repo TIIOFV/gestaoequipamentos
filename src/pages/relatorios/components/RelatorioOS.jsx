@@ -4,7 +4,7 @@ import {
   Calendar as CalendarIcon, Filter, Layers, AlertTriangle, 
   Tag, Clock, MapPin, Wrench, User, Activity, Loader2, FileSpreadsheet
 } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 import toast from 'react-hot-toast'
 
 // Função auxiliar à prova de bugs de fuso horário

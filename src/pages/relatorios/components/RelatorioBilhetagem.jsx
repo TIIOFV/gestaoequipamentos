@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import { Filter, CalendarDays, Loader2, FileSpreadsheet, Droplet, Layers } from 'lucide-react'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
 import toast from 'react-hot-toast'
 
 // Gera o YYYY-MM local perfeitamente

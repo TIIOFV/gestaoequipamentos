@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
-import { ArrowLeft, Factory, Activity } from 'lucide-react'
+import { ArrowLeft, Factory, Activity, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import FormImagens from './components/FormImagens'
 
@@ -13,7 +13,8 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
   const [formData, setFormData] = useState({ 
     ...inicial, 
     tipo_impressora: inicial.tipo_impressora || '',
-    registro_anvisa: inicial.registro_anvisa || '' 
+    registro_anvisa: inicial.registro_anvisa || '',
+    periodicidade: inicial.periodicidade || '' // NOVO CAMPO
   })
   
   const [arquivoImagem, setArquivoImagem] = useState(null)
@@ -24,7 +25,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
     if (!formData) return;
     setLoading(true)
     try {
-      // 1. Upload da Foto de Capa (se houver uma nova)
+      // 1. Upload da Foto de Capa
       let urlImagemFinal = formData.imagem_url
       if (arquivoImagem) {
         toast.loading('Fazendo upload da imagem principal...', { id: 'salvar-eq' });
@@ -39,6 +40,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
       const payload = { 
         ...formData, modulo: moduloAtivo, imagem_url: urlImagemFinal,
         registro_anvisa: formData.registro_anvisa || null,
+        periodicidade: formData.periodicidade || null, // INCLUÍDO NO PAYLOAD
         fabricante_id: formData.fabricante_id === "" ? null : formData.fabricante_id,
         prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
         unidade_id: formData.unidade_id === "" ? null : formData.unidade_id,
@@ -74,7 +76,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         if (dbError) throw dbError
       }
 
-      // 4. Lógica de OS Automáticas Perpétuas (AGORA COM PRESTADOR E SEM DUPLICAR)
+      // 4. Lógica de OS Automáticas
       if (!['ti', 'impressoras'].includes(moduloAtivo)) {
         const { data: authData } = await supabase.auth.getUser()
         let perfilId = null;
@@ -83,73 +85,40 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
            if (perfilData) perfilId = perfilData.id;
         }
 
-        // --- HISTÓRICO DE CALIBRAÇÕES PASSADAS ---
         if (payload.data_ultima_calibracao) {
-          // Busca por tipo de intervenção e data exata, não mais por texto de descrição
-          const { data: osMesmaData } = await supabase
-            .from('chamados')
-            .select('id')
-            .eq('equipamento_id', equipamentoId)
-            .eq('data_conclusao', payload.data_ultima_calibracao)
-            .in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação'])
-            .maybeSingle();
+          const { data: osMesmaData } = await supabase.from('chamados').select('id').eq('equipamento_id', equipamentoId).eq('data_conclusao', payload.data_ultima_calibracao).in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação']).maybeSingle();
 
           if (!osMesmaData) {
             const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
-            
-            // Corrige o formato visual da data para a descrição
             const dataBr = payload.data_ultima_calibracao.split('-').reverse().join('/');
             
             await supabase.from('chamados').insert([{ 
-              equipamento_id: equipamentoId, 
-              modulo: moduloAtivo, 
-              tipo_intervencao: 'Preventiva', 
-              data_abertura: payload.data_ultima_calibracao, 
-              data_prevista: payload.data_ultima_calibracao, 
+              equipamento_id: equipamentoId, modulo: moduloAtivo, tipo_intervencao: 'Preventiva', 
+              data_abertura: payload.data_ultima_calibracao, data_prevista: payload.data_ultima_calibracao, 
               data_conclusao: payload.data_ultima_calibracao, 
               descricao: `Registro de Manutenção Preventiva/Calibração realizada em ${dataBr}. (Lançamento automático)`, 
-              status_id: stConcluido?.id, 
-              aberto_por_id: perfilId,
-              prestador_id: payload.prestador_id // <-- PRESTADOR VINCULADO
+              status_id: stConcluido?.id, aberto_por_id: perfilId, prestador_id: payload.prestador_id 
             }]);
           }
         }
 
-        // --- GERENCIAMENTO DE CALIBRAÇÃO FUTURA ---
         if (payload.data_proxima_calibracao) {
           const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
           
-          let queryFutura = supabase
-            .from('chamados')
-            .select('id')
-            .eq('equipamento_id', equipamentoId)
-            .in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação']);
-            
-          if (stConcluido?.id) {
-             queryFutura = queryFutura.neq('status_id', stConcluido.id); // Ignora as concluídas
-          }
-          
+          let queryFutura = supabase.from('chamados').select('id').eq('equipamento_id', equipamentoId).in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação']);
+          if (stConcluido?.id) queryFutura = queryFutura.neq('status_id', stConcluido.id);
           const { data: osFutura } = await queryFutura.maybeSingle();
 
           if (osFutura) {
-            // Atualiza data E o prestador, caso tenha mudado a assistência técnica
-            await supabase.from('chamados').update({ 
-              data_prevista: payload.data_proxima_calibracao,
-              prestador_id: payload.prestador_id // <-- PRESTADOR VINCULADO
-            }).eq('id', osFutura.id);
+            await supabase.from('chamados').update({ data_prevista: payload.data_proxima_calibracao, prestador_id: payload.prestador_id }).eq('id', osFutura.id);
           } else {
             const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
             
             await supabase.from('chamados').insert([{ 
-              equipamento_id: equipamentoId, 
-              modulo: moduloAtivo, 
-              tipo_intervencao: 'Preventiva', 
-              data_abertura: new Date().toISOString(), 
-              data_prevista: payload.data_proxima_calibracao, 
+              equipamento_id: equipamentoId, modulo: moduloAtivo, tipo_intervencao: 'Preventiva', 
+              data_abertura: new Date().toISOString(), data_prevista: payload.data_proxima_calibracao, 
               descricao: `Manutenção Preventiva / Calibração programada.`, 
-              status_id: stAberto?.id, 
-              aberto_por_id: perfilId,
-              prestador_id: payload.prestador_id // <-- PRESTADOR VINCULADO
+              status_id: stAberto?.id, aberto_por_id: perfilId, prestador_id: payload.prestador_id 
             }]);
           }
         }
@@ -274,13 +243,26 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           </div>
 
           {!isModuloTecnologia && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-orange-50 border border-orange-100 rounded-xl">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border border-orange-100 rounded-xl">
                <div>
-                 <label className="block text-sm font-bold text-slate-800 mb-2">Data da Última Prev./Calib.</label>
+                 <label className="block text-sm font-bold text-slate-800 mb-2">Última Prev./Calibração</label>
                  <input type="date" value={formData.data_ultima_calibracao || ''} onChange={e => setFormData({...formData, data_ultima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium" />
                </div>
+               
+               {/* NOVO CAMPO: PERIODICIDADE */}
                <div>
-                 <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center justify-between">Próxima Data Prevista<span className="bg-red-600 text-white px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider animate-pulse shadow-sm">Gera OS Automática</span></label>
+                 <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-1.5"><Clock size={16} className="text-orange-600" /> Periodicidade</label>
+                 <select value={formData.periodicidade || ''} onChange={e => setFormData({...formData, periodicidade: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium">
+                   <option value="">Não definida</option>
+                   <option value="3 Meses">A cada 3 Meses</option>
+                   <option value="6 Meses">A cada 6 Meses</option>
+                   <option value="1 Ano">A cada 1 Ano</option>
+                   <option value="2 Anos">A cada 2 Anos</option>
+                 </select>
+               </div>
+
+               <div>
+                 <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center justify-between">Próxima Prevista<span className="bg-red-600 text-white px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider animate-pulse shadow-sm">Gera OS Automática</span></label>
                  <input type="date" value={formData.data_proxima_calibracao || ''} onChange={e => setFormData({...formData, data_proxima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border-2 border-orange-200 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 bg-white text-slate-700 font-bold" />
                </div>
             </div>

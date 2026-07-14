@@ -24,7 +24,7 @@ export default function MenuSidebar({
   const [alertas, setAlertas] = useState([])
 
   // 🏷️ VERSÃO DA RELEASE ATUAL DO SISTEMA
-  const VERSAO_ATUAL = "v1.25.0"
+  const VERSAO_ATUAL = "v1.25.4"
 
   const nomesModulos = {
     medicos: 'Equipamentos Médicos',

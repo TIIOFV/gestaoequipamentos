@@ -121,7 +121,7 @@ export default function LoginPage() {
       <div className="mt-8 md:mt-12 flex flex-col items-center opacity-60 hover:opacity-100 transition-opacity relative z-10">
         <div className="flex items-center gap-2 text-slate-500 text-[10px] font-bold tracking-[0.2em] uppercase">
           <ShieldCheck size={12} className="text-blue-500" />
-          Desenvolvido por Pedro Oliveira - v.1.25.0
+          Desenvolvido por Pedro Oliveira - v.1.25.4
         </div>
       </div>
     </div>

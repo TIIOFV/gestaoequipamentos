@@ -29,8 +29,32 @@ export default function EquipamentoCard({
 
       <div className="flex-1 p-5 md:p-6 flex flex-col justify-center gap-5">
         <div>
-          <h3 className="text-xl md:text-2xl font-black text-slate-800 tracking-tight leading-tight mb-2">{eq.nome}</h3>
-          <div className="flex flex-wrap gap-2">
+          {/* Nome Principal */}
+          <h3 className="text-xl md:text-2xl font-black text-slate-800 uppercase tracking-tight leading-tight">
+            {eq.nome}
+          </h3>
+          
+          {/* NOVO: Subtítulo com Fabricante e Modelo */}
+          {(eq.fabricante?.nome || eq.modelo) && (
+            <div className="flex items-center gap-2 mt-2 mb-3 text-xs md:text-[13px] text-slate-500 font-medium">
+              {eq.fabricante?.nome && (
+                <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded border border-slate-200">
+                  {eq.fabricante.nome}
+                </span>
+              )}
+              
+              {eq.fabricante?.nome && eq.modelo && <span className="text-slate-300">•</span>}
+              
+              {eq.modelo && (
+                <span className="flex items-center gap-1">
+                  Mod: <strong className="text-slate-800">{eq.modelo}</strong>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Badges / Etiquetas de Status */}
+          <div className={`flex flex-wrap gap-2 ${!(eq.fabricante?.nome || eq.modelo) ? 'mt-3' : ''}`}>
             {eq.sem_patrimonio && <span className="bg-rose-50 text-rose-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-rose-200 uppercase flex items-center gap-1.5"><AlertTriangle size={12}/> Sem Patrimônio</span>}
             {eq.possui_etiqueta ? <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-indigo-100 uppercase flex items-center gap-1.5">🏷️ Etiquetado</span> : <span className="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-amber-200 uppercase flex items-center gap-1.5">⚠️ Sem Etiqueta</span>}
             {statusCalib === 'atrasada' && <span className="bg-red-50 text-red-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-red-200 uppercase flex items-center gap-1.5"><Clock size={12}/> Prev./Calib. Atrasada</span>}
@@ -64,7 +88,7 @@ export default function EquipamentoCard({
             </div>
           )}
 
-          {/* Coluna 4 e 5: Local / Setor (Ocupa as 2 colunas restantes) */}
+          {/* Coluna 4 e 5: Local / Setor */}
           <div className="flex flex-col col-span-2 lg:col-span-2">
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Local / Setor</span>
             <span className="font-bold text-blue-700 text-sm truncate" title={`${eq.unidade?.nome} ${eq.setor?.nome ? `- ${eq.setor?.nome}` : ''}`}>
