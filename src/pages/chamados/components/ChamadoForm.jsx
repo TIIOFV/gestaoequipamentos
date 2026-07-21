@@ -3,20 +3,28 @@ import { ArrowLeft, Paperclip, FileText, X } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
+// --- FUNÇÕES BLINDADAS DE FUSO HORÁRIO ---
+const converteParaInputLocal = (dataIsoUTC) => {
+  if (!dataIsoUTC) return '';
+  const d = new Date(dataIsoUTC);
+  if (isNaN(d.getTime())) return '';
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+
+const converteParaBancoUTC = (dataInputLocal) => {
+  if (!dataInputLocal) return null;
+  return new Date(dataInputLocal).toISOString();
+};
+
 export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, auxiliares, usuarioAtual, moduloAtivo, voltarParaLista, onSalvo }) {
   const [loading, setLoading] = useState(false)
-  
-  const getDataHoraAtual = () => {
-    const agora = new Date()
-    agora.setMinutes(agora.getMinutes() - agora.getTimezoneOffset())
-    return agora.toISOString().slice(0, 16)
-  }
 
   const estadoInicialForm = {
     id: null, equipamento_id: equipamentoIdNovo || '', tipo_intervencao: 'Corretiva',
     status_id: '', prestador_id: '', protocolo_externo: '',
-    descricao: '', data_abertura: getDataHoraAtual(), data_prevista: '',
-    data_conclusao_manual: '', // <-- NOVO: Permite setar a data real no passado
+    descricao: '', data_abertura: converteParaInputLocal(new Date().toISOString()), data_prevista: '',
+    data_conclusao_manual: '', 
     aberto_por_id: usuarioAtual?.id || '', anexos: [] 
   }
 
@@ -27,9 +35,10 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
       setFormData({
         id: chamadoInicial.id, equipamento_id: chamadoInicial.equipamento_id || '', tipo_intervencao: chamadoInicial.tipo_intervencao || 'Corretiva',
         status_id: chamadoInicial.status_id || '', prestador_id: chamadoInicial.prestador_id || '', protocolo_externo: chamadoInicial.protocolo_externo || '',
-        descricao: chamadoInicial.descricao || '', data_abertura: chamadoInicial.data_abertura ? new Date(chamadoInicial.data_abertura).toISOString().slice(0, 16) : getDataHoraAtual(),
+        descricao: chamadoInicial.descricao || '', 
+        data_abertura: chamadoInicial.data_abertura ? converteParaInputLocal(chamadoInicial.data_abertura) : converteParaInputLocal(new Date().toISOString()),
         data_prevista: chamadoInicial.data_prevista || '', 
-        data_conclusao_manual: chamadoInicial.data_conclusao ? chamadoInicial.data_conclusao.split('T')[0] : '', // Extrai só YYYY-MM-DD
+        data_conclusao_manual: chamadoInicial.data_conclusao ? chamadoInicial.data_conclusao.split('T')[0] : '', 
         aberto_por_id: chamadoInicial.aberto_por_id || usuarioAtual?.id, anexos: chamadoInicial.anexos || []
       })
     }
@@ -77,26 +86,21 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
       equipamento_id: formData.equipamento_id || null, status_id: formData.status_id || null,
       prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
       aberto_por_id: formData.aberto_por_id || usuarioAtual?.id || null,
-      data_prevista: formData.data_prevista === "" ? null : formData.data_prevista
+      data_prevista: formData.data_prevista === "" ? null : formData.data_prevista,
+      data_abertura: converteParaBancoUTC(formData.data_abertura)
     }
 
-    // --- NOVA LÓGICA DE DATA DE CONCLUSÃO SEGURO ---
-    delete payload.data_conclusao_manual; // Remove variável temporária do formulário
+    delete payload.data_conclusao_manual; 
     
     if (isConcluido) {
       if (formData.data_conclusao_manual) {
-        // Se o utilizador digitou uma data de conclusão (retroativa ou não), usa ela.
-        payload.data_conclusao = formData.data_conclusao_manual;
+        payload.data_conclusao = `${formData.data_conclusao_manual}T12:00:00.000Z`;
       } else if (view === 'novo') {
-        // Se está a criar agora já como concluído e não digitou data, usa hoje.
         payload.data_conclusao = new Date().toISOString();
       } else if (view === 'editar' && !chamadoInicial.data_conclusao) {
-        // Se está a editar, mudou para concluído agora e não tinha data antes, usa hoje.
         payload.data_conclusao = new Date().toISOString();
       }
-      // NOTA: Se está a editar, e JÁ TINHA data_conclusao salva (do sistema automático), NÃO FAZ NADA e ela não será esmagada.
     } else {
-      // Se mudou para Pendente/Aberto, limpa a data de conclusão
       payload.data_conclusao = null; 
     }
 
@@ -109,12 +113,51 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
       toast.error('Erro ao salvar chamado: ' + error.message)
       setLoading(false)
     } else {
+      // --- QA: LÓGICA DE ATUALIZAÇÃO SEGURA DO EQUIPAMENTO (SINGLE SOURCE OF TRUTH) ---
+      // Apenas Manutenções de Cronograma alteram a data. Corretivas são ignoradas.
+      if (['Preventiva', 'Calibração', 'Qualificação'].includes(payload.tipo_intervencao) && payload.equipamento_id) {
+        try {
+          const { data: eqAtual } = await supabase.from('equipamentos')
+            .select('data_ultima_calibracao, data_proxima_calibracao')
+            .eq('id', payload.equipamento_id).single();
+          
+          if (eqAtual) {
+            let updateEquipamento = {};
+            const dataOsConclusao = payload.data_conclusao ? payload.data_conclusao.split('T')[0] : null;
+            
+            // 1. Atualizar Última Calibração
+            if (isConcluido && dataOsConclusao) {
+              // Regra Anti-Retrocesso: Só atualiza se for vazia ou mais recente/igual
+              if (!eqAtual.data_ultima_calibracao || dataOsConclusao >= eqAtual.data_ultima_calibracao) {
+                updateEquipamento.data_ultima_calibracao = dataOsConclusao;
+              }
+              // Regra da Lousa Limpa: Se concluiu a que estava marcada como 'próxima', limpa para agendar a seguinte.
+              if (payload.data_prevista && payload.data_prevista === eqAtual.data_proxima_calibracao) {
+                updateEquipamento.data_proxima_calibracao = null;
+              }
+            }
+
+            // 2. Atualizar Próxima Calibração (Se agendada e não concluída)
+            if (!isConcluido && payload.data_prevista) {
+                updateEquipamento.data_proxima_calibracao = payload.data_prevista;
+            }
+
+            // Aplica a atualização silenciosamente
+            if (Object.keys(updateEquipamento).length > 0) {
+              await supabase.from('equipamentos').update(updateEquipamento).eq('id', payload.equipamento_id);
+            }
+          }
+        } catch (err) {
+          console.error("Erro secundário ao atualizar equipamento:", err);
+          // Falhar nisto não deve impedir o toast de sucesso da OS
+        }
+      }
+      
       toast.success(view === 'novo' ? 'Chamado aberto com sucesso!' : 'Chamado atualizado!')
-      onSalvo() // Chama a função do pai para atualizar a lista
+      onSalvo() 
     }
   }
 
-  // Verifica se o status selecionado é "Concluído" para mostrar o campo de data retroativa
   const mostrarDataConclusao = auxiliares.status.find(s => s.id === formData.status_id)?.nome === 'Concluído'
 
   return (
@@ -138,7 +181,11 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-5 bg-blue-50/50 border border-blue-100 rounded-xl">
             <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Tipo de Intervenção</label><select value={formData.tipo_intervencao} onChange={e => setFormData({...formData, tipo_intervencao: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="Corretiva">Corretiva</option><option value="Preventiva">Preventiva</option><option value="Calibração">Calibração</option><option value="Qualificação">Qualificação</option></select></div>
             
-            {/* RENDERIZA DATA PREVISTA OU DATA CONCLUSÃO DEPENDENDO DO STATUS */}
+            <div className="md:col-span-2 border-b border-slate-200 pb-4 mb-2">
+               <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Data e Hora da Abertura</label>
+               <input type="datetime-local" required value={formData.data_abertura} onChange={e => setFormData({...formData, data_abertura: e.target.value})} className="w-full md:w-1/2 px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+            </div>
+
             {!mostrarDataConclusao ? (
               <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Data Prevista (Agendamento)</label><input type="date" value={formData.data_prevista} onChange={e => setFormData({...formData, data_prevista: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" /><p className="text-[10px] md:text-xs text-slate-500 mt-1 md:mt-1.5">Deixe em branco se for registro imediato.</p></div>
             ) : (

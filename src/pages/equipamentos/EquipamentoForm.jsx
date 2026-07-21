@@ -14,7 +14,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
     ...inicial, 
     tipo_impressora: inicial.tipo_impressora || '',
     registro_anvisa: inicial.registro_anvisa || '',
-    periodicidade: inicial.periodicidade || '' // NOVO CAMPO
+    periodicidade: inicial.periodicidade || ''
   })
   
   const [arquivoImagem, setArquivoImagem] = useState(null)
@@ -25,7 +25,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
     if (!formData) return;
     setLoading(true)
     try {
-      // 1. Upload da Foto de Capa
+      // 1. Upload da Foto
       let urlImagemFinal = formData.imagem_url
       if (arquivoImagem) {
         toast.loading('Fazendo upload da imagem principal...', { id: 'salvar-eq' });
@@ -40,7 +40,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
       const payload = { 
         ...formData, modulo: moduloAtivo, imagem_url: urlImagemFinal,
         registro_anvisa: formData.registro_anvisa || null,
-        periodicidade: formData.periodicidade || null, // INCLUÍDO NO PAYLOAD
+        periodicidade: formData.periodicidade || null, // <- Sempre atualiza
         fabricante_id: formData.fabricante_id === "" ? null : formData.fabricante_id,
         prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
         unidade_id: formData.unidade_id === "" ? null : formData.unidade_id,
@@ -54,7 +54,7 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         tipo_impressora: formData.tipo_impressora || null
       }
       
-      // LIMPEZA DE SEGURANÇA
+      // Limpeza de objetos aninhados e temporários
       delete payload.desconhece_fabricacao;
       delete payload.fabricante; 
       delete payload.prestador;  
@@ -64,6 +64,13 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
       
       const isNovo = !payload.id;
       if (isNovo) delete payload.id;
+      
+      // Se estiver a editar, as datas não são enviadas no payload principal
+      // Elas só mudam pelo módulo de Chamados (Fonte Única de Verdade)
+      if (!isNovo) {
+        delete payload.data_ultima_calibracao;
+        delete payload.data_proxima_calibracao;
+      }
       
       // 3. Salvar no Banco
       let equipamentoId = formData.id;
@@ -76,8 +83,9 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         if (dbError) throw dbError
       }
 
-      // 4. Lógica de OS Automáticas
-      if (!['ti', 'impressoras'].includes(moduloAtivo)) {
+      // 4. Lógica de OS Automáticas (APENAS NA CRIAÇÃO DO EQUIPAMENTO)
+      // QA: Bloqueia duplicidades e geração de OS fantasma em edições
+      if (isNovo && !['ti', 'impressoras'].includes(moduloAtivo)) {
         const { data: authData } = await supabase.auth.getUser()
         let perfilId = null;
         if (authData?.user?.id) {
@@ -85,42 +93,31 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
            if (perfilData) perfilId = perfilData.id;
         }
 
+        // Gera o histórico da última calibração informada no cadastro
         if (payload.data_ultima_calibracao) {
-          const { data: osMesmaData } = await supabase.from('chamados').select('id').eq('equipamento_id', equipamentoId).eq('data_conclusao', payload.data_ultima_calibracao).in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação']).maybeSingle();
-
-          if (!osMesmaData) {
             const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
             const dataBr = payload.data_ultima_calibracao.split('-').reverse().join('/');
             
+            const dataSegura = `${payload.data_ultima_calibracao}T12:00:00.000Z`;
+
             await supabase.from('chamados').insert([{ 
               equipamento_id: equipamentoId, modulo: moduloAtivo, tipo_intervencao: 'Preventiva', 
-              data_abertura: payload.data_ultima_calibracao, data_prevista: payload.data_ultima_calibracao, 
-              data_conclusao: payload.data_ultima_calibracao, 
-              descricao: `Registro de Manutenção Preventiva/Calibração realizada em ${dataBr}. (Lançamento automático)`, 
+              data_abertura: dataSegura, data_prevista: payload.data_ultima_calibracao, 
+              data_conclusao: dataSegura, 
+              descricao: `Registro Inicial: Manutenção Preventiva/Calibração realizada em ${dataBr}.`, 
               status_id: stConcluido?.id, aberto_por_id: perfilId, prestador_id: payload.prestador_id 
             }]);
-          }
         }
 
+        // Gera o agendamento da próxima
         if (payload.data_proxima_calibracao) {
-          const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
-          
-          let queryFutura = supabase.from('chamados').select('id').eq('equipamento_id', equipamentoId).in('tipo_intervencao', ['Preventiva', 'Calibração', 'Qualificação']);
-          if (stConcluido?.id) queryFutura = queryFutura.neq('status_id', stConcluido.id);
-          const { data: osFutura } = await queryFutura.maybeSingle();
-
-          if (osFutura) {
-            await supabase.from('chamados').update({ data_prevista: payload.data_proxima_calibracao, prestador_id: payload.prestador_id }).eq('id', osFutura.id);
-          } else {
             const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
-            
             await supabase.from('chamados').insert([{ 
               equipamento_id: equipamentoId, modulo: moduloAtivo, tipo_intervencao: 'Preventiva', 
               data_abertura: new Date().toISOString(), data_prevista: payload.data_proxima_calibracao, 
-              descricao: `Manutenção Preventiva / Calibração programada.`, 
+              descricao: `Agendamento Automático: Manutenção Preventiva / Calibração.`, 
               status_id: stAberto?.id, aberto_por_id: perfilId, prestador_id: payload.prestador_id 
             }]);
-          }
         }
       }
       
@@ -243,16 +240,23 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           </div>
 
           {!isModuloTecnologia && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border border-orange-100 rounded-xl">
-               <div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border border-orange-100 rounded-xl relative overflow-hidden">
+               {/* Aviso de bloqueio se estiver a editar */}
+               {!!formData.id && (
+                 <div className="absolute top-0 left-0 right-0 bg-orange-200 text-orange-800 text-[10px] font-bold text-center py-1 uppercase tracking-wider">
+                   As datas são geridas automaticamente pelo histórico de Chamados/OS
+                 </div>
+               )}
+               
+               <div className={!!formData.id ? 'mt-3' : ''}>
                  <label className="block text-sm font-bold text-slate-800 mb-2">Última Prev./Calibração</label>
-                 <input type="date" value={formData.data_ultima_calibracao || ''} onChange={e => setFormData({...formData, data_ultima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium" />
+                 <input type="date" disabled={!!formData.id} value={formData.data_ultima_calibracao || ''} onChange={e => setFormData({...formData, data_ultima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium disabled:opacity-60 disabled:cursor-not-allowed" />
                </div>
                
-               {/* NOVO CAMPO: PERIODICIDADE */}
-               <div>
+               <div className={!!formData.id ? 'mt-3' : ''}>
                  <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-1.5"><Clock size={16} className="text-orange-600" /> Periodicidade</label>
-                 <select value={formData.periodicidade || ''} onChange={e => setFormData({...formData, periodicidade: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium">
+                 {/* PERMITE EDIÇÃO SEMPRE */}
+                 <select value={formData.periodicidade || ''} onChange={e => setFormData({...formData, periodicidade: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium cursor-pointer">
                    <option value="">Não definida</option>
                    <option value="3 Meses">A cada 3 Meses</option>
                    <option value="6 Meses">A cada 6 Meses</option>
@@ -261,9 +265,9 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
                  </select>
                </div>
 
-               <div>
-                 <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center justify-between">Próxima Prevista<span className="bg-red-600 text-white px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider animate-pulse shadow-sm">Gera OS Automática</span></label>
-                 <input type="date" value={formData.data_proxima_calibracao || ''} onChange={e => setFormData({...formData, data_proxima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border-2 border-orange-200 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 bg-white text-slate-700 font-bold" />
+               <div className={!!formData.id ? 'mt-3' : ''}>
+                 <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center justify-between">Próxima Prevista{!formData.id && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider shadow-sm">Gera OS Automática</span>}</label>
+                 <input type="date" disabled={!!formData.id} value={formData.data_proxima_calibracao || ''} onChange={e => setFormData({...formData, data_proxima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border-2 border-orange-200 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 bg-white text-slate-700 font-bold disabled:opacity-60 disabled:cursor-not-allowed disabled:border-slate-200" />
                </div>
             </div>
           )}

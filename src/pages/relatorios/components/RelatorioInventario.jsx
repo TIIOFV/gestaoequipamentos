@@ -176,7 +176,7 @@ export default function RelatorioInventario({ moduloAtivo, nomeAmbiente, setBloq
       'MODELO': eq.modelo || '-',
       'Nº SÉRIE': eq.numero_serie || '-',
       'FABRICANTE': eq.fabricante?.nome || '-',
-      'REGISTRO DA ANVISA': eq.registro_anvisa || '-',
+      'REGISTRO DA ANVISA / CME': eq.registro_anvisa || '-',
       'SETOR': eq.setor?.nome || '-',
       'LOCALIZAÇÃO': eq.unidade?.nome || '-',
       'PERIODICIDADE SUGERIDA': eq.periodicidade ? eq.periodicidade.toUpperCase() : '-',

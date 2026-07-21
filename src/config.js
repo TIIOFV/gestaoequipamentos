@@ -1,0 +1,1 @@
+export const VERSAO_SISTEMA = "v1.26.0";
