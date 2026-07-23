@@ -9,7 +9,8 @@ import ModalConfirmacao from '../../../../components/ModalConfirmacao'
 import Paginacao from '../../../../components/Paginacao'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-export default function MedicosList({ setView, setEquipamentoSelecionado }) {
+// Recebe o refreshTrigger do pai
+export default function MedicosList({ setView, setEquipamentoSelecionado, refreshTrigger }) {
   const { profile } = useAuth()
   
   const location = useLocation()
@@ -37,11 +38,19 @@ export default function MedicosList({ setView, setEquipamentoSelecionado }) {
     setPaginaAtual(1);
   }, [busca, filtroUnidade, filtroSetor, filtroStatus, filtroCalibracao, filtroEtiqueta]);
 
+  // 🚀 NOVO: Rastreia a mudança de página e força o scroll suave para o topo
+  useEffect(() => {
+    const mainContent = document.querySelector('main');
+    if (mainContent) {
+      mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [paginaAtual]);
+
+  // Atualiza os dados na montagem e sempre que o Formulário salvar algo
   useEffect(() => {
     carregarDados()
-  }, [])
+  }, [refreshTrigger]) // 🚀 NOVO: refreshTrigger adicionado
 
-  // O BLOCO SEGURO DE ESCUTA DE NOTIFICAÇÕES
   useEffect(() => {
     if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
       const eqAlerta = equipamentos.find(e => e.id === location.state.openDetailsId);
@@ -85,7 +94,6 @@ export default function MedicosList({ setView, setEquipamentoSelecionado }) {
     const matchUnidade = filtroUnidade === '' || String(item.unidade_id) === String(filtroUnidade)
     const matchSetor = filtroSetor === '' || String(item.setor_id) === String(filtroSetor)
     
-    // CORREÇÃO AQUI: Verifica o nome do status ignorando maiúsculas
     const statusLimpo = item.status?.nome?.toLowerCase().trim() || ''
     const matchStatus = filtroStatus === '' || statusLimpo === filtroStatus.toLowerCase().trim()
     

@@ -9,7 +9,8 @@ import Paginacao from '../../../../components/Paginacao'
 import toast from 'react-hot-toast'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecionado }) {
+// Recebe o refreshTrigger do pai
+export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecionado, refreshTrigger }) {
   const { profile } = useAuth()
   
   const location = useLocation()
@@ -35,6 +36,14 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
     setPaginaAtual(1);
   }, [busca, filtroUnidade, filtroSetor, filtroStatus]);
 
+  // 🚀 NOVO: Rastreia a mudança de página e força o scroll suave para o topo
+  useEffect(() => {
+    const mainContent = document.querySelector('main');
+    if (mainContent) {
+      mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [paginaAtual]);
+
   const getHeaderInfo = () => {
     switch (moduloAtivo) {
       case 'ti': return { icone: <MonitorDot className="text-indigo-600" size={28} />, titulo: 'Equipamentos de TI' }
@@ -46,11 +55,11 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
 
   const { icone, titulo } = getHeaderInfo()
 
+  // Atualiza os dados na montagem, ao mudar o módulo e sempre que o Formulário salvar algo
   useEffect(() => {
     carregarDados()
-  }, [moduloAtivo]) 
+  }, [moduloAtivo, refreshTrigger]) // 🚀 NOVO: refreshTrigger adicionado
 
-  // O BLOCO SEGURO DE ESCUTA DE NOTIFICAÇÕES
   useEffect(() => {
     if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
       const eqAlerta = equipamentos.find(e => e.id === location.state.openDetailsId);
@@ -92,7 +101,6 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
     const matchUnidade = filtroUnidade === '' || String(item.unidade_id) === String(filtroUnidade)
     const matchSetor = filtroSetor === '' || String(item.setor_id) === String(filtroSetor)
     
-    // CORREÇÃO AQUI: Verifica o nome do status ignorando maiúsculas
     const statusLimpo = item.status?.nome?.toLowerCase().trim() || ''
     const matchStatus = filtroStatus === '' || statusLimpo === filtroStatus.toLowerCase().trim()
     

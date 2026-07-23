@@ -9,7 +9,8 @@ import Paginacao from '../../../../components/Paginacao'
 import toast from 'react-hot-toast'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-export default function ImpressorasList({ setView, setEquipamentoSelecionado }) {
+// Recebe o refreshTrigger do pai
+export default function ImpressorasList({ setView, setEquipamentoSelecionado, refreshTrigger }) {
   const { profile } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
@@ -31,13 +32,23 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
   const [paginaAtual, setPaginaAtual] = useState(1);
   const ITENS_POR_PAGINA = 15;
 
+  // Rastreia a mudança de filtros para voltar à página 1
   useEffect(() => {
     setPaginaAtual(1);
   }, [busca, filtroUnidade, filtroSetor, filtroStatus, filtroPatrimonio]);
 
+  // 🚀 NOVO: Rastreia a mudança de página e força o scroll suave para o topo
+  useEffect(() => {
+    const mainContent = document.querySelector('main');
+    if (mainContent) {
+      mainContent.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [paginaAtual]);
+
+  // Atualiza os dados na montagem e sempre que o Formulário salvar algo
   useEffect(() => {
     carregarDados()
-  }, [])
+  }, [refreshTrigger]) // 🚀 NOVO: refreshTrigger adicionado
 
   useEffect(() => {
     if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
@@ -50,7 +61,6 @@ export default function ImpressorasList({ setView, setEquipamentoSelecionado }) 
     }
   }, [loading, equipamentos, location.state, navigate, setView, setEquipamentoSelecionado]);
 
-  // CORREÇÃO: Função carregarDados limpa e sem duplicações
   const carregarDados = async () => {
     setLoading(true)
     try {

@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
 import toast from 'react-hot-toast'
 import ModalConfirmacao from '../../components/ModalConfirmacao'
 
-// Importando os nossos novos componentes
 import ChamadosList from './components/ChamadosList'
 import ChamadoDetalhes from './components/ChamadoDetalhes'
 import ChamadoForm from './components/ChamadoForm'
@@ -21,6 +20,12 @@ export default function ChamadosPage() {
   const [loading, setLoading] = useState(true)
   const [usuarioAtual, setUsuarioAtual] = useState({ id: '', nome: 'Carregando...' })
 
+  // Gatilho para atualizar a lista em background
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
+  // Referências para o scroll blindado
+  const scrollPositionRef = useRef(0);
+
   const [modalConfirm, setModalConfirm] = useState({
     isOpen: false, titulo: '', mensagem: '', textoConfirmar: 'Confirmar', onConfirm: () => {}
   });
@@ -29,24 +34,51 @@ export default function ChamadosPage() {
     equipamentos: [], status: [], prestadores: []
   })
 
+  // 1. RASTREADOR DE SCROLL EM TEMPO REAL 🚀
+  useEffect(() => {
+    const mainContent = document.querySelector('main');
+    if (!mainContent) return;
+
+    const handleScroll = () => {
+      // Só grava a posição se estiver ativamente a ver a lista
+      if (view === 'lista') {
+        scrollPositionRef.current = mainContent.scrollTop;
+      }
+    };
+
+    mainContent.addEventListener('scroll', handleScroll, { passive: true });
+    return () => mainContent.removeEventListener('scroll', handleScroll);
+  }, [view]);
+
+  // 2. RESTAURAÇÃO SÍNCRONA DE SCROLL (Antes da tela desenhar) 🚀
+  useLayoutEffect(() => {
+    const mainContent = document.querySelector('main');
+    if (!mainContent) return;
+
+    if (view !== 'lista') {
+      mainContent.scrollTo({ top: 0, behavior: 'instant' });
+    } else {
+      mainContent.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' });
+    }
+  }, [view]);
+
+  // 3. BUSCA DE DADOS AO ABRIR (OU AO ATUALIZAR O GATILHO)
   useEffect(() => {
     if (!moduloAtivo) return;
-    inicializarPagina()
-  }, [location.state, moduloAtivo])
-
-  const inicializarPagina = async () => {
-    setLoading(true)
-    await identificarUsuario()
-    await carregarAuxiliares()
-    await buscarChamados()
-    
-    if (location.state?.action === 'novo') {
-      setView('novo')
-      window.history.replaceState({}, document.title)
-    }
-
-    setLoading(false)
-  }
+    const fetchData = async () => {
+      setLoading(true);
+      await identificarUsuario();
+      await carregarAuxiliares();
+      await buscarChamados();
+      
+      if (location.state?.action === 'novo') {
+        setView('novo');
+        window.history.replaceState({}, document.title);
+      }
+      setLoading(false);
+    };
+    fetchData();
+  }, [location.state, moduloAtivo, refreshTrigger])
 
   const identificarUsuario = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -79,7 +111,6 @@ export default function ChamadosPage() {
         if (chTarget) {
           setChamadoSelecionado(chTarget);
           setView('detalhes');
-          window.scrollTo(0, 0);
           window.history.replaceState({}, document.title);
         }
       }
@@ -95,7 +126,6 @@ export default function ChamadosPage() {
       onConfirm: async () => {
         setLoading(true)
         try {
-          // 1. BUSCAR OS ANEXOS ANTES DE APAGAR O REGISTRO
           const { data: chamadoParaApagar, error: fetchError } = await supabase
             .from('chamados')
             .select('anexos')
@@ -104,12 +134,10 @@ export default function ChamadosPage() {
             
           if (fetchError) throw fetchError;
 
-          // 2. SE HOUVER ANEXOS, APAGAR DO STORAGE PRIMEIRO
           if (chamadoParaApagar && chamadoParaApagar.anexos && chamadoParaApagar.anexos.length > 0) {
-            // Extrai apenas o nome do arquivo da URL completa do Supabase
             const pathsParaRemover = chamadoParaApagar.anexos.map(url => {
               const partes = url.split('/equipamentos/');
-              return partes[1]; // Ex: 'os_anexo_12345.pdf'
+              return partes[1]; 
             }).filter(Boolean);
 
             if (pathsParaRemover.length > 0) {
@@ -118,13 +146,12 @@ export default function ChamadosPage() {
             }
           }
 
-          // 3. DEPOIS DE LIMPAR OS ARQUIVOS, APAGA O REGISTRO DO BANCO
           const { error: deleteError } = await supabase.from('chamados').delete().eq('id', id);
           if (deleteError) throw deleteError;
 
           toast.success('Ordem de Serviço e anexos excluídos com sucesso!')
           voltarParaLista()
-          buscarChamados()
+          setRefreshTrigger(prev => prev + 1); // Avisa a lista que algo mudou
         } catch (error) {
           toast.error('Erro ao excluir: ' + error.message)
         } finally {
@@ -141,38 +168,43 @@ export default function ChamadosPage() {
   }
 
   const handleSalvo = () => {
-    voltarParaLista()
-    buscarChamados()
+    setRefreshTrigger(prev => prev + 1); // Força os dados a ficarem novos
+    voltarParaLista();
   }
 
   return (
-    <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
+    <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-300">
       <ModalConfirmacao
         isOpen={modalConfirm.isOpen} onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
         onConfirm={modalConfirm.onConfirm} titulo={modalConfirm.titulo}
         mensagem={modalConfirm.mensagem} textoConfirmar={modalConfirm.textoConfirmar}
       />
 
-      {view === 'lista' && (
+      {/* MODO PERSISTENTE: O display none guarda tudo se não estivermos nela! */}
+      <div style={{ display: view === 'lista' ? 'block' : 'none' }}>
         <ChamadosList 
           chamados={chamados} loading={loading} auxiliares={auxiliares} 
           setView={setView} setChamadoSelecionado={setChamadoSelecionado} 
         />
-      )}
+      </div>
 
       {view === 'detalhes' && chamadoSelecionado && (
-        <ChamadoDetalhes 
-          chamado={chamadoSelecionado} voltarParaLista={voltarParaLista} 
-          iniciarEdicao={(ch) => setView('editar')} handleExcluir={handleExcluir} 
-        />
+        <div className="animate-in fade-in duration-300">
+          <ChamadoDetalhes 
+            chamado={chamadoSelecionado} voltarParaLista={voltarParaLista} 
+            iniciarEdicao={(ch) => setView('editar')} handleExcluir={handleExcluir} 
+          />
+        </div>
       )}
 
       {(view === 'novo' || view === 'editar') && (
-        <ChamadoForm 
-          view={view} chamadoInicial={chamadoSelecionado} equipamentoIdNovo={location.state?.equipamentoId}
-          auxiliares={auxiliares} usuarioAtual={usuarioAtual} moduloAtivo={moduloAtivo} 
-          voltarParaLista={voltarParaLista} onSalvo={handleSalvo} 
-        />
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <ChamadoForm 
+            view={view} chamadoInicial={chamadoSelecionado} equipamentoIdNovo={location.state?.equipamentoId}
+            auxiliares={auxiliares} usuarioAtual={usuarioAtual} moduloAtivo={moduloAtivo} 
+            voltarParaLista={voltarParaLista} onSalvo={handleSalvo} 
+          />
+        </div>
       )}
     </div>
   )

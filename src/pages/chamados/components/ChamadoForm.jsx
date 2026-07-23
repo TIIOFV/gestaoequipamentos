@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Paperclip, FileText, X } from 'lucide-react'
+import { ArrowLeft, Paperclip, FileText, X, UploadCloud } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
-// --- FUNÇÕES BLINDADAS DE FUSO HORÁRIO ---
 const converteParaInputLocal = (dataIsoUTC) => {
   if (!dataIsoUTC) return '';
   const d = new Date(dataIsoUTC);
@@ -19,6 +18,7 @@ const converteParaBancoUTC = (dataInputLocal) => {
 
 export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, auxiliares, usuarioAtual, moduloAtivo, voltarParaLista, onSalvo }) {
   const [loading, setLoading] = useState(false)
+  const [isDraggingAtivo, setIsDraggingAtivo] = useState(false) // 🚀 ESTADO DO DRAG & DROP
 
   const estadoInicialForm = {
     id: null, equipamento_id: equipamentoIdNovo || '', tipo_intervencao: 'Corretiva',
@@ -46,16 +46,16 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
 
   const isPDF = (url) => url?.toLowerCase().includes('.pdf')
 
-  const handleUploadAnexos = async (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
+  // 🚀 LÓGICA DE UPLOAD EXTRAÍDA PARA SUPORTAR O DRAG & DROP
+  const processarArquivos = async (filesArray) => {
+    if (filesArray.length === 0) return;
     
     setLoading(true);
     toast.loading('Enviando anexos...', { id: 'upload-anexo' });
 
     try {
       const novasUrls = [];
-      for (const file of files) {
+      for (const file of filesArray) {
         const fileExt = file.name.split('.').pop();
         const fileName = `os_anexo_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
         const { error: uploadError } = await supabase.storage.from('equipamentos').upload(fileName, file);
@@ -64,11 +64,24 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
         novasUrls.push(publicUrl);
       }
       setFormData(prev => ({ ...prev, anexos: [...(prev.anexos || []), ...novasUrls] }));
-      toast.success(`${files.length} anexo(s) carregado(s)!`, { id: 'upload-anexo' });
+      toast.success(`${filesArray.length} anexo(s) carregado(s)!`, { id: 'upload-anexo' });
     } catch (error) {
       toast.error('Erro ao enviar os arquivos.', { id: 'upload-anexo' });
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Tratadores do botão tradicional e Drag & Drop
+  const handleUploadClick = (e) => processarArquivos(Array.from(e.target.files));
+  
+  const handleDragOver = (e) => { e.preventDefault(); setIsDraggingAtivo(true); }
+  const handleDragLeave = (e) => { e.preventDefault(); setIsDraggingAtivo(false); }
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDraggingAtivo(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processarArquivos(Array.from(e.dataTransfer.files));
     }
   }
 
@@ -113,8 +126,6 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
       toast.error('Erro ao salvar chamado: ' + error.message)
       setLoading(false)
     } else {
-      // --- QA: LÓGICA DE ATUALIZAÇÃO SEGURA DO EQUIPAMENTO (SINGLE SOURCE OF TRUTH) ---
-      // Apenas Manutenções de Cronograma alteram a data. Corretivas são ignoradas.
       if (['Preventiva', 'Calibração', 'Qualificação'].includes(payload.tipo_intervencao) && payload.equipamento_id) {
         try {
           const { data: eqAtual } = await supabase.from('equipamentos')
@@ -125,31 +136,25 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
             let updateEquipamento = {};
             const dataOsConclusao = payload.data_conclusao ? payload.data_conclusao.split('T')[0] : null;
             
-            // 1. Atualizar Última Calibração
             if (isConcluido && dataOsConclusao) {
-              // Regra Anti-Retrocesso: Só atualiza se for vazia ou mais recente/igual
               if (!eqAtual.data_ultima_calibracao || dataOsConclusao >= eqAtual.data_ultima_calibracao) {
                 updateEquipamento.data_ultima_calibracao = dataOsConclusao;
               }
-              // Regra da Lousa Limpa: Se concluiu a que estava marcada como 'próxima', limpa para agendar a seguinte.
               if (payload.data_prevista && payload.data_prevista === eqAtual.data_proxima_calibracao) {
                 updateEquipamento.data_proxima_calibracao = null;
               }
             }
 
-            // 2. Atualizar Próxima Calibração (Se agendada e não concluída)
             if (!isConcluido && payload.data_prevista) {
                 updateEquipamento.data_proxima_calibracao = payload.data_prevista;
             }
 
-            // Aplica a atualização silenciosamente
             if (Object.keys(updateEquipamento).length > 0) {
               await supabase.from('equipamentos').update(updateEquipamento).eq('id', payload.equipamento_id);
             }
           }
         } catch (err) {
           console.error("Erro secundário ao atualizar equipamento:", err);
-          // Falhar nisto não deve impedir o toast de sucesso da OS
         }
       }
       
@@ -200,20 +205,36 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
 
           <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Descrição da Manutenção</label><textarea required rows="4" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none" placeholder="Descreva os procedimentos realizados..."></textarea></div>
 
-          <div className="bg-slate-50 border border-slate-200 p-4 md:p-5 rounded-xl">
-            <label className="block text-xs md:text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Paperclip size={16} className="text-slate-400" /> Anexos (Fotos ou PDF do Laudo/OS)</label>
-            <input type="file" multiple accept="image/*,application/pdf" onChange={handleUploadAnexos} disabled={loading} className="block w-full text-xs md:text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
+          {/* 🚀 ZONA DE DRAG & DROP PARA ANEXOS */}
+          <div 
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed p-6 rounded-2xl transition-all text-center ${isDraggingAtivo ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}
+          >
+            <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
+              <UploadCloud size={32} className={`${isDraggingAtivo ? 'text-blue-500 animate-bounce' : 'text-slate-400'}`} />
+              <p className="text-sm font-bold text-slate-700">Arraste e solte os Laudos ou Fotos aqui</p>
+              <p className="text-xs text-slate-500">Ou clique no botão abaixo para escolher</p>
+            </div>
+            
+            <input type="file" id="arquivoUpload" multiple accept="image/*,application/pdf" onChange={handleUploadClick} disabled={loading} className="hidden" />
+            <label htmlFor="arquivoUpload" className="mt-4 inline-block bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-bold text-blue-700 cursor-pointer hover:bg-blue-50 transition-colors shadow-sm">
+              Explorar Arquivos
+            </label>
+
             {formData.anexos && formData.anexos.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-4">
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-6 border-t border-slate-200 pt-4 text-left">
                 {formData.anexos.map((anexo, index) => (
-                  <div key={index} className="relative group rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white h-20 md:h-24 flex items-center justify-center">
-                    {isPDF(anexo) ? (<div className="flex flex-col items-center p-2"><FileText size={24} className="text-red-500 mb-1" /><span className="text-[9px] font-bold text-slate-500">PDF</span></div>) : (<img src={anexo} alt={`Anexo ${index}`} className="w-full h-full object-cover" />)}
-                    <button type="button" onClick={() => removerAnexo(anexo)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-80 hover:opacity-100 transition-opacity"><X size={10} /></button>
+                  <div key={index} className="relative group rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white h-24 flex flex-col items-center justify-center cursor-default">
+                    {isPDF(anexo) ? (<><FileText size={24} className="text-red-500 mb-1" /><span className="text-[9px] font-bold text-slate-500">PDF</span></>) : (<img src={anexo} alt={`Anexo ${index}`} className="w-full h-full object-cover" />)}
+                    <button type="button" onClick={(e) => { e.preventDefault(); removerAnexo(anexo); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-80 hover:opacity-100 transition-opacity z-10"><X size={10} /></button>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
         </div>
 
         <button type="submit" disabled={loading} className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3.5 md:py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-70 text-base md:text-lg">
