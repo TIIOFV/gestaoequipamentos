@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom' // 🚀 Importação do Navigate
-import { useModulo } from '../../contexts/ModuloContext' // 🚀 Importação do Contexto
+import { useModulo } from '../../../contexts/ModuloContext' // 🚀 Importação do Contexto
 import { 
   ArrowLeft, Edit, Trash2, Monitor, Hash, FileText, Paperclip, 
   CheckCircle2, Clock, AlertCircle, Ticket, Calendar, Building, 

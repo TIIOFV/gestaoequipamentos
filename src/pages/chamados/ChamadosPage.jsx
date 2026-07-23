@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { useModulo } from '../../../contexts/ModuloContext'
+import { useModulo } from '../../contexts/ModuloContext'
 import toast from 'react-hot-toast'
 import ModalConfirmacao from '../../components/ModalConfirmacao'
 
