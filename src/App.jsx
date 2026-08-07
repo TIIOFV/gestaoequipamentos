@@ -25,8 +25,7 @@ const ConfiguracoesPage = lazy(() => import('./pages/configuracoes/Configuracoes
 const BilhetagemPage = lazy(() => import('./pages/impressoras/BilhetagemPage'))
 const ReleasesPage = lazy(() => import('./pages/releases/ReleasesPage'))
 
-// 🚀 NOVO: Importação da página de Logs (ajuste o caminho se tiver guardado noutra pasta)
-const LogsAuditoriaPage = lazy(() => import('./pages/logs/AuditoriaPage'))
+const LogsAuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'))
  
 export default function App() {
   return (
