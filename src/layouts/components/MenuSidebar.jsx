@@ -7,7 +7,8 @@ import {
   LayoutDashboard, Monitor, Wrench, CalendarDays, FileText, 
   Settings, LogOut, Bell, X, Key, Droplet, Rocket,
   ChevronLeft, ChevronRight, AlertCircle, Clock, ShieldAlert, Tag,
-  ChevronsUpDown, Stethoscope, BatteryCharging, Printer
+  ChevronsUpDown, Stethoscope, BatteryCharging, Printer, 
+  ShieldCheck // 🚀 ÍCONE DE SEGURANÇA IMPORTADO AQUI
 } from 'lucide-react'
 
 const NOMES_MODULOS = {
@@ -168,7 +169,7 @@ export default function MenuSidebar({
               {grupo.alertas.map(al => (
                 <div 
                   key={al.id} 
-                  onClick={(e) => handleNotifClick(e, al.link, al.targetId)} 
+                  onClick={(e) => handleNotifClick(e, al.targetId)} 
                   className="cursor-pointer block text-[11px] p-2 rounded-lg bg-white border border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/50 transition-all shadow-sm"
                 >
                   <span className="font-medium text-slate-700 leading-tight block">{al.texto}</span>
@@ -352,16 +353,31 @@ export default function MenuSidebar({
 
             {hasFullAccess && (
               <div className={`pt-4 mt-4 border-t border-slate-200/60 space-y-1.5 ${isRetraido ? 'flex flex-col items-center' : ''}`}>
+                
+                {/* 🚀 ÁREA RESTRITA DOS ADMINISTRADORES */}
                 {profile?.perfil === 'administrador' && (
-                  <Link 
-                    to={`/${moduloAtivo}/configuracoes`} 
-                    title={isRetraido ? "Configurações" : ""}
-                    onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/configuracoes`)} 
-                    className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/configuracoes') ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
-                  >
-                    <Settings className={`w-4 h-4 transition-transform duration-200 group-hover:rotate-90 ${isActive('/configuracoes') ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-800'} ${!isRetraido && 'mr-3'}`} /> 
-                    {!isRetraido && <span className="whitespace-nowrap">Configurações</span>}
-                  </Link>
+                  <>
+                    <Link 
+                      to={`/${moduloAtivo}/configuracoes`} 
+                      title={isRetraido ? "Configurações" : ""}
+                      onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/configuracoes`)} 
+                      className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/configuracoes') ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
+                    >
+                      <Settings className={`w-4 h-4 transition-transform duration-200 group-hover:rotate-90 ${isActive('/configuracoes') ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-800'} ${!isRetraido && 'mr-3'}`} /> 
+                      {!isRetraido && <span className="whitespace-nowrap">Configurações</span>}
+                    </Link>
+
+                    {/* 🚀 NOVO: Link de Auditoria / Logs */}
+                    <Link 
+                      to={`/${moduloAtivo}/logs`} 
+                      title={isRetraido ? "Auditoria do Sistema" : ""}
+                      onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/logs`)} 
+                      className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/logs') ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
+                    >
+                      <ShieldCheck className={`w-4 h-4 transition-transform duration-200 group-hover:scale-110 ${isActive('/logs') ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-800'} ${!isRetraido && 'mr-3'}`} /> 
+                      {!isRetraido && <span className="whitespace-nowrap">Auditoria (Logs)</span>}
+                    </Link>
+                  </>
                 )}
                 
                 <Link 
@@ -405,7 +421,7 @@ export default function MenuSidebar({
           )}
         </div>
 
-        {/* MODO FLUTUANTE (POPOVER): Exibido APENAS se o menu estiver retraído */}
+        {/* MODO FLUTUANTE (POPOVER) */}
         {isRetraido && showNotif && (
           <div className="absolute left-[90px] top-[140px] w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 z-[100] p-4 flex flex-col max-h-[70vh]">
             <div className="flex items-center justify-between mb-4 shrink-0">

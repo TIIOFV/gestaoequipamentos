@@ -16,10 +16,9 @@ export default function DashboardPage() {
   const [filtroUnidade, setFiltroUnidade] = useState('Todas')
   const [modalInoperantes, setModalInoperantes] = useState({ aberto: false, lista: [] })
   
-  // Removido o custoMes
   const [kpis, setKpis] = useState({ totalEquip: 0, dispPercent: 0, osAbertas: 0, osAtrasadas: 0, concluidasMes: 0, inoperantes: 0, paginasMes: 0 })
   const [graficos, setGraficos] = useState({ tendencia: [], statusParque: [], tendenciaImpressoes: [] })
-  const [listas, setListas] = useState({ atrasadas: [], proximas: [] })
+  const [listas, setListas] = useState({ atrasadas: [], proximas: [], top5Cor: [], mesTop5: '' })
 
   useEffect(() => {
     const consoleWarnOriginal = console.warn;
@@ -63,17 +62,28 @@ export default function DashboardPage() {
     const chamados = (chamadosReq.data || []).filter(ch => ch.equipamento !== null)
 
     let leituras = []
+    let top5Cor = []
+    let mesTop5 = ''
+
     if (moduloAtivo === 'impressoras' && equipamentos.length > 0) {
       const equipIds = equipamentos.map(e => e.id)
-      const { data } = await supabase.from('leituras_impressoras').select('*').in('equipamento_id', equipIds)
-      if (data) leituras = data
+      const { data: leiturasData } = await supabase.from('leituras_impressoras').select('*').in('equipamento_id', equipIds)
+      if (leiturasData) leituras = leiturasData
+
+      // 🚀 BUSCA INTELIGENTE: Pega o mês mais recente que tem auditoria lançada
+      const { data: ultimaAuditoria } = await supabase.from('auditoria_impressoes').select('mes_referencia').order('mes_referencia', { ascending: false }).limit(1)
+      if (ultimaAuditoria && ultimaAuditoria.length > 0) {
+        mesTop5 = ultimaAuditoria[0].mes_referencia;
+        const { data: rankingData } = await supabase.from('auditoria_impressoes').select('*, equipamento:equipamento_id(nome)').eq('mes_referencia', mesTop5).order('paginas_cor', { ascending: false }).limit(5)
+        top5Cor = rankingData || [];
+      }
     }
 
-    processarDadosReais(equipamentos, chamados, leituras)
+    processarDadosReais(equipamentos, chamados, leituras, top5Cor, mesTop5)
     if (showLoading) setLoading(false)
   }
 
-  const processarDadosReais = (equipamentos, chamados, leituras) => {
+  const processarDadosReais = (equipamentos, chamados, leituras, top5Cor, mesTop5) => {
     const hoje = new Date()
     hoje.setHours(0, 0, 0, 0)
     const mesAtual = hoje.getMonth()
@@ -95,40 +105,52 @@ export default function DashboardPage() {
       return conc.getUTCMonth() === mesAtual && conc.getUTCFullYear() === anoAtual
     })
 
-    // Processamento EXCLUSIVO para volume de impressões
+    // 🚀 LÓGICA DE CÁLCULO DE CONSUMO MENSAL (Deltas)
     let paginasMes = 0; 
     const ultimos6MesesImpressoes = [];
     
     if (moduloAtivo === 'impressoras') {
-      // NOVA LÓGICA: Pegar o mês anterior para o KPI principal
-      const dataAnterior = new Date(anoAtual, mesAtual - 1, 1)
-      const stringMesAnteriorFormatada = `${dataAnterior.getFullYear()}-${String(dataAnterior.getMonth() + 1).padStart(2, '0')}-01`
-      
-      const leiturasMesAnterior = leituras.filter(l => l.mes_referencia === stringMesAnteriorFormatada)
-      leiturasMesAnterior.forEach(l => {
-        paginasMes += (l.contador_pb || 0) + (l.contador_cor || 0) + (l.contador_etiquetas || 0) + (l.contador_pulseiras || 0)
-      })
+      const consumoPorMes = {};
+      const leiturasPorEquip = {};
 
-      // Gráfico dos últimos 6 meses (Mantém igual)
+      // Agrupa as leituras por impressora
+      leituras.forEach(l => {
+        if (!leiturasPorEquip[l.equipamento_id]) leiturasPorEquip[l.equipamento_id] = [];
+        leiturasPorEquip[l.equipamento_id].push(l);
+      });
+
+      // Calcula a diferença mês a mês
+      Object.keys(leiturasPorEquip).forEach(eqId => {
+        const leits = leiturasPorEquip[eqId].sort((a, b) => new Date(a.mes_referencia) - new Date(b.mes_referencia));
+        for (let i = 1; i < leits.length; i++) {
+          const prev = leits[i-1];
+          const curr = leits[i];
+          if (!consumoPorMes[curr.mes_referencia]) consumoPorMes[curr.mes_referencia] = { pb: 0, cor: 0, termica: 0 };
+          
+          consumoPorMes[curr.mes_referencia].pb += Math.max(0, (curr.contador_pb || 0) - (prev.contador_pb || 0));
+          consumoPorMes[curr.mes_referencia].cor += Math.max(0, (curr.contador_cor || 0) - (prev.contador_cor || 0));
+          consumoPorMes[curr.mes_referencia].termica += Math.max(0, ((curr.contador_etiquetas || 0) + (curr.contador_pulseiras || 0)) - ((prev.contador_etiquetas || 0) + (prev.contador_pulseiras || 0)));
+        }
+      });
+
+      // KPI de Volume (Soma do último mês registado no consumo)
+      const mesesComConsumo = Object.keys(consumoPorMes).sort((a,b) => new Date(b) - new Date(a));
+      if (mesesComConsumo.length > 0) {
+        const ultMes = consumoPorMes[mesesComConsumo[0]];
+        paginasMes = ultMes.pb + ultMes.cor + ultMes.termica;
+      }
+
+      // Monta os dados para o Gráfico de Barras (Últimos 6 meses)
       for (let i = 5; i >= 0; i--) {
         const d = new Date(anoAtual, mesAtual - i, 1)
         const mesStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
-        const leiturasMes = leituras.filter(l => l.mes_referencia === mesStr)
         
-        let pb = 0; let cor = 0; let etiquetas = 0; let pulseiras = 0;
-        leiturasMes.forEach(l => {
-          pb += l.contador_pb || 0
-          cor += l.contador_cor || 0
-          etiquetas += l.contador_etiquetas || 0
-          pulseiras += l.contador_pulseiras || 0
-        })
-
+        const cons = consumoPorMes[mesStr] || { pb: 0, cor: 0, termica: 0 };
         ultimos6MesesImpressoes.push({ 
           name: d.toLocaleString('pt-BR', { month: 'short' }).toUpperCase(), 
-          "Páginas P&B": pb, 
-          "Páginas Cor": cor,
-          "Etiquetas": etiquetas,
-          "Pulseiras": pulseiras
+          "P&B": cons.pb, 
+          "Cor": cons.cor,
+          "Térmica": cons.termica
         })
       }
     }
@@ -154,7 +176,6 @@ export default function DashboardPage() {
     chamados.forEach(ch => {
       const dataRef = ch.data_conclusao ? new Date(ch.data_conclusao) : new Date(ch.data_abertura);
       if (!dataRef || isNaN(dataRef)) return;
-      
       const index = ultimos6Meses.findIndex(m => m.mesReal === dataRef.getUTCMonth() && m.anoReal === dataRef.getUTCFullYear())
       if (index !== -1) ultimos6Meses[index]["OS Registradas"]++
     })
@@ -174,11 +195,13 @@ export default function DashboardPage() {
 
     setListas({
       atrasadas: [...osAtrasadas].sort((a, b) => new Date(a.data_prevista) - new Date(b.data_prevista)).slice(0, 5),
-      proximas: osAbertas.filter(ch => ch.data_prevista && new Date(ch.data_prevista).setHours(0,0,0,0) >= hoje).sort((a, b) => new Date(a.data_prevista) - new Date(b.data_prevista)).slice(0, 5)
+      proximas: osAbertas.filter(ch => ch.data_prevista && new Date(ch.data_prevista).setHours(0,0,0,0) >= hoje).sort((a, b) => new Date(a.data_prevista) - new Date(b.data_prevista)).slice(0, 5),
+      top5Cor,
+      mesTop5
     })
   }
 
-  const nomeAmbiente = { medicos: 'Equipamentos Médicos', ti: 'Tecnologia da Informação', infra: 'Nobreaks & Baterias', manutencao: 'Manutenção Predial', impressoras: 'Impressoras & Copiadoras' }[moduloAtivo] || 'Dashboard'
+  const nomeAmbiente = { medicos: 'Equipamentos Médicos', ti: 'Tecnologia da Informação', infra: 'Nobreaks & Baterias', manutencao: 'Manutenção Predial', impressoras: 'Dashboard MPS' }[moduloAtivo] || 'Dashboard'
 
   if (loading) return <div className="flex h-full items-center justify-center text-slate-500 font-medium">Analisando dados do ambiente...</div>
 
@@ -187,7 +210,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3"><Activity className="text-blue-600" size={28} /> {nomeAmbiente}</h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores em tempo real do setor.</p>
+          <p className="text-sm md:text-base text-slate-500 mt-1">Indicadores em tempo real de manutenção e consumo.</p>
         </div>
         <div className="flex items-center gap-3 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200 w-full md:w-auto">
           <Building2 size={20} className="text-slate-400 shrink-0" />

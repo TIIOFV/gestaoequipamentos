@@ -18,7 +18,7 @@ const converteParaBancoUTC = (dataInputLocal) => {
 
 export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, auxiliares, usuarioAtual, moduloAtivo, voltarParaLista, onSalvo }) {
   const [loading, setLoading] = useState(false)
-  const [isDraggingAtivo, setIsDraggingAtivo] = useState(false) // 🚀 ESTADO DO DRAG & DROP
+  const [isDraggingAtivo, setIsDraggingAtivo] = useState(false) 
 
   const estadoInicialForm = {
     id: null, equipamento_id: equipamentoIdNovo || '', tipo_intervencao: 'Corretiva',
@@ -46,7 +46,6 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
 
   const isPDF = (url) => url?.toLowerCase().includes('.pdf')
 
-  // 🚀 LÓGICA DE UPLOAD EXTRAÍDA PARA SUPORTAR O DRAG & DROP
   const processarArquivos = async (filesArray) => {
     if (filesArray.length === 0) return;
     
@@ -72,7 +71,6 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
     }
   }
 
-  // Tratadores do botão tradicional e Drag & Drop
   const handleUploadClick = (e) => processarArquivos(Array.from(e.target.files));
   
   const handleDragOver = (e) => { e.preventDefault(); setIsDraggingAtivo(true); }
@@ -158,6 +156,18 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
         }
       }
       
+      // 🚀 ENVIO DO LOG DE AUDITORIA
+      const equipamentoNome = auxiliares.equipamentos.find(e => e.id === payload.equipamento_id)?.nome || 'Equipamento Desconhecido';
+      
+      await supabase.from('logs_auditoria').insert([{
+        usuario_nome: usuarioAtual?.nome || 'Usuário Desconhecido',
+        acao: view === 'novo' ? 'CRIAÇÃO' : 'EDIÇÃO',
+        modulo: moduloAtivo,
+        detalhes: view === 'novo'
+          ? `Lançou uma nova OS de ${payload.tipo_intervencao} para o equipamento: ${equipamentoNome}`
+          : `Editou a OS de ${payload.tipo_intervencao} vinculada ao equipamento: ${equipamentoNome}`
+      }]);
+
       toast.success(view === 'novo' ? 'Chamado aberto com sucesso!' : 'Chamado atualizado!')
       onSalvo() 
     }
@@ -205,7 +215,6 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
 
           <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Descrição da Manutenção</label><textarea required rows="4" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none" placeholder="Descreva os procedimentos realizados..."></textarea></div>
 
-          {/* 🚀 ZONA DE DRAG & DROP PARA ANEXOS */}
           <div 
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}

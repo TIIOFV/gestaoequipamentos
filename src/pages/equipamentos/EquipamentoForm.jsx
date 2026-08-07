@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
+import { useAuth } from '../../contexts/AuthContext' // 🚀 IMPORTADO PARA PEGAR O USUÁRIO
 import { ArrowLeft, Factory, Activity, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import FormImagens from './components/FormImagens'
@@ -8,6 +9,7 @@ import FormImagens from './components/FormImagens'
 export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, onVoltar, onSucesso }) {
   const inicial = formDataInicial || {};
   const { moduloAtivo } = useModulo()
+  const { profile } = useAuth() // 🚀 PERFIL DO USUÁRIO LOGADO
   const [loading, setLoading] = useState(false)
   
   const [formData, setFormData] = useState({ 
@@ -25,7 +27,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
     if (!formData) return;
     setLoading(true)
     try {
-      // 1. Upload da Foto
       let urlImagemFinal = formData.imagem_url
       if (arquivoImagem) {
         toast.loading('Fazendo upload da imagem principal...', { id: 'salvar-eq' });
@@ -36,11 +37,10 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         urlImagemFinal = supabase.storage.from('equipamentos').getPublicUrl(nomeArquivo).data.publicUrl
       }
 
-      // 2. Preparar dados
       const payload = { 
         ...formData, modulo: moduloAtivo, imagem_url: urlImagemFinal,
         registro_anvisa: formData.registro_anvisa || null,
-        periodicidade: formData.periodicidade || null, // <- Sempre atualiza
+        periodicidade: formData.periodicidade || null,
         fabricante_id: formData.fabricante_id === "" ? null : formData.fabricante_id,
         prestador_id: formData.prestador_id === "" ? null : formData.prestador_id,
         unidade_id: formData.unidade_id === "" ? null : formData.unidade_id,
@@ -54,7 +54,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         tipo_impressora: formData.tipo_impressora || null
       }
       
-      // Limpeza de objetos aninhados e temporários
       delete payload.desconhece_fabricacao;
       delete payload.fabricante; 
       delete payload.prestador;  
@@ -65,14 +64,11 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
       const isNovo = !payload.id;
       if (isNovo) delete payload.id;
       
-      // Se estiver a editar, as datas não são enviadas no payload principal
-      // Elas só mudam pelo módulo de Chamados (Fonte Única de Verdade)
       if (!isNovo) {
         delete payload.data_ultima_calibracao;
         delete payload.data_proxima_calibracao;
       }
       
-      // 3. Salvar no Banco
       let equipamentoId = formData.id;
       if (isNovo) {
         const { data: novoEq, error: dbError } = await supabase.from('equipamentos').insert([payload]).select().single()
@@ -83,8 +79,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         if (dbError) throw dbError
       }
 
-      // 4. Lógica de OS Automáticas (APENAS NA CRIAÇÃO DO EQUIPAMENTO)
-      // QA: Bloqueia duplicidades e geração de OS fantasma em edições
       if (isNovo && !['ti', 'impressoras'].includes(moduloAtivo)) {
         const { data: authData } = await supabase.auth.getUser()
         let perfilId = null;
@@ -93,11 +87,9 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
            if (perfilData) perfilId = perfilData.id;
         }
 
-        // Gera o histórico da última calibração informada no cadastro
         if (payload.data_ultima_calibracao) {
             const { data: stConcluido } = await supabase.from('status_chamado').select('id').ilike('nome', '%Concluído%').limit(1).maybeSingle();
             const dataBr = payload.data_ultima_calibracao.split('-').reverse().join('/');
-            
             const dataSegura = `${payload.data_ultima_calibracao}T12:00:00.000Z`;
 
             await supabase.from('chamados').insert([{ 
@@ -109,7 +101,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
             }]);
         }
 
-        // Gera o agendamento da próxima
         if (payload.data_proxima_calibracao) {
             const { data: stAberto } = await supabase.from('status_chamado').select('id').ilike('nome', '%Aberto%').limit(1).maybeSingle();
             await supabase.from('chamados').insert([{ 
@@ -120,6 +111,16 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
             }]);
         }
       }
+
+      // 🚀 ENVIO DO LOG DE AUDITORIA
+      await supabase.from('logs_auditoria').insert([{
+        usuario_nome: profile?.nome || 'Usuário Desconhecido',
+        acao: isNovo ? 'CRIAÇÃO' : 'EDIÇÃO',
+        modulo: moduloAtivo,
+        detalhes: isNovo
+          ? `Cadastrou o equipamento: ${payload.nome} (Patrimônio: ${payload.patrimonio || 'S/N'}).`
+          : `Editou os dados do equipamento: ${payload.nome} (Patrimônio: ${payload.patrimonio || 'S/N'}).`
+      }]);
       
       toast.success(isNovo ? 'Equipamento cadastrado!' : 'Equipamento atualizado!', { id: 'salvar-eq' });
       onSucesso()
@@ -241,7 +242,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
 
           {!isModuloTecnologia && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border border-orange-100 rounded-xl relative overflow-hidden">
-               {/* Aviso de bloqueio se estiver a editar */}
                {!!formData.id && (
                  <div className="absolute top-0 left-0 right-0 bg-orange-200 text-orange-800 text-[10px] font-bold text-center py-1 uppercase tracking-wider">
                    As datas são geridas automaticamente pelo histórico de Chamados/OS
@@ -255,7 +255,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
                
                <div className={!!formData.id ? 'mt-3' : ''}>
                  <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-1.5"><Clock size={16} className="text-orange-600" /> Periodicidade</label>
-                 {/* PERMITE EDIÇÃO SEMPRE */}
                  <select value={formData.periodicidade || ''} onChange={e => setFormData({...formData, periodicidade: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium cursor-pointer">
                    <option value="">Não definida</option>
                    <option value="3 Meses">A cada 3 Meses</option>

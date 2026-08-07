@@ -128,7 +128,7 @@ export default function ChamadosPage() {
         try {
           const { data: chamadoParaApagar, error: fetchError } = await supabase
             .from('chamados')
-            .select('anexos')
+            .select('anexos, equipamento:equipamento_id(nome)')
             .eq('id', id)
             .single();
             
@@ -148,6 +148,14 @@ export default function ChamadosPage() {
 
           const { error: deleteError } = await supabase.from('chamados').delete().eq('id', id);
           if (deleteError) throw deleteError;
+
+          // 🚀 ENVIO DO LOG DE AUDITORIA
+          await supabase.from('logs_auditoria').insert([{
+            usuario_nome: usuarioAtual?.nome || 'Usuário Desconhecido',
+            acao: 'EXCLUSÃO',
+            modulo: moduloAtivo,
+            detalhes: `Excluiu a Ordem de Serviço ID #${id} e os seus anexos. Equipamento vinculado: ${chamadoParaApagar?.equipamento?.nome || 'N/A'}.`
+          }]);
 
           toast.success('Ordem de Serviço e anexos excluídos com sucesso!')
           voltarParaLista()

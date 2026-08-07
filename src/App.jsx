@@ -25,6 +25,9 @@ const ConfiguracoesPage = lazy(() => import('./pages/configuracoes/Configuracoes
 const BilhetagemPage = lazy(() => import('./pages/impressoras/BilhetagemPage'))
 const ReleasesPage = lazy(() => import('./pages/releases/ReleasesPage'))
 
+// 🚀 NOVO: Importação da página de Logs (ajuste o caminho se tiver guardado noutra pasta)
+const LogsAuditoriaPage = lazy(() => import('./pages/logs/LogsAuditoriaPage'))
+
 export default function App() {
   return (
     <AuthProvider>
@@ -50,6 +53,7 @@ export default function App() {
               <Route element={<ProtectedRoute />}>
                 <Route path="/modulos" element={<ModulosPage />} />
                 <Route path="/:modulo/releases" element={<ReleasesPage />} />
+                
                 <Route path="/:moduloId" element={<AppLayout />}>
                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<DashboardPage />} />
@@ -59,6 +63,9 @@ export default function App() {
                   <Route path="relatorios" element={<RelatoriosPage />} />
                   <Route path="chamados" element={<ChamadosPage />} />
                   <Route path="bilhetagem" element={<BilhetagemPage />} />
+                  
+                  {/* 🚀 NOVO: Rota para a Central de Auditoria */}
+                  <Route path="logs" element={<LogsAuditoriaPage />} />
                 </Route>
 
                 <Route path="/" element={<Navigate to="/modulos" replace />} />

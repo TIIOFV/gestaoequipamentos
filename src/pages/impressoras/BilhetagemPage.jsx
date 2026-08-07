@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
 import { Printer, Droplet, ListPlus, CalendarDays, Search, Trash2, X, Plus, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ModalConfirmacao from '../../components/ModalConfirmacao' // 🚀 IMPORTADO
 
 export default function BilhetagemPage() {
   const { moduloAtivo } = useModulo()
@@ -11,15 +12,16 @@ export default function BilhetagemPage() {
   const [busca, setBusca] = useState('')
   const [mesFiltro, setMesFiltro] = useState(new Date().toISOString().slice(0, 7))
 
-  // Estados do Modal de Lote
   const [modalAberto, setModalAberto] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [impressoras, setImpressoras] = useState([])
   const [impressoraSelecionada, setImpressoraSelecionada] = useState('')
   const [linhasLote, setLinhasLote] = useState([{ id_impressao: '', usuario_setor: '', paginas_cor: '' }])
 
+  // 🚀 ESTADO DO MODAL DE CONFIRMAÇÃO
+  const [modalConfirm, setModalConfirm] = useState({ isOpen: false, idParaExcluir: null })
+
   useEffect(() => {
-    // Redundância de segurança: só roda no módulo de impressoras
     if (moduloAtivo === 'impressoras') {
       carregarDados()
       carregarImpressorasColoridas()
@@ -34,7 +36,7 @@ export default function BilhetagemPage() {
         .from('auditoria_impressoes')
         .select(`*, equipamento:equipamento_id(nome)`)
         .eq('mes_referencia', dataInicio)
-        .order('paginas_cor', { ascending: false }) // Mostra quem imprimiu mais primeiro
+        .order('paginas_cor', { ascending: false })
 
       if (error) throw error
       setLeituras(data || [])
@@ -50,13 +52,12 @@ export default function BilhetagemPage() {
       .from('equipamentos')
       .select('id, nome')
       .eq('modulo', 'impressoras')
-      .ilike('tipo_impressora', '%colorida%') // Traz apenas as que importam
+      .ilike('tipo_impressora', '%colorida%')
     
     setImpressoras(data || [])
     if (data && data.length > 0) setImpressoraSelecionada(data[0].id)
   }
 
-  // --- FUNÇÕES DO MODAL EM LOTE ---
   const adicionarLinha = () => setLinhasLote([...linhasLote, { id_impressao: '', usuario_setor: '', paginas_cor: '' }])
   const removerLinha = (index) => setLinhasLote(linhasLote.filter((_, i) => i !== index).length ? linhasLote.filter((_, i) => i !== index) : [{ id_impressao: '', usuario_setor: '', paginas_cor: '' }])
   const atualizarLinha = (index, campo, valor) => {
@@ -72,9 +73,7 @@ export default function BilhetagemPage() {
 
     setSalvando(true)
     try {
-      // 1. Converte o mês (ex: 2026-06) para data completa (ex: 2026-06-01)
       const dataFormatada = `${mesFiltro}-01`
-
       const payload = validas.map(linha => ({
         equipamento_id: impressoraSelecionada,
         mes_referencia: dataFormatada,
@@ -83,16 +82,8 @@ export default function BilhetagemPage() {
         paginas_cor: parseInt(linha.paginas_cor) || 0
       }))
 
-      console.log("Enviando para Supabase:", payload); // Debug: Veja no F12 o que está a ser enviado
-
-      const { error } = await supabase
-        .from('auditoria_impressoes')
-        .insert(payload)
-
-      if (error) {
-        console.error("Erro detalhado Supabase:", error);
-        throw error;
-      }
+      const { error } = await supabase.from('auditoria_impressoes').insert(payload)
+      if (error) throw error;
 
       toast.success(`Relatório guardado com sucesso!`);
       setModalAberto(false);
@@ -105,20 +96,42 @@ export default function BilhetagemPage() {
     }
   }
 
-  const handleExcluir = async (id) => {
-    if (!window.confirm('Excluir este registo de utilizador?')) return
-    const { error } = await supabase.from('auditoria_impressoes').delete().eq('id', id)
-    if (!error) { toast.success('Excluído!'); carregarDados(); }
+  // 🚀 ABRE O MODAL PREMIUM
+  const handleExcluir = (id) => {
+    setModalConfirm({ isOpen: true, idParaExcluir: id })
   }
 
-  // Filtro de busca em tela
+  // 🚀 LÓGICA DE EXCLUSÃO
+  const confirmarExclusao = async () => {
+    if (!modalConfirm.idParaExcluir) return;
+    try {
+      const { error } = await supabase.from('auditoria_impressoes').delete().eq('id', modalConfirm.idParaExcluir)
+      if (error) throw error;
+      toast.success('Registo excluído com sucesso!')
+      carregarDados();
+    } catch (error) {
+      toast.error('Erro ao excluir utilizador.');
+    } finally {
+      setModalConfirm({ isOpen: false, idParaExcluir: null })
+    }
+  }
+
   const dadosFiltrados = leituras.filter(l => l.usuario_setor.toLowerCase().includes(busca.toLowerCase()) || l.id_impressao?.includes(busca))
   const totalPaginas = dadosFiltrados.reduce((acc, curr) => acc + (curr.paginas_cor || 0), 0)
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       
-      {/* CABEÇALHO */}
+      {/* 🚀 MODAL DE CONFIRMAÇÃO AQUI */}
+      <ModalConfirmacao 
+        isOpen={modalConfirm.isOpen}
+        onClose={() => setModalConfirm({ isOpen: false, idParaExcluir: null })}
+        onConfirm={confirmarExclusao}
+        titulo="Excluir Registo"
+        mensagem="Tem a certeza que deseja remover este utilizador do relatório de auditoria deste mês?"
+        textoConfirmar="Sim, Excluir"
+      />
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
@@ -131,7 +144,6 @@ export default function BilhetagemPage() {
         </button>
       </div>
 
-      {/* CONTROLES E RESUMO */}
       <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row gap-4 justify-between items-center">
         <div className="flex gap-4 w-full md:w-auto">
           <input type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} className="px-4 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-rose-500 font-bold text-slate-700" />
@@ -150,7 +162,6 @@ export default function BilhetagemPage() {
         </div>
       </div>
 
-      {/* TABELA DE DADOS */}
       {loading ? (
          <div className="animate-pulse h-64 bg-slate-100 rounded-2xl w-full border border-slate-200"></div>
       ) : dadosFiltrados.length === 0 ? (
@@ -178,6 +189,7 @@ export default function BilhetagemPage() {
                   <td className="px-6 py-4 font-bold text-slate-700">{item.usuario_setor}</td>
                   <td className="px-6 py-4 text-center font-black text-rose-600 text-base">{item.paginas_cor}</td>
                   <td className="px-6 py-4 text-right">
+                    {/* 🚀 BOTÃO DE EXCLUIR CHAMA O MODAL */}
                     <button onClick={() => handleExcluir(item.id)} className="text-slate-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={18} /></button>
                   </td>
                 </tr>
@@ -187,7 +199,6 @@ export default function BilhetagemPage() {
         </div>
       )}
 
-      {/* MODAL DE LANÇAMENTO EM LOTE */}
       {modalAberto && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in duration-200">
