@@ -68,13 +68,13 @@ export default function AppLayout() {
     }
   }
 
-  // Se estiver a verificar ou se perdeu o módulo (e vai ser redirecionado), mostra apenas a tela de carregamento
+  // TELA DE CARREGAMENTO INICIAL
   if (!moduloAtivo && !isTrocaSenhaObrigatoria) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3 text-slate-500">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          <span className="text-sm font-bold">Ajustando ambiente...</span>
+        <div className="flex flex-col items-center gap-4 text-slate-500 animate-in fade-in duration-500">
+          <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+          <span className="text-sm font-bold tracking-wide uppercase">Ajustando ambiente...</span>
         </div>
       </div>
     )
@@ -83,7 +83,7 @@ export default function AppLayout() {
   return (
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
       
-      {/* 1. O MENU LATERAL AGORA É APENAS UMA LINHA DE CÓDIGO AQUI */}
+      {/* MENU LATERAL */}
       <MenuSidebar 
         profile={profile}
         hasFullAccess={hasFullAccess}
@@ -95,32 +95,38 @@ export default function AppLayout() {
       />
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
-        {/* CABEÇALHO MOBILE */}
-        <header className={`md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm ${isTrocaSenhaObrigatoria ? 'hidden' : ''}`}>
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-blue-800 text-white rounded md flex items-center justify-center font-bold text-xs mr-2">IOFV</div>
-            <span className="font-bold text-slate-800 text-sm">GESTÃO</span>
+        
+        {/* CABEÇALHO MOBILE (Corrigido erro do Tailwind "rounded md") */}
+        <header className={`md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm transition-all duration-300 ${isTrocaSenhaObrigatoria ? 'hidden' : ''}`}>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-black text-xs shadow-inner">
+              IO
+            </div>
+            <span className="font-black text-slate-800 text-sm tracking-tight">IOFV <span className="text-indigo-600">GESTÃO</span></span>
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100">
-              <Menu size={24} />
-            </button>
-          </div>
+          <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors active:scale-95">
+            <Menu size={24} />
+          </button>
         </header>
 
         {/* ÁREA PRINCIPAL ONDE AS PÁGINAS RENDERIZAM */}
-        <main className={`flex-1 overflow-auto bg-slate-50/50 ${isTrocaSenhaObrigatoria ? 'blur-sm pointer-events-none select-none' : ''}`}>
-          <div className="p-4 md:p-8 max-w-7xl mx-auto h-full">
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto bg-slate-50/50 transition-all duration-500 ${isTrocaSenhaObrigatoria ? 'blur-md pointer-events-none select-none brightness-95' : ''}`}>
+          
+          {/* 🚀 A MÁGICA ACONTECE AQUI: w-full e max-w-[1800px] para esticar nas telas grandes! */}
+          <div className="p-4 md:p-6 lg:p-8 w-full max-w-[1800px] mx-auto min-h-full flex flex-col">
             {isVerifying ? (
-               <div className="h-full flex flex-col items-center justify-center gap-3">
-                 <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-                 <span className="text-sm font-bold text-slate-500">Autenticando acesso...</span>
+               <div className="flex-1 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
+                 <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+                 <span className="text-sm font-bold text-slate-500 uppercase tracking-wider">Autenticando acesso...</span>
                </div>
             ) : (!hasFullAccess && !isAgendaRoute && !isTrocaSenhaObrigatoria) ? (
-               <div className="h-full flex flex-col items-center justify-center">
-                 <span className="text-sm font-bold text-slate-400">Redirecionando para área permitida...</span>
+               <div className="flex-1 flex flex-col items-center justify-center animate-in fade-in duration-300">
+                 <span className="text-sm font-bold text-slate-400 bg-white px-6 py-3 rounded-2xl border border-slate-200 shadow-sm">
+                   Redirecionando para área permitida...
+                 </span>
                </div>
             ) : (
+              // 🚀 Todas as páginas (Dashboard, Bilhetagem, Releases) caem aqui dentro!
               <Outlet />
             )}
           </div>

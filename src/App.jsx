@@ -24,9 +24,8 @@ const RelatoriosPage = lazy(() => import('./pages/relatorios/RelatoriosPage'))
 const ConfiguracoesPage = lazy(() => import('./pages/configuracoes/ConfiguracoesPage'))
 const BilhetagemPage = lazy(() => import('./pages/impressoras/BilhetagemPage'))
 const ReleasesPage = lazy(() => import('./pages/releases/ReleasesPage'))
-
 const LogsAuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'))
- 
+
 export default function App() {
   return (
     <AuthProvider>
@@ -51,8 +50,8 @@ export default function App() {
               
               <Route element={<ProtectedRoute />}>
                 <Route path="/modulos" element={<ModulosPage />} />
-                <Route path="/:modulo/releases" element={<ReleasesPage />} />
                 
+                {/* 🚀 CORREÇÃO: A rota releases agora está DENTRO do AppLayout! */}
                 <Route path="/:moduloId" element={<AppLayout />}>
                   <Route index element={<Navigate to="dashboard" replace />} />
                   <Route path="dashboard" element={<DashboardPage />} />
@@ -62,8 +61,7 @@ export default function App() {
                   <Route path="relatorios" element={<RelatoriosPage />} />
                   <Route path="chamados" element={<ChamadosPage />} />
                   <Route path="bilhetagem" element={<BilhetagemPage />} />
-                  
-                  {/* 🚀 NOVO: Rota para a Central de Auditoria */}
+                  <Route path="releases" element={<ReleasesPage />} />
                   <Route path="logs" element={<LogsAuditoriaPage />} />
                 </Route>
 

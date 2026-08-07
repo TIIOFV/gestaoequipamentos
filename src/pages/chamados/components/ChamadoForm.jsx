@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Paperclip, FileText, X, UploadCloud } from 'lucide-react'
+import { ArrowLeft, Paperclip, FileText, X, UploadCloud, Monitor, Clock, Calendar, Ticket, CheckCircle2, Building, Hash, Save, Loader2, AlignLeft } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -50,7 +50,7 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
     if (filesArray.length === 0) return;
     
     setLoading(true);
-    toast.loading('Enviando anexos...', { id: 'upload-anexo' });
+    toast.loading('A processar anexos...', { id: 'upload-anexo' });
 
     try {
       const novasUrls = [];
@@ -156,7 +156,6 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
         }
       }
       
-      // 🚀 ENVIO DO LOG DE AUDITORIA
       const equipamentoNome = auxiliares.equipamentos.find(e => e.id === payload.equipamento_id)?.nome || 'Equipamento Desconhecido';
       
       await supabase.from('logs_auditoria').insert([{
@@ -168,7 +167,7 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
           : `Editou a OS de ${payload.tipo_intervencao} vinculada ao equipamento: ${equipamentoNome}`
       }]);
 
-      toast.success(view === 'novo' ? 'Chamado aberto com sucesso!' : 'Chamado atualizado!')
+      toast.success(view === 'novo' ? 'Ordem de Serviço aberta com sucesso!' : 'Ordem de Serviço atualizada!')
       onSalvo() 
     }
   }
@@ -176,79 +175,173 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
   const mostrarDataConclusao = auxiliares.status.find(s => s.id === formData.status_id)?.nome === 'Concluído'
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    // 🚀 MUDANÇA 1: w-full para preencher todo o ecrã
+    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
+      
+      {/* CABEÇALHO */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{view === 'novo' ? 'Nova Ordem de Serviço' : 'Editar OS'}</h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Registre a manutenção e anexe laudos técnicos.</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight">
+            {view === 'novo' ? 'Nova Ordem de Serviço' : 'Editar O.S.'}
+          </h1>
+          <p className="text-sm font-semibold text-slate-500 mt-1">Registe a intervenção técnica e anexe os laudos.</p>
         </div>
-        <button type="button" onClick={voltarParaLista} className="w-full sm:w-auto justify-center flex items-center gap-2 px-4 md:px-5 py-2.5 text-sm text-blue-800 font-bold bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-xl transition-colors"><ArrowLeft size={18} /> Voltar</button>
+        <button type="button" onClick={voltarParaLista} className="px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+          <ArrowLeft size={18} /> Cancelar e Voltar
+        </button>
       </div>
 
-      <form onSubmit={handleSalvar} className="space-y-4 md:space-y-6">
-        <div className="bg-white p-5 md:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-4 md:space-y-6">
+      <form onSubmit={handleSalvar} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* =========================================================================
+            COLUNA ESQUERDA (CONFIGURAÇÕES E DATAS) 
+            ========================================================================= */}
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Equipamento</label><select required value={formData.equipamento_id} onChange={e => setFormData({...formData, equipamento_id: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione o equipamento...</option>{auxiliares.equipamentos.map(eq => <option key={eq.id} value={eq.id}>{eq.nome} (Pat: {eq.patrimonio})</option>)}</select></div>
-            <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Status atual</label><select required value={formData.status_id} onChange={e => setFormData({...formData, status_id: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{auxiliares.status.map(st => <option key={st.id} value={st.id}>{st.nome}</option>)}</select></div>
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-5">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Ticket size={14} /> Classificação da OS
+            </h4>
+            
+            <div>
+              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Monitor size={12}/> Equipamento Vinculado *</label>
+              <select required value={formData.equipamento_id} onChange={e => setFormData({...formData, equipamento_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
+                <option value="">Selecione o equipamento...</option>
+                {auxiliares.equipamentos.map(eq => <option key={eq.id} value={eq.id}>{eq.nome} (Pat: {eq.patrimonio || 'S/N'})</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Status da OS *</label>
+              <select required value={formData.status_id} onChange={e => setFormData({...formData, status_id: e.target.value})} className={`w-full px-4 py-3 rounded-xl font-black outline-none focus:ring-2 transition-all cursor-pointer border ${mostrarDataConclusao ? 'bg-emerald-50 border-emerald-200 text-emerald-800 focus:ring-emerald-500' : 'bg-slate-50 border-slate-200 text-slate-800 focus:ring-indigo-500'}`}>
+                <option value="">Selecione...</option>
+                {auxiliares.status.map(st => <option key={st.id} value={st.id}>{st.nome}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Tipo de Intervenção</label>
+              <select value={formData.tipo_intervencao} onChange={e => setFormData({...formData, tipo_intervencao: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
+                <option value="Corretiva">Corretiva (Falha/Avaria)</option>
+                <option value="Preventiva">Preventiva (Revisão)</option>
+                <option value="Calibração">Calibração (Aferição)</option>
+                <option value="Qualificação">Qualificação (Validação)</option>
+              </select>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 p-4 md:p-5 bg-blue-50/50 border border-blue-100 rounded-xl">
-            <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Tipo de Intervenção</label><select value={formData.tipo_intervencao} onChange={e => setFormData({...formData, tipo_intervencao: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="Corretiva">Corretiva</option><option value="Preventiva">Preventiva</option><option value="Calibração">Calibração</option><option value="Qualificação">Qualificação</option></select></div>
-            
-            <div className="md:col-span-2 border-b border-slate-200 pb-4 mb-2">
-               <label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Data e Hora da Abertura</label>
-               <input type="datetime-local" required value={formData.data_abertura} onChange={e => setFormData({...formData, data_abertura: e.target.value})} className="w-full md:w-1/2 px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-5">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Clock size={14} /> Cronograma
+            </h4>
+
+            <div>
+              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Abertura da OS *</label>
+              <input type="datetime-local" required value={formData.data_abertura} onChange={e => setFormData({...formData, data_abertura: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
             </div>
 
             {!mostrarDataConclusao ? (
-              <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Data Prevista (Agendamento)</label><input type="date" value={formData.data_prevista} onChange={e => setFormData({...formData, data_prevista: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" /><p className="text-[10px] md:text-xs text-slate-500 mt-1 md:mt-1.5">Deixe em branco se for registro imediato.</p></div>
+              <div className="bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
+                <label className="block text-[11px] font-black text-blue-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Calendar size={12}/> Data Prevista (Agendamento)</label>
+                <input type="date" value={formData.data_prevista} onChange={e => setFormData({...formData, data_prevista: e.target.value})} className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                <p className="text-[9px] font-bold text-blue-600/70 mt-2 uppercase tracking-widest">Deixe em branco se for imediato.</p>
+              </div>
             ) : (
-              <div><label className="block text-xs md:text-sm font-bold text-emerald-700 mb-1.5 md:mb-2">Data Real da Conclusão (Opcional)</label><input type="date" value={formData.data_conclusao_manual} onChange={e => setFormData({...formData, data_conclusao_manual: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-emerald-50 text-emerald-900 font-medium" /><p className="text-[10px] md:text-xs text-emerald-600/70 mt-1 md:mt-1.5">Preencha caso o serviço tenha sido feito em dia anterior.</p></div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Fornecedor / prestador</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Interno (Equipe IOFV)</option>{auxiliares.prestadores.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}</select></div>
-            <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Protocolo externo (OS)</label><input value={formData.protocolo_externo} onChange={e => setFormData({...formData, protocolo_externo: e.target.value})} placeholder="Nº da OS do prestador" className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-          </div>
-
-          <div><label className="block text-xs md:text-sm font-bold text-slate-700 mb-1.5 md:mb-2">Descrição da Manutenção</label><textarea required rows="4" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="w-full px-3 py-2.5 md:px-4 md:py-3 text-sm md:text-base rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none" placeholder="Descreva os procedimentos realizados..."></textarea></div>
-
-          <div 
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed p-6 rounded-2xl transition-all text-center ${isDraggingAtivo ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100'}`}
-          >
-            <div className="flex flex-col items-center justify-center gap-2 pointer-events-none">
-              <UploadCloud size={32} className={`${isDraggingAtivo ? 'text-blue-500 animate-bounce' : 'text-slate-400'}`} />
-              <p className="text-sm font-bold text-slate-700">Arraste e solte os Laudos ou Fotos aqui</p>
-              <p className="text-xs text-slate-500">Ou clique no botão abaixo para escolher</p>
-            </div>
-            
-            <input type="file" id="arquivoUpload" multiple accept="image/*,application/pdf" onChange={handleUploadClick} disabled={loading} className="hidden" />
-            <label htmlFor="arquivoUpload" className="mt-4 inline-block bg-white border border-slate-200 px-4 py-2 rounded-lg text-sm font-bold text-blue-700 cursor-pointer hover:bg-blue-50 transition-colors shadow-sm">
-              Explorar Arquivos
-            </label>
-
-            {formData.anexos && formData.anexos.length > 0 && (
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mt-6 border-t border-slate-200 pt-4 text-left">
-                {formData.anexos.map((anexo, index) => (
-                  <div key={index} className="relative group rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white h-24 flex flex-col items-center justify-center cursor-default">
-                    {isPDF(anexo) ? (<><FileText size={24} className="text-red-500 mb-1" /><span className="text-[9px] font-bold text-slate-500">PDF</span></>) : (<img src={anexo} alt={`Anexo ${index}`} className="w-full h-full object-cover" />)}
-                    <button type="button" onClick={(e) => { e.preventDefault(); removerAnexo(anexo); }} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-80 hover:opacity-100 transition-opacity z-10"><X size={10} /></button>
-                  </div>
-                ))}
+              <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100">
+                <label className="block text-[11px] font-black text-emerald-800 uppercase tracking-widest mb-2 flex items-center gap-1.5"><CheckCircle2 size={12}/> Conclusão Manual (Opcional)</label>
+                <input type="date" value={formData.data_conclusao_manual} onChange={e => setFormData({...formData, data_conclusao_manual: e.target.value})} className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl font-black text-emerald-900 outline-none focus:ring-2 focus:ring-emerald-500 transition-all" />
+                <p className="text-[9px] font-bold text-emerald-600/70 mt-2 uppercase tracking-widest">Se vazio, assume o dia e hora atual.</p>
               </div>
             )}
           </div>
 
         </div>
 
-        <button type="submit" disabled={loading} className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-3.5 md:py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-70 text-base md:text-lg">
-          {loading ? 'Salvando...' : 'Salvar Ordem de Serviço'}
-        </button>
+        {/* =========================================================================
+            COLUNA DIREITA (EXECUÇÃO E RELATOS) 
+            ========================================================================= */}
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+          
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Building size={16} /> Responsabilidade de Execução
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Fornecedor / Prestador de Serviço</label>
+                <select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all cursor-pointer">
+                  <option value="">Manutenção Interna (Equipe IOFV)</option>
+                  {auxiliares.prestadores.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5"><Hash size={12}/> Protocolo Externo da OS</label>
+                <input value={formData.protocolo_externo} onChange={e => setFormData({...formData, protocolo_externo: e.target.value})} placeholder="Nº da OS gerada pelo prestador..." className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <AlignLeft size={16} /> Relato Técnico / Descrição da Manutenção *
+            </label>
+            <textarea required rows="6" value={formData.descricao} onChange={e => setFormData({...formData, descricao: e.target.value})} className="w-full px-5 py-4 bg-amber-50/30 border border-amber-100/50 rounded-2xl font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all resize-none shadow-inner" placeholder="Descreva os problemas identificados, peças trocadas e procedimentos realizados..."></textarea>
+          </div>
+
+          {/* 🚀 DROPZONE GIGANTE E MODERNO */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <Paperclip size={16} /> Arquivos e Laudos (PDF ou Imagens)
+            </h3>
+            
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`border-2 border-dashed p-10 rounded-[2rem] transition-all text-center flex flex-col items-center justify-center min-h-[200px] ${isDraggingAtivo ? 'border-indigo-500 bg-indigo-50/50 shadow-inner' : 'border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400'}`}
+            >
+              <div className="flex flex-col items-center justify-center gap-3 pointer-events-none">
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center ${isDraggingAtivo ? 'bg-indigo-100 text-indigo-600 animate-bounce' : 'bg-white text-slate-400 shadow-sm'}`}>
+                  <UploadCloud size={40} />
+                </div>
+                <p className="text-lg font-black text-slate-700 tracking-tight">Arraste e solte os seus arquivos aqui</p>
+                <p className="text-sm font-semibold text-slate-500">Documentos PDF, Fotos de peças, Notas Fiscais...</p>
+              </div>
+              
+              <input type="file" id="arquivoUpload" multiple accept="image/*,application/pdf" onChange={handleUploadClick} disabled={loading} className="hidden" />
+              <label htmlFor="arquivoUpload" className="mt-6 inline-block bg-white border border-slate-200 px-6 py-3 rounded-xl text-sm font-bold text-indigo-700 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 transition-all shadow-sm active:scale-95">
+                Procurar no Computador
+              </label>
+            </div>
+
+            {formData.anexos && formData.anexos.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-4 mt-6 pt-6 border-t border-slate-100">
+                {formData.anexos.map((anexo, index) => (
+                  <div key={index} className="relative group aspect-square rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-slate-50 flex flex-col items-center justify-center cursor-default hover:border-indigo-300 transition-all">
+                    {isPDF(anexo) ? (
+                      <div className="flex flex-col items-center gap-2">
+                        <FileText size={40} className="text-rose-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">PDF Anexo</span>
+                      </div>
+                    ) : (
+                      <img src={anexo} alt={`Anexo ${index}`} className="w-full h-full object-cover" />
+                    )}
+                    <button type="button" onClick={(e) => { e.preventDefault(); removerAnexo(anexo); }} className="absolute inset-0 bg-red-900/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white transition-all z-10">
+                      <X size={32} className="mb-2 hover:scale-110 transition-transform" />
+                      <span className="text-xs font-bold uppercase tracking-wider">Remover</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-70 text-lg flex items-center justify-center gap-3">
+            {loading ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
+            {loading ? 'A Gravar Sistema...' : 'Salvar Ordem de Serviço'}
+          </button>
+          
+        </div>
       </form>
     </div>
   )

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom' // 🚀 Importação do Navigate
-import { useModulo } from '../../../contexts/ModuloContext' // 🚀 Importação do Contexto
+import { useNavigate } from 'react-router-dom' 
+import { useModulo } from '../../../contexts/ModuloContext' 
 import { 
   ArrowLeft, Edit, Trash2, Monitor, Hash, FileText, Paperclip, 
   CheckCircle2, Clock, AlertCircle, Ticket, Calendar, Building, 
@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 
 // ============================================================================
-// COMPONENTE: LIGHTBOX (Mantido Intacto)
+// COMPONENTE: LIGHTBOX 
 // ============================================================================
 const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(indexInicial || 0)
@@ -144,11 +144,11 @@ const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
 }
 
 // ============================================================================
-// COMPONENTE PRINCIPAL
+// COMPONENTE PRINCIPAL (OS DETALHES)
 // ============================================================================
 export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdicao, handleExcluir }) {
-  const navigate = useNavigate() // 🚀
-  const { moduloAtivo } = useModulo() // 🚀
+  const navigate = useNavigate() 
+  const { moduloAtivo } = useModulo() 
 
   const isPDF = (url) => url?.toLowerCase().includes('.pdf')
   
@@ -158,11 +158,8 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
   const [lightboxAberto, setLightboxAberto] = useState(false)
   const [imagemAtiva, setImagemAtiva] = useState(null)
 
-  const handleImprimir = () => {
-    window.print()
-  }
+  const handleImprimir = () => window.print()
 
-  // 🚀 NOVO: Navegação Direta para o Equipamento
   const irParaEquipamento = () => {
     if (chamado.equipamento_id) {
       navigate(`/${moduloAtivo}/equipamentos`, { 
@@ -172,86 +169,109 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 bg-slate-50/30 p-2 md:p-6 rounded-3xl print:p-0 print:bg-white relative">
+    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-300 print:p-0 print:bg-white relative">
       
+      {/* 🚀 CORREÇÃO 1: CSS de impressão blindado. Força uma coluna (flex-col) e garante as cores de fundo */}
       <style>{`
         @media print {
+          @page { margin: 10mm; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white !important; }
           body * { visibility: hidden !important; }
           .print-container, .print-container * { visibility: visible !important; }
-          .print-container { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+          
+          /* Remove a sobreposição do grid convertendo a página de impressão em uma coluna única flexível */
+          .print-container { 
+            position: absolute !important; 
+            left: 0 !important; 
+            top: 0 !important; 
+            width: 100% !important; 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            display: flex !important; 
+            flex-direction: column !important; 
+            gap: 20px !important; 
+          }
+          
           .no-print { display: none !important; }
           .print-break-inside-avoid { break-inside: avoid; }
         }
       `}</style>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-1">
-            <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">Detalhes da OS</h1>
-            <span className={`px-2.5 py-1 rounded-md text-xs font-bold border uppercase ${chamado.tipo_intervencao === 'Preventiva' ? 'bg-green-100 text-green-800 border-green-200' : chamado.tipo_intervencao === 'Calibração' ? 'bg-blue-100 text-blue-800 border-blue-200' : chamado.tipo_intervencao === 'Qualificação' ? 'bg-purple-100 text-purple-800 border-purple-200' : 'bg-red-100 text-red-800 border-red-200'}`}>{chamado.tipo_intervencao || 'Corretiva'}</span>
+      {/* CABEÇALHO (Oculto na Impressão) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
+        <div className="flex-1 min-w-0 pr-4">
+          <div className="flex items-center gap-3 mb-2.5">
+            <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border flex items-center gap-1.5 shadow-sm ${chamado.tipo_intervencao === 'Preventiva' ? 'bg-green-50 text-green-700 border-green-200' : chamado.tipo_intervencao === 'Calibração' ? 'bg-blue-50 text-blue-700 border-blue-200' : chamado.tipo_intervencao === 'Qualificação' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+               <div className={`w-1.5 h-1.5 rounded-full ${chamado.tipo_intervencao === 'Preventiva' ? 'bg-green-500' : chamado.tipo_intervencao === 'Calibração' ? 'bg-blue-500' : chamado.tipo_intervencao === 'Qualificação' ? 'bg-purple-500' : 'bg-red-500'}`}></div>
+               {chamado.tipo_intervencao || 'Corretiva'}
+            </span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">OS #{chamado.id}</span>
           </div>
-          <p className="text-sm text-slate-500 font-medium">Acompanhamento e ficha técnica da ordem de serviço.</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-none">
+            Ordem de Serviço Técnica
+          </h1>
         </div>
         
-        <div className="flex flex-col sm:flex-row flex-wrap gap-2.5 w-full md:w-auto">
-          <button onClick={voltarParaLista} className="flex-1 sm:flex-none justify-center px-4 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-all shadow-sm"><ArrowLeft size={16} className="inline mr-2" /> Voltar</button>
-          <button onClick={handleImprimir} className="flex-1 sm:flex-none justify-center px-4 py-2.5 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl transition-all shadow-sm"><Printer size={16} className="inline mr-2" /> Imprimir OS</button>
-          <button onClick={() => iniciarEdicao(chamado)} className="flex-1 sm:flex-none justify-center px-4 py-2.5 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl transition-all shadow-sm"><Edit size={16} className="inline mr-2" /> Editar</button>
-          <button onClick={() => handleExcluir(chamado.id)} className="w-full sm:w-auto justify-center px-4 py-2.5 text-sm font-bold text-red-700 bg-red-50 border border-red-200 hover:bg-red-100 rounded-xl transition-all shadow-sm"><Trash2 size={16} className="inline mr-2" /> Excluir</button>
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button onClick={voltarParaLista} className="px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+            <ArrowLeft size={18} /> Voltar
+          </button>
+          <button onClick={handleImprimir} className="px-5 py-3 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+            <Printer size={18} /> Imprimir OS
+          </button>
+          <button onClick={() => iniciarEdicao(chamado)} className="px-5 py-3 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+            <Edit size={18} /> Editar
+          </button>
+          <button onClick={() => handleExcluir(chamado.id)} className="px-5 py-3 text-sm font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+            <Trash2 size={18} /> Excluir
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print-container">
+      {/* 🚀 O recipiente principal da impressão ("print-container") */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start print-container">
         
-        <div className="hidden print:block col-span-3 border-b-2 border-slate-800 pb-4 mb-4">
+        {/* === IMPRESSÃO ONLY CABEÇALHO === */}
+        <div className="hidden print:block w-full border-b-2 border-slate-800 pb-4 mb-2">
            <h2 className="text-2xl font-black text-slate-900 uppercase">Ordem de Serviço Técnica</h2>
            <p className="text-slate-500 font-bold mt-1">OS #{chamado.id || 'N/A'} - Emitida em {new Date().toLocaleDateString('pt-BR')}</p>
         </div>
 
-        <div className="lg:col-span-2 space-y-6">
+        {/* ===============================================================
+            COLUNA ESQUERDA (8 COLUNAS)
+            =============================================================== */}
+        <div className="lg:col-span-8 space-y-6 print:w-full">
           
-          {/* 🚀 NOVO: Card de Equipamento Transformado em Botão Navegável */}
-          <div 
-            onClick={irParaEquipamento}
-            className={`bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5 print:border-slate-800 print:shadow-none print:p-4 group transition-all relative ${chamado.equipamento_id ? 'cursor-pointer hover:border-blue-400 hover:shadow-md' : ''}`}
-          >
-            {chamado.equipamento_id && (
-              <div className="absolute top-4 right-4 text-slate-300 group-hover:text-blue-500 transition-colors no-print">
-                <ExternalLink size={20} />
-              </div>
-            )}
-            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shrink-0 border border-blue-100 no-print group-hover:bg-blue-600 group-hover:text-white transition-colors"><Monitor size={32} /></div>
-            <div className="pr-6">
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1 group-hover:text-blue-500 transition-colors">Equipamento Vinculado</p>
-              <h3 className="text-xl md:text-2xl font-black text-slate-800 leading-tight tracking-tight uppercase group-hover:text-blue-900 transition-colors">{chamado.equipamento?.nome || 'Equipamento Excluído'}</h3>
-              <div className="flex items-center gap-3 mt-3 text-sm font-bold text-slate-600">
-                <span className="bg-slate-100 px-3 py-1 rounded-lg border border-slate-200 flex items-center gap-1.5 group-hover:border-blue-200 group-hover:bg-blue-50 transition-colors"><Hash size={14} className="text-slate-400 group-hover:text-blue-500"/> Patrimônio: <span className="text-slate-800 group-hover:text-blue-900">{chamado.equipamento?.patrimonio || 'S/N'}</span></span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4 print-break-inside-avoid">
-            <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2 border-b border-slate-100 pb-3 print:border-slate-800 uppercase text-sm tracking-wider"><FileText className="text-blue-600 no-print" size={20} /> Relato / Descrição Técnica</h3>
-            <p className="text-slate-700 text-sm md:text-base bg-slate-50/80 p-5 rounded-2xl border border-slate-100 min-h-[140px] whitespace-pre-wrap leading-relaxed shadow-inner print:shadow-none print:border-slate-300 print:bg-white">{chamado.descricao || 'Nenhum detalhe técnico foi inserido.'}</p>
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4 print-break-inside-avoid">
+            <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3 print:border-slate-800">
+              <FileText className="text-slate-400 no-print" size={16} /> Relato / Descrição Técnica
+            </h3>
+            <p className="text-slate-700 text-sm md:text-base bg-amber-50/50 p-6 rounded-2xl border border-amber-100/50 min-h-[200px] whitespace-pre-wrap leading-relaxed shadow-inner print:shadow-none print:border-slate-300 print:bg-white font-medium">
+              {chamado.descricao || 'Nenhum detalhe técnico foi inserido.'}
+            </p>
           </div>
 
           {(imagens.length > 0 || documentos.length > 0) && (
-            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm no-print">
-              <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2 border-b border-slate-100 pb-3"><Paperclip className="text-blue-600" size={20} /> Documentos e Anexos</h3>
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
+              <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3">
+                <Paperclip className="text-slate-400" size={16} /> Documentos e Anexos
+              </h3>
               
               {imagens.length > 0 && (
-                <div className="mb-6">
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Imagens / Fotos ({imagens.length})</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <div className="mb-8">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Fotos / Imagens ({imagens.length})</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {imagens.map((imgUrl, index) => (
                       <div 
                         key={index} 
                         onClick={() => { setImagemAtiva(imgUrl); setLightboxAberto(true); }}
-                        className="group relative flex flex-col items-center justify-center border-2 border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:border-blue-400 transition-all h-32 md:h-40 shadow-sm"
+                        className="group relative flex flex-col items-center justify-center border border-slate-200 rounded-2xl overflow-hidden cursor-pointer hover:border-indigo-400 transition-all h-32 md:h-40 shadow-sm bg-slate-50"
                       >
-                        <img src={imgUrl} alt={`Foto OS ${index}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/30 transition-colors flex items-center justify-center">
-                           <span className="opacity-0 group-hover:opacity-100 bg-white/90 text-slate-800 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transform translate-y-4 group-hover:translate-y-0 transition-all"><ZoomIn size={14}/> Ampliar</span>
+                        <img src={imgUrl} alt={`Foto OS ${index}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/40 transition-colors duration-300 flex items-center justify-center">
+                           <span className="opacity-0 group-hover:opacity-100 bg-white/95 text-slate-800 text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 transform translate-y-4 group-hover:translate-y-0 transition-all shadow-lg">
+                             <ZoomIn size={16}/> Ampliar
+                           </span>
                         </div>
                       </div>
                     ))}
@@ -261,18 +281,18 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
 
               {documentos.length > 0 && (
                 <div>
-                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Documentos PDF ({documentos.length})</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">Laudos PDF ({documentos.length})</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {documentos.map((docUrl, index) => (
                       <a 
                         key={index} 
                         href={docUrl} 
                         target="_blank" 
                         rel="noopener noreferrer" 
-                        className="group relative flex flex-col items-center justify-center p-4 border-2 border-slate-200 rounded-2xl bg-slate-50 hover:bg-red-50 hover:border-red-200 transition-all text-center h-32 md:h-40 shadow-sm"
+                        className="group relative flex flex-col items-center justify-center p-4 border border-slate-200 rounded-2xl bg-rose-50/30 hover:bg-rose-50 hover:border-rose-300 transition-all text-center h-32 md:h-40 shadow-sm"
                       >
-                        <FileText size={40} className="text-red-500 mb-3 group-hover:-translate-y-2 transition-transform duration-300" />
-                        <span className="text-xs font-bold text-slate-700">Ver Laudo/Doc</span>
+                        <FileText size={48} className="text-rose-500 mb-4 group-hover:-translate-y-2 transition-transform duration-300 drop-shadow-sm" />
+                        <span className="text-xs font-bold text-slate-700 bg-white px-3 py-1 rounded-lg shadow-sm border border-slate-100 group-hover:border-rose-200 transition-colors">Abrir PDF</span>
                       </a>
                     ))}
                   </div>
@@ -282,46 +302,88 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
           )}
         </div>
 
-        <div className="space-y-6">
-          <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3 print:text-black">Status Atual</p>
-            <div className={`flex items-center gap-3 p-4 rounded-2xl border print:border-slate-300 print:text-black print:bg-white ${chamado.status?.nome === 'Concluído' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : chamado.status?.nome === 'Aberto' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
-              {chamado.status?.nome === 'Concluído' ? <CheckCircle2 size={24} className="no-print" /> : chamado.status?.nome === 'Aberto' ? <Clock size={24} className="no-print" /> : <AlertCircle size={24} className="no-print" />}
-              <span className="text-lg font-black uppercase tracking-wide">{chamado.status?.nome || 'Sem Status'}</span>
+        {/* ===============================================================
+            COLUNA DIREITA (4 COLUNAS)
+            =============================================================== */}
+        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6 print:static print:w-full">
+          
+          {/* Card: Status Visual */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 print:text-black">Status Atual da OS</p>
+            <div className={`flex items-center gap-4 p-5 rounded-2xl border print:border-slate-300 print:text-black print:bg-white shadow-inner ${chamado.status?.nome === 'Concluído' ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800' : chamado.status?.nome === 'Aberto' ? 'bg-amber-50/80 border-amber-200 text-amber-800' : 'bg-blue-50/80 border-blue-200 text-blue-800'}`}>
+              {chamado.status?.nome === 'Concluído' ? <CheckCircle2 size={32} className="no-print" /> : chamado.status?.nome === 'Aberto' ? <Clock size={32} className="no-print" /> : <AlertCircle size={32} className="no-print" />}
+              <span className="text-xl md:text-2xl font-black uppercase tracking-tight">{chamado.status?.nome || 'Sem Status'}</span>
             </div>
           </div>
 
-          <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-5 print:text-black border-b border-slate-100 pb-2 print:border-slate-800">Cronograma</p>
-            <div className="space-y-5">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 shrink-0 no-print"><Ticket size={18}/></div>
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5 print:text-black">Data de Abertura</p><p className="text-sm font-bold text-slate-800">{chamado.data_abertura ? new Date(chamado.data_abertura).toLocaleString('pt-BR') : '-'}</p></div>
+          {/* 🚀 CORREÇÃO 2: Limitador min-w-0 e truncate adicionado para o texto não explodir o bloco */}
+          <div 
+            onClick={irParaEquipamento}
+            className={`bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-4 print:border-slate-800 print:shadow-none print:p-4 group transition-all relative ${chamado.equipamento_id ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md hover:bg-indigo-50/30' : ''}`}
+          >
+            {chamado.equipamento_id && (
+              <div className="absolute top-5 right-5 text-slate-300 group-hover:text-indigo-500 transition-colors no-print">
+                <ExternalLink size={20} />
               </div>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-500 shrink-0 no-print"><Calendar size={18}/></div>
-                <div><p className="text-[10px] font-bold text-slate-400 uppercase mb-0.5 print:text-black">Previsão (Agenda)</p><p className="text-sm font-bold text-slate-800">{chamado.data_prevista ? new Date(chamado.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não agendado'}</p></div>
+            )}
+            <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0 border border-indigo-100 no-print group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-inner"><Monitor size={24} /></div>
+            
+            <div className="flex-1 min-w-0 pr-6 print:pr-0">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">Equipamento Vinculado</p>
+              <h3 className="text-base font-black text-slate-800 leading-tight tracking-tight uppercase group-hover:text-indigo-900 transition-colors truncate w-full block">{chamado.equipamento?.nome || 'Excluído'}</h3>
+              <p className="text-xs font-bold text-slate-500 mt-1 flex items-center gap-1 truncate w-full"><Hash size={12} className="shrink-0"/> Patrimônio: {chamado.equipamento?.patrimonio || 'S/N'}</p>
+            </div>
+          </div>
+
+          {/* Card: Cronograma e Datas */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 print:text-black border-b border-slate-100 pb-2 print:border-slate-800">Cronograma da Intervenção</p>
+            
+            <div className="relative space-y-6">
+              <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-slate-100 no-print"></div>
+
+              <div className="flex items-start gap-4 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-white border-2 border-slate-200 flex items-center justify-center text-slate-400 shrink-0 no-print shadow-sm"><Ticket size={20}/></div>
+                <div className="pt-1"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 print:text-black">Data de Abertura</p><p className="text-sm font-bold text-slate-800">{chamado.data_abertura ? new Date(chamado.data_abertura).toLocaleString('pt-BR') : '-'}</p></div>
               </div>
+              
+              <div className="flex items-start gap-4 relative z-10">
+                <div className="w-12 h-12 rounded-2xl bg-white border-2 border-blue-200 flex items-center justify-center text-blue-500 shrink-0 no-print shadow-sm"><Calendar size={20}/></div>
+                <div className="pt-1"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 print:text-black">Previsão Agendada</p><p className="text-sm font-bold text-slate-800">{chamado.data_prevista ? new Date(chamado.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não agendado'}</p></div>
+              </div>
+
               {chamado.data_conclusao && (
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 shrink-0 no-print"><CheckCircle2 size={18}/></div>
-                  <div><p className="text-[10px] font-bold text-emerald-600/70 uppercase mb-0.5 print:text-black">Data de Conclusão</p><p className="text-sm font-black text-emerald-800 print:text-black">{new Date(chamado.data_conclusao).toLocaleString('pt-BR')}</p></div>
+                <div className="flex items-start gap-4 relative z-10">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500 border-2 border-emerald-500 flex items-center justify-center text-white shrink-0 no-print shadow-md"><CheckCircle2 size={20}/></div>
+                  <div className="pt-1"><p className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-widest mb-0.5 print:text-black">Data de Conclusão</p><p className="text-sm font-black text-emerald-800 print:text-black">{new Date(chamado.data_conclusao).toLocaleString('pt-BR')}</p></div>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-5 print:text-black border-b border-slate-100 pb-2 print:border-slate-800">Execução & Responsáveis</p>
-            <div className="space-y-4">
-              <div className="flex flex-col gap-1 border-b border-slate-50 pb-3 print:border-slate-300"><span className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1.5 print:text-black"><Building size={14} className="no-print"/> Fornecedor / Prestador</span><span className="text-sm font-bold text-slate-800 md:ml-5 print:ml-0">{chamado.prestador?.nome || 'Manutenção Interna'}</span></div>
-              <div className="flex flex-col gap-1 border-b border-slate-50 pb-3 print:border-slate-300"><span className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1.5 print:text-black"><Hash size={14} className="no-print"/> Protocolo Externo (OS)</span><span className="text-sm font-bold text-slate-800 md:ml-5 print:ml-0">{chamado.protocolo_externo || 'Sem protocolo vinculado'}</span></div>
-              <div className="flex flex-col gap-1"><span className="text-[11px] font-bold text-slate-400 uppercase flex items-center gap-1.5 print:text-black"><User size={14} className="no-print"/> Solicitante</span><span className="text-sm font-bold text-slate-800 md:ml-5 print:ml-0">{chamado.aberto_por?.nome || '-'}</span></div>
+          {/* Card: Responsáveis */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 print:text-black border-b border-slate-100 pb-2 print:border-slate-800">Execução & Responsáveis</p>
+            <div className="space-y-5">
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-4 print:border-slate-300">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black"><Building size={12} className="no-print"/> Fornecedor / Prestador</span>
+                <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0">{chamado.prestador?.nome || 'Manutenção Interna'}</span>
+              </div>
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-4 print:border-slate-300">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black"><Hash size={12} className="no-print"/> Protocolo Externo (OS)</span>
+                <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0">{chamado.protocolo_externo || 'S/ Protocolo'}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black"><User size={12} className="no-print"/> Solicitante / Criador</span>
+                <span className="text-sm font-bold text-slate-800 mt-1">{chamado.aberto_por?.nome || '-'}</span>
+              </div>
             </div>
           </div>
+
         </div>
 
-        <div className="hidden print:flex col-span-3 justify-between items-end mt-24 pt-8">
+        {/* === IMPRESSÃO ONLY RODAPÉ === */}
+        <div className="hidden print:flex w-full justify-between items-end mt-16 pt-8">
            <div className="w-64 border-t-2 border-slate-800 text-center pt-2 font-bold text-xs uppercase tracking-wider">Assinatura do Técnico</div>
            <div className="w-64 border-t-2 border-slate-800 text-center pt-2 font-bold text-xs uppercase tracking-wider">Visto do Solicitante / Fiscal</div>
         </div>

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, Clock, Calendar, Wrench, Paperclip, FileText, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { Plus, Search, Filter, Clock, Calendar, Wrench, Paperclip, FileText, CheckCircle2, AlertTriangle, Monitor, ChevronRight, Ticket } from 'lucide-react'
 import { Skeleton } from '../../../components/ui/Skeleton'
 import Paginacao from '../../../components/Paginacao'
 
@@ -15,7 +15,7 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
   const [filtroPrestador, setFiltroPrestador] = useState('')
-  const [filtroPeriodo, setFiltroPeriodo] = useState('') // 🚀 NOVO: Filtro de Período
+  const [filtroPeriodo, setFiltroPeriodo] = useState('') 
 
   const [paginaAtual, setPaginaAtual] = useState(1);
   const ITENS_POR_PAGINA = 15;
@@ -33,105 +33,124 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
 
   const isPDF = (url) => url?.toLowerCase().includes('.pdf')
 
-  const chamadosFiltrados = chamados.filter(ch => {
-    const term = busca.toLowerCase()
-    const matchBusca = (ch.equipamento?.nome || '').toLowerCase().includes(term) || 
-                       (ch.protocolo_externo || '').toLowerCase().includes(term) || 
-                       (ch.descricao || '').toLowerCase().includes(term)
+  // 🚀 OTIMIZAÇÃO: useMemo aplicado aqui para blindar a performance!
+  const chamadosFiltrados = useMemo(() => {
+    return chamados.filter(ch => {
+      const term = busca.toLowerCase()
+      const matchBusca = (ch.equipamento?.nome || '').toLowerCase().includes(term) || 
+                         (ch.protocolo_externo || '').toLowerCase().includes(term) || 
+                         (ch.descricao || '').toLowerCase().includes(term)
 
-    const matchTipo = filtroTipo === '' || ch.tipo_intervencao === filtroTipo
-    const matchStatus = filtroStatus === '' || ch.status_id === filtroStatus
-    const matchPrestador = filtroPrestador === '' || ch.prestador_id === filtroPrestador
-    
-    // 🚀 LÓGICA DO FILTRO DE TEMPO
-    let matchPeriodo = true;
-    if (filtroPeriodo !== '') {
-      const hoje = new Date();
-      const hojeStr = hoje.toISOString().split('T')[0];
+      const matchTipo = filtroTipo === '' || ch.tipo_intervencao === filtroTipo
+      const matchStatus = filtroStatus === '' || ch.status_id === filtroStatus
+      const matchPrestador = filtroPrestador === '' || ch.prestador_id === filtroPrestador
       
-      if (filtroPeriodo === 'atrasados') {
-        matchPeriodo = ch.status?.nome !== 'Concluído' && ch.data_prevista && ch.data_prevista < hojeStr;
-      } else {
-        const dataRef = ch.data_abertura ? new Date(ch.data_abertura) : new Date(ch.created_at);
-        if (filtroPeriodo === 'hoje') {
-          matchPeriodo = dataRef.toISOString().split('T')[0] === hojeStr;
-        } else if (filtroPeriodo === 'semana') {
-          const umaSemanaAtras = new Date();
-          umaSemanaAtras.setDate(umaSemanaAtras.getDate() - 7);
-          matchPeriodo = dataRef >= umaSemanaAtras;
-        } else if (filtroPeriodo === 'mes') {
-          matchPeriodo = dataRef.getMonth() === hoje.getMonth() && dataRef.getFullYear() === hoje.getFullYear();
+      let matchPeriodo = true;
+      if (filtroPeriodo !== '') {
+        const hoje = new Date();
+        const hojeStr = hoje.toISOString().split('T')[0];
+        
+        if (filtroPeriodo === 'atrasados') {
+          matchPeriodo = ch.status?.nome !== 'Concluído' && ch.data_prevista && ch.data_prevista < hojeStr;
+        } else {
+          const dataRef = ch.data_abertura ? new Date(ch.data_abertura) : new Date(ch.created_at);
+          if (filtroPeriodo === 'hoje') {
+            matchPeriodo = dataRef.toISOString().split('T')[0] === hojeStr;
+          } else if (filtroPeriodo === 'semana') {
+            const umaSemanaAtras = new Date();
+            umaSemanaAtras.setDate(umaSemanaAtras.getDate() - 7);
+            matchPeriodo = dataRef >= umaSemanaAtras;
+          } else if (filtroPeriodo === 'mes') {
+            matchPeriodo = dataRef.getMonth() === hoje.getMonth() && dataRef.getFullYear() === hoje.getFullYear();
+          }
         }
       }
-    }
-    
-    return matchBusca && matchTipo && matchStatus && matchPrestador && matchPeriodo
-  })
+      
+      return matchBusca && matchTipo && matchStatus && matchPrestador && matchPeriodo
+    })
+  }, [chamados, busca, filtroTipo, filtroStatus, filtroPrestador, filtroPeriodo]);
 
   return (
-    <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="w-full space-y-6">
+      
+      {/* CABEÇALHO */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">Chamados e OS</h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Gerencie as corretivas, preventivas, calibrações e qualificações.</p>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 flex items-center gap-3 tracking-tight uppercase">
+            <Ticket className="text-indigo-600" size={32} /> Central de O.S
+          </h1>
+          <p className="text-sm font-semibold text-slate-500 mt-1">Gestão, histórico e controlo de intervenções técnicas.</p>
         </div>
-        <button onClick={() => setView('novo')} className="w-full md:w-auto bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2">
-          <Plus size={20} /> Novo chamado
+        <button onClick={() => setView('novo')} className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-indigo-600/20 transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0">
+          <Plus size={20} /> Abrir Nova OS
         </button>
       </div>
 
-      <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      {/* BARRA DE PESQUISA E FILTROS */}
+      <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-5">
         <div className="relative w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input type="text" placeholder="Buscar por equipamento, protocolo externo ou descrição..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-11 md:pl-12 pr-4 py-3 md:py-3.5 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <input type="text" placeholder="Buscar por equipamento, protocolo externo ou palavra-chave na descrição..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-12 pr-5 py-4 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium transition-all shadow-inner" />
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-          <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1 shrink-0"><Filter size={14}/> Filtros:</span>
+        <div className="flex flex-wrap lg:flex-nowrap gap-3 items-center pt-2 border-t border-slate-100">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 flex items-center gap-1.5 shrink-0">
+            <Filter size={14}/> Filtros
+          </span>
           
-          {/* 🚀 NOVO: SELECT DE PERÍODO E ATRASOS */}
-          <select value={filtroPeriodo} onChange={(e) => setFiltroPeriodo(e.target.value)} className={`w-auto min-w-[140px] shrink-0 px-3 py-2 border rounded-lg outline-none focus:ring-2 text-xs font-bold transition-colors ${filtroPeriodo === 'atrasados' ? 'bg-red-50 border-red-200 text-red-700 focus:ring-red-500' : 'bg-white border-slate-200 text-slate-700 focus:ring-blue-500'}`}>
-            <option value="">Todo o Período</option>
+          <select value={filtroPeriodo} onChange={(e) => setFiltroPeriodo(e.target.value)} className={`flex-1 min-w-[140px] px-4 py-3 border rounded-xl outline-none focus:ring-2 text-xs font-bold transition-all cursor-pointer ${filtroPeriodo === 'atrasados' ? 'bg-red-50 border-red-200 text-red-700 focus:ring-red-500 shadow-sm' : 'bg-white border-slate-200 text-slate-700 focus:ring-indigo-500'}`}>
+            <option value="">Histórico Completo</option>
             <option value="hoje">Abertos Hoje</option>
             <option value="semana">Últimos 7 dias</option>
             <option value="mes">Este Mês</option>
-            <option value="atrasados">🚨 Atrasados (Previstos)</option>
+            <option value="atrasados">🚨 Atrasados / Vencidos</option>
           </select>
 
-          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} className="w-auto min-w-[140px] shrink-0 px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700">
-            <option value="">Tipo de Serviço</option>
-            <option value="Corretiva">Corretiva</option><option value="Preventiva">Preventiva</option><option value="Calibração">Calibração</option><option value="Qualificação">Qualificação</option>
+          <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)} className="flex-1 min-w-[140px] px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-slate-700 cursor-pointer">
+            <option value="">Qualquer Intervenção</option>
+            <option value="Corretiva">Corretiva</option>
+            <option value="Preventiva">Preventiva</option>
+            <option value="Calibração">Calibração</option>
+            <option value="Qualificação">Qualificação</option>
           </select>
-          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="w-auto min-w-[140px] shrink-0 px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700">
-            <option value="">Status da OS</option>
+
+          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="flex-1 min-w-[140px] px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-slate-700 cursor-pointer">
+            <option value="">Qualquer Status</option>
             {auxiliares.status.map(st => <option key={st.id} value={st.id}>{st.nome}</option>)}
           </select>
-          <select value={filtroPrestador} onChange={(e) => setFiltroPrestador(e.target.value)} className="w-auto min-w-[140px] shrink-0 px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700">
-            <option value="">Empresa/Prestador</option><option value="Interno">Manutenção Interna</option>
+
+          <select value={filtroPrestador} onChange={(e) => setFiltroPrestador(e.target.value)} className="flex-1 min-w-[140px] px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-bold text-slate-700 cursor-pointer">
+            <option value="">Qualquer Prestador</option>
+            <option value="Interno">Manutenção Interna</option>
             {auxiliares.prestadores.map(pr => <option key={pr.id} value={pr.id}>{pr.nome}</option>)}
           </select>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4">
+      {/* LISTA DE TICKETS */}
+      <div className="grid grid-cols-1 gap-4 w-full">
         {loading ? (
            [1, 2, 3].map(i => (
-            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-              <div className="space-y-2 w-full sm:w-1/2">
-                <Skeleton className="h-6 w-1/2" />
-                <Skeleton className="h-4 w-3/4" />
+            <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col xl:flex-row gap-6 justify-between items-start xl:items-center">
+              <div className="space-y-3 w-full xl:w-2/3">
+                <Skeleton className="h-6 w-3/4 md:w-1/2" />
+                <Skeleton className="h-4 w-full md:w-2/3" />
               </div>
-              <Skeleton className="h-10 w-28 rounded-xl shrink-0" />
+              <Skeleton className="h-10 w-full xl:w-48 rounded-xl shrink-0" />
             </div>
           ))
         ) : chamadosFiltrados.length === 0 ? (
-          <div className="text-center py-10 text-slate-500 font-medium bg-white rounded-2xl border border-slate-100">Nenhum chamado encontrado para este filtro.</div>
+          <div className="text-center py-16 text-slate-400 bg-slate-50 rounded-[2rem] border border-slate-200 border-dashed flex flex-col items-center">
+            <Ticket size={48} className="mb-4 opacity-50 text-slate-300" />
+            <span className="font-bold text-lg">Nenhuma OS encontrada para estes filtros.</span>
+          </div>
         ) : (
           <>
             {chamadosFiltrados
               .slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
               .map((ch) => {
                 const temPDF = ch.anexos && ch.anexos.some(a => isPDF(a));
+                const qtdAnexos = ch.anexos ? ch.anexos.length : 0;
                 
                 let tituloData = 'Aberto:'
                 let valorData = formatDataSegura(ch.data_abertura)
@@ -144,39 +163,92 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
                 if (ch.status?.nome === 'Concluído' && ch.data_conclusao) {
                   tituloData = 'Concluído:'
                   valorData = formatDataSegura(ch.data_conclusao)
-                  corData = 'text-emerald-600'
+                  corData = 'text-emerald-700 bg-emerald-50 border border-emerald-200'
                   IconeData = CheckCircle2
                 } else if (ch.data_prevista && ch.status?.nome !== 'Concluído') {
-                  tituloData = 'Agendado:'
+                  tituloData = 'Previsão:'
                   valorData = formatDataSegura(ch.data_prevista)
-                  corData = estaAtrasado ? 'text-red-600 font-bold' : 'text-blue-600'
+                  corData = estaAtrasado ? 'text-red-700 font-bold bg-red-50 border border-red-200' : 'text-blue-700 bg-blue-50 border border-blue-200'
                   IconeData = estaAtrasado ? AlertTriangle : Calendar
+                } else {
+                  corData = 'text-slate-600 bg-slate-50 border border-slate-200'
                 }
 
                 return (
-                  <div key={ch.id} className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row gap-4 items-start md:items-center justify-between group">
-                    <div className="flex-1 w-full">
-                      <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
-                        <span className={`text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-md border ${ch.tipo_intervencao === 'Preventiva' ? 'bg-green-50 text-green-700 border-green-200' : ch.tipo_intervencao === 'Calibração' ? 'bg-blue-50 text-blue-700 border-blue-200' : ch.tipo_intervencao === 'Qualificação' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-red-50 text-red-700 border-red-200'}`}>{ch.tipo_intervencao || 'Corretiva'}</span>
-                        <span className="font-bold text-slate-800 text-base md:text-lg">{ch.equipamento?.nome || 'Equipamento Excluído'}</span>
-                        <span className="bg-slate-100 text-slate-600 text-[10px] md:text-xs px-2 py-1 rounded font-mono border border-slate-200">#{ch.equipamento?.patrimonio || 'S/N'}</span>
-                        <span className={`text-[10px] md:text-xs font-bold px-2.5 py-1 rounded-full border ${ch.status?.nome === 'Concluído' ? 'bg-green-50 text-green-700 border-green-200' : ch.status?.nome === 'Aberto' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`}>{ch.status?.nome}</span>
-                        {ch.anexos?.length > 0 && (
-                          <span className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded border shadow-sm ${temPDF ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
-                            {temPDF ? <FileText size={12} /> : <Paperclip size={12} />} {ch.anexos.length}
+                  <div 
+                    key={ch.id} 
+                    onClick={() => { setChamadoSelecionado(ch); setView('detalhes'); }}
+                    className="bg-white p-5 md:p-6 rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all flex flex-col xl:flex-row gap-5 xl:gap-8 items-start xl:items-center justify-between group cursor-pointer relative overflow-hidden"
+                  >
+                    
+                    {/* Borda lateral indicadora de Status */}
+                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 transition-colors ${ch.status?.nome === 'Concluído' ? 'bg-emerald-400' : ch.status?.nome === 'Aberto' ? 'bg-amber-400' : 'bg-blue-400'}`}></div>
+
+                    {/* BLOCO ESQUERDO: INFO PRINCIPAL */}
+                    <div className="flex-1 w-full pl-2">
+                      <div className="flex flex-wrap items-center gap-2 mb-2.5">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border ${ch.tipo_intervencao === 'Preventiva' ? 'bg-green-50 text-green-700 border-green-200' : ch.tipo_intervencao === 'Calibração' ? 'bg-blue-50 text-blue-700 border-blue-200' : ch.tipo_intervencao === 'Qualificação' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-rose-50 text-rose-700 border-rose-200'}`}>
+                          {ch.tipo_intervencao || 'Corretiva'}
+                        </span>
+                        
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg">
+                          OS #{ch.id}
+                        </span>
+                        
+                        {ch.status?.nome && (
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border flex items-center gap-1.5 ${ch.status.nome === 'Concluído' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ch.status.nome === 'Aberto' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${ch.status.nome === 'Concluído' ? 'bg-emerald-500' : ch.status.nome === 'Aberto' ? 'bg-amber-500' : 'bg-indigo-500'}`}></div>
+                            {ch.status.nome}
                           </span>
                         )}
                       </div>
-                      <p className="text-slate-500 text-xs md:text-sm line-clamp-2 md:line-clamp-1 mt-1">{ch.descricao}</p>
-                      <div className="flex flex-wrap items-center gap-3 md:gap-4 mt-3 text-[11px] md:text-xs font-medium text-slate-400">
-                        <div className={`flex items-center gap-1.5 ${corData}`}>
-                          <IconeData size={14} /> 
-                          {estaAtrasado ? <span className="uppercase tracking-wider">Atrasado ({valorData})</span> : <>{tituloData} {valorData}</>}
-                        </div>
-                        <div className="flex items-center gap-1"><Wrench size={12} /> {ch.prestador?.nome || 'Interno'}</div>
+                      
+                      <div className="flex items-center gap-2 mb-1">
+                        <Monitor size={16} className="text-slate-400 shrink-0" />
+                        <h3 className="font-black text-slate-800 text-lg md:text-xl uppercase tracking-tight truncate group-hover:text-indigo-700 transition-colors">
+                          {ch.equipamento?.nome || 'Equipamento Excluído'}
+                        </h3>
+                        {ch.equipamento?.patrimonio && (
+                          <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 shrink-0">
+                            PAT: {ch.equipamento.patrimonio}
+                          </span>
+                        )}
                       </div>
+                      
+                      <p className="text-slate-500 text-sm font-medium line-clamp-2 md:line-clamp-1 pl-6 leading-relaxed">
+                        {ch.descricao}
+                      </p>
                     </div>
-                    <button onClick={() => { setChamadoSelecionado(ch); setView('detalhes'); }} className="w-full md:w-auto px-5 py-2.5 text-sm font-bold text-slate-600 bg-slate-50 border border-slate-200 hover:bg-slate-100 rounded-xl transition-colors whitespace-nowrap">Ver detalhes</button>
+
+                    {/* BLOCO DIREITO: METADADOS */}
+                    <div className="w-full xl:w-auto flex flex-wrap xl:flex-col items-center xl:items-end justify-between xl:justify-center gap-3 shrink-0 pl-2 xl:pl-0 border-t xl:border-t-0 border-slate-100 pt-4 xl:pt-0">
+                      
+                      <div className="flex items-center gap-3 w-full xl:w-auto xl:justify-end">
+                        {/* Pílula de Data */}
+                        <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold ${corData}`}>
+                          <IconeData size={14} /> 
+                          {estaAtrasado ? <span className="uppercase tracking-wider">Atrasada ({valorData})</span> : <>{tituloData} {valorData}</>}
+                        </div>
+                        
+                        {/* Pílula de Anexos */}
+                        {qtdAnexos > 0 && (
+                          <div className={`flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-xl border shadow-sm ${temPDF ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-50 text-slate-600 border-slate-200'}`}>
+                            {temPDF ? <FileText size={14} /> : <Paperclip size={14} />} {qtdAnexos}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between w-full xl:w-auto xl:justify-end gap-4 text-xs font-bold text-slate-400">
+                        <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100">
+                          <Wrench size={12} className="text-slate-400" /> {ch.prestador?.nome || 'Manutenção Interna'}
+                        </span>
+                        
+                        <div className="hidden xl:flex w-8 h-8 rounded-full bg-slate-50 text-slate-400 items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                          <ChevronRight size={16} />
+                        </div>
+                      </div>
+
+                    </div>
                   </div>
                 )
               })}

@@ -1,4 +1,4 @@
-import { Upload, X, Trash2, Image as ImageIcon } from 'lucide-react'
+import { Upload, X, Trash2, Image as ImageIcon, Camera } from 'lucide-react'
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
@@ -55,46 +55,65 @@ export default function FormImagens({
   }
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 items-start p-5 bg-slate-50 border border-slate-200 rounded-xl">
-      <div className="w-32 h-32 bg-white rounded-xl flex items-center justify-center border border-slate-200 shrink-0 overflow-hidden shadow-sm relative group">
-        {previewImagem ? (
-          <img src={previewImagem} alt="Preview" className="w-full h-full object-cover" />
-        ) : (
-          <ImageIcon size={32} className="text-slate-300" />
-        )}
-        {previewImagem && (
-          <div onClick={handleRemoverImagemPrincipal} className="absolute inset-0 bg-red-500/80 hidden group-hover:flex items-center justify-center text-white cursor-pointer transition-all">
-            <Trash2 size={24} />
-          </div>
-        )}
-      </div>
-      <div className="flex-1 w-full space-y-4">
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">Foto de Capa</label>
-          <label className="flex items-center justify-center w-full px-4 py-4 border-2 border-dashed border-blue-300 rounded-xl hover:bg-blue-50 hover:border-blue-400 transition-colors cursor-pointer group">
-            <div className="flex flex-col items-center gap-1 text-blue-600">
-              <Upload size={20} className="group-hover:-translate-y-1 transition-transform" />
-              <span className="font-bold text-sm">Escolher foto principal</span>
+    <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-6">
+      
+      {/* 📷 FOTO DE CAPA */}
+      <div className="space-y-4">
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+          <Camera size={14} /> Foto Principal
+        </h4>
+        
+        <div className="w-full aspect-square bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100 overflow-hidden shadow-inner relative group">
+          {previewImagem ? (
+            <img src={previewImagem} alt="Preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+          ) : (
+            <div className="flex flex-col items-center gap-2 text-slate-300">
+              <ImageIcon size={48} className="opacity-40" />
+              <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Sem Capa</span>
             </div>
-            <input type="file" accept="image/*" className="hidden" onChange={handleSelecionarArquivo} disabled={loading} />
-          </label>
-        </div>
-        <div>
-          <label className="block text-sm font-bold text-slate-700 mb-2">Galeria Adicional</label>
-          <input type="file" multiple accept="image/*" onChange={handleUploadFotosAdicionais} disabled={loading} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer" />
-          {formData.fotos_adicionais && formData.fotos_adicionais.length > 0 && (
-            <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-3">
-              {formData.fotos_adicionais.map((foto, index) => (
-                <div key={index} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 shadow-sm">
-                  <img src={foto} alt={`Miniatura ${index}`} className="w-full h-full object-cover" />
-                  <button type="button" onClick={() => removerFotoAdicional(foto)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-80 hover:opacity-100 transition-opacity" title="Remover foto">
-                    <X size={10} />
-                  </button>
-                </div>
-              ))}
+          )}
+          
+          {/* Camada de Sobreposição para Remover */}
+          {previewImagem && (
+            <div onClick={handleRemoverImagemPrincipal} className="absolute inset-0 bg-red-900/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white cursor-pointer transition-all duration-300">
+              <Trash2 size={32} className="mb-2 hover:scale-110 transition-transform" />
+              <span className="text-xs font-bold uppercase tracking-wider">Remover Foto</span>
             </div>
           )}
         </div>
+
+        <label className="flex items-center justify-center w-full px-4 py-3.5 border-2 border-dashed border-indigo-200 bg-indigo-50/50 text-indigo-600 rounded-2xl hover:bg-indigo-50 hover:border-indigo-400 transition-colors cursor-pointer group active:scale-95">
+          <div className="flex items-center gap-2">
+            <Upload size={18} className="group-hover:-translate-y-1 transition-transform" />
+            <span className="font-bold text-sm">{previewImagem ? 'Trocar Imagem' : 'Carregar Imagem'}</span>
+          </div>
+          <input type="file" accept="image/*" className="hidden" onChange={handleSelecionarArquivo} disabled={loading} />
+        </label>
+      </div>
+
+      {/* 🖼️ GALERIA ADICIONAL */}
+      <div className="space-y-4 border-t border-slate-100 pt-6">
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+          <ImageIcon size={14} /> Fotos Adicionais
+        </h4>
+        
+        <label className="flex items-center justify-center w-full px-4 py-3 bg-slate-50 border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer active:scale-95">
+          <span className="font-bold text-xs flex items-center gap-2"><Upload size={14} /> Adicionar à Galeria</span>
+          <input type="file" multiple accept="image/*" onChange={handleUploadFotosAdicionais} disabled={loading} className="hidden" />
+        </label>
+
+        {formData.fotos_adicionais && formData.fotos_adicionais.length > 0 && (
+          <div className="grid grid-cols-3 gap-2 mt-2">
+            {formData.fotos_adicionais.map((foto, index) => (
+              <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+                <img src={foto} alt={`Miniatura ${index}`} className="w-full h-full object-cover" />
+                <button type="button" onClick={() => removerFotoAdicional(foto)} className="absolute inset-0 bg-red-900/60 backdrop-blur-sm opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-all" title="Remover foto">
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

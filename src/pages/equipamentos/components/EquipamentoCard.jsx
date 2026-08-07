@@ -1,4 +1,12 @@
-import { Image as ImageIcon, AlertTriangle, CheckCircle2, Clock, Copy, Edit, Trash2 } from 'lucide-react'
+import { Image as ImageIcon, AlertTriangle, CheckCircle2, Clock, Copy, Edit, Trash2, CalendarDays, Network, Printer as PrinterIcon, ShieldCheck, MapPin, Hash, Barcode } from 'lucide-react'
+
+// Função auxiliar para formatar datas rapidamente
+const formatarDataLocal = (dataString) => {
+  if (!dataString) return '-';
+  const data = new Date(dataString);
+  data.setMinutes(data.getMinutes() + data.getTimezoneOffset());
+  return data.toLocaleDateString('pt-BR');
+}
 
 export default function EquipamentoCard({ 
   eq, 
@@ -9,109 +17,138 @@ export default function EquipamentoCard({
   onDuplicar, 
   onExcluir 
 }) {
+  const isTecnologia = ['ti', 'impressoras'].includes(moduloAtivo);
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all overflow-hidden flex flex-col md:flex-row group">
-      <div className="w-full md:w-64 h-48 md:h-auto bg-slate-50 border-b md:border-b-0 md:border-r border-slate-100 flex items-center justify-center shrink-0 relative">
+    // 🚀 MUDANÇA 1: Padding ao redor de tudo (p-3 md:p-4) para a imagem não tocar na borda
+    <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col xl:flex-row p-3 md:p-4 gap-6 group">
+      
+      {/* 📷 ÁREA DA IMAGEM: Agora é um bloco flutuante e arredondado dentro do card */}
+      <div className="w-full xl:w-80 h-64 xl:h-auto bg-slate-50 rounded-3xl flex items-center justify-center shrink-0 relative overflow-hidden border border-slate-100 shadow-inner">
         {eq.imagem_url ? (
-          <img src={eq.imagem_url} alt={eq.nome} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={eq.imagem_url} alt={eq.nome} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
         ) : (
-          <div className="flex flex-col items-center text-slate-300">
-            <ImageIcon size={48} className="mb-2" />
-            <span className="text-[10px] font-bold uppercase tracking-wider">Sem Imagem</span>
+          <div className="flex flex-col items-center text-slate-300 bg-slate-100/50 w-full h-full justify-center">
+            <ImageIcon size={56} className="mb-3 opacity-40" />
+            <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Sem Imagem</span>
           </div>
         )}
-        <div className="absolute top-3 left-3">
-          <span className="bg-white/90 backdrop-blur text-blue-800 px-3 py-1 rounded-lg text-[10px] font-black tracking-wider uppercase border border-white/50 shadow-sm">
+        {/* Badge de Status */}
+        <div className="absolute top-4 left-4">
+          <span className="bg-white/95 backdrop-blur-md text-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-black tracking-widest uppercase border border-white shadow-sm flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${eq.status?.nome?.toLowerCase() === 'ativo' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400'}`}></div>
             {eq.status?.nome || 'Sem Status'}
           </span>
         </div>
       </div>
 
-      <div className="flex-1 p-5 md:p-6 flex flex-col justify-center gap-5">
-        <div>
-          {/* Nome Principal */}
-          <h3 className="text-xl md:text-2xl font-black text-slate-800 uppercase tracking-tight leading-tight">
-            {eq.nome}
-          </h3>
-          
-          {/* NOVO: Subtítulo com Fabricante e Modelo */}
-          {(eq.fabricante?.nome || eq.modelo) && (
-            <div className="flex items-center gap-2 mt-2 mb-3 text-xs md:text-[13px] text-slate-500 font-medium">
+      {/* 📄 ÁREA DE CONTEÚDO E DADOS */}
+      <div className="flex-1 flex flex-col justify-between py-2 xl:pr-2">
+        
+        {/* Cabeçalho do Card */}
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-6">
+          <div>
+            <h3 className="text-2xl md:text-3xl font-black text-slate-800 uppercase tracking-tight leading-none mb-3">
+              {eq.nome}
+            </h3>
+            
+            <div className="flex flex-wrap items-center gap-2 text-[13px] text-slate-500 font-bold">
               {eq.fabricante?.nome && (
-                <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded border border-slate-200">
+                <span className="bg-slate-100 text-slate-700 px-3 py-1 rounded-lg border border-slate-200 shadow-sm">
                   {eq.fabricante.nome}
                 </span>
               )}
-              
-              {eq.fabricante?.nome && eq.modelo && <span className="text-slate-300">•</span>}
-              
               {eq.modelo && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 bg-white border border-slate-200 px-3 py-1 rounded-lg shadow-sm">
                   Mod: <strong className="text-slate-800">{eq.modelo}</strong>
                 </span>
               )}
             </div>
-          )}
+          </div>
 
-          {/* Badges / Etiquetas de Status */}
-          <div className={`flex flex-wrap gap-2 ${!(eq.fabricante?.nome || eq.modelo) ? 'mt-3' : ''}`}>
-            {eq.sem_patrimonio && <span className="bg-rose-50 text-rose-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-rose-200 uppercase flex items-center gap-1.5"><AlertTriangle size={12}/> Sem Patrimônio</span>}
-            {eq.possui_etiqueta ? <span className="bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-indigo-100 uppercase flex items-center gap-1.5">🏷️ Etiquetado</span> : <span className="bg-amber-50 text-amber-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-amber-200 uppercase flex items-center gap-1.5">⚠️ Sem Etiqueta</span>}
-            {statusCalib === 'atrasada' && <span className="bg-red-50 text-red-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-red-200 uppercase flex items-center gap-1.5"><Clock size={12}/> Prev./Calib. Atrasada</span>}
-            {statusCalib === 'em_dia' && <span className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-md text-[10px] font-bold border border-emerald-200 uppercase flex items-center gap-1.5"><CheckCircle2 size={12}/> Prev./Calib. em Dia</span>}
+          {/* Etiquetas (Badges) de Alertas alinhadas à direita no desktop */}
+          <div className="flex flex-wrap md:justify-end gap-2 shrink-0">
+            {eq.sem_patrimonio && <span className="bg-rose-50 text-rose-700 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-rose-200 uppercase flex items-center gap-1.5 shadow-sm"><AlertTriangle size={14}/> Sem Patrimônio</span>}
+            {eq.possui_etiqueta ? <span className="bg-indigo-50 text-indigo-700 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-indigo-100 uppercase flex items-center gap-1.5 shadow-sm">🏷️ Etiquetado</span> : <span className="bg-amber-50 text-amber-700 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-amber-200 uppercase flex items-center gap-1.5 shadow-sm">⚠️ Sem Etiqueta</span>}
+            {statusCalib === 'atrasada' && <span className="bg-red-50 text-red-700 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-red-200 uppercase flex items-center gap-1.5 shadow-sm"><Clock size={14}/> Calib. Atrasada</span>}
+            {statusCalib === 'em_dia' && <span className="bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-emerald-200 uppercase flex items-center gap-1.5 shadow-sm"><CheckCircle2 size={14}/> Calib. em Dia</span>}
           </div>
         </div>
 
-        <div className="bg-slate-50/80 rounded-xl p-4 md:p-5 grid grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6 border border-slate-100 shadow-sm">
-          {/* Coluna 1: Série */}
-          <div className="flex flex-col">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Série</span>
-            <span className="font-bold text-slate-800 text-sm truncate" title={eq.numero_serie}>{eq.numero_serie || '-'}</span>
-          </div>
-
-          {/* Coluna 2: Patrimônio */}
-          <div className="flex flex-col">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Patrimônio</span>
-            <span className="font-bold text-slate-800 text-sm truncate" title={eq.patrimonio}>{eq.patrimonio || '-'}</span>
-          </div>
-
-          {/* Coluna 3: Modelo OU ANVISA (Lógica Condicional) */}
-          {moduloAtivo === 'medicos' ? (
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-emerald-500 tracking-wider mb-1">Reg. ANVISA</span>
-              <span className="font-bold text-emerald-700 text-sm truncate" title={eq.registro_anvisa}>{eq.registro_anvisa || 'N/A'}</span>
+        {/* 🚀 MUDANÇA 2: GRID COM "PÍLULAS DE DADOS" (Cápsulas brancas) */}
+        <div className="bg-slate-50/70 rounded-3xl p-5 border border-slate-100 shadow-inner mb-6">
+          {/* Adicionado 2xl:grid-cols-5 para preencher bem a sua tela ultrawide */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 gap-4">
+            
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Hash size={12}/> Série</span>
+              <span className="font-bold text-slate-800 text-sm truncate bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm" title={eq.numero_serie}>{eq.numero_serie || '-'}</span>
             </div>
-          ) : (
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Modelo</span>
-              <span className="font-bold text-slate-800 text-sm truncate" title={eq.modelo}>{eq.modelo || '-'}</span>
-            </div>
-          )}
 
-          {/* Coluna 4 e 5: Local / Setor */}
-          <div className="flex flex-col col-span-2 lg:col-span-2">
-            <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Local / Setor</span>
-            <span className="font-bold text-blue-700 text-sm truncate" title={`${eq.unidade?.nome} ${eq.setor?.nome ? `- ${eq.setor?.nome}` : ''}`}>
-              {eq.unidade?.nome} 
-              <span className="text-slate-500 font-medium">{eq.setor?.nome ? ` (${eq.setor?.nome})` : ''}</span>
-            </span>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Barcode size={12}/> Patrimônio</span>
+              <span className="font-bold text-slate-800 text-sm truncate bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm" title={eq.patrimonio}>{eq.patrimonio || '-'}</span>
+            </div>
+
+            <div className="flex flex-col col-span-2 lg:col-span-1 2xl:col-span-2 gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><MapPin size={12}/> Local / Setor</span>
+              <span className="font-bold text-blue-700 text-sm truncate bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm" title={`${eq.unidade?.nome} - ${eq.setor?.nome}`}>
+                {eq.unidade?.nome || 'Não definido'} 
+                <span className="text-slate-500 font-medium">{eq.setor?.nome ? ` (${eq.setor?.nome})` : ''}</span>
+              </span>
+            </div>
+
+            {moduloAtivo === 'impressoras' && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[10px] uppercase font-bold text-purple-500 tracking-widest flex items-center gap-1.5"><PrinterIcon size={12}/> Impressora</span>
+                <span className="font-bold text-purple-900 text-sm truncate bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm">{eq.tipo_impressora || 'Não definido'}</span>
+              </div>
+            )}
+
+            {isTecnologia && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-blue-500 tracking-widest flex items-center gap-1.5"><Network size={12}/> IP / MAC</span>
+                  <span className="font-bold text-slate-800 text-sm truncate font-mono bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm">{eq.ip_mac_address || '-'}</span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-amber-600 tracking-widest flex items-center gap-1.5"><ShieldCheck size={12}/> Garantia</span>
+                  <span className="font-bold text-slate-800 text-sm truncate bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm">{formatarDataLocal(eq.data_garantia)}</span>
+                </div>
+              </>
+            )}
+
+            {moduloAtivo === 'medicos' && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-emerald-500 tracking-widest">Reg. ANVISA</span>
+                  <span className="font-black text-emerald-700 text-sm truncate bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm">{eq.registro_anvisa || 'N/A'}</span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] uppercase font-bold text-orange-500 tracking-widest flex items-center gap-1.5"><CalendarDays size={12}/> Próx. Calib.</span>
+                  <span className="font-bold text-slate-800 text-sm truncate bg-white px-3.5 py-2.5 rounded-xl border border-slate-200 shadow-sm">{formatarDataLocal(eq.data_proxima_calibracao)}</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        <div className="flex justify-end flex-wrap gap-3 mt-1">
-          <button onClick={() => onDuplicar(eq)} className="px-4 py-2 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-lg transition-colors flex items-center gap-1.5 mr-auto">
-            <Copy size={14} /> Duplicar
+        {/* 🎛️ BOTÕES DE AÇÃO */}
+        <div className="flex justify-end flex-wrap gap-3 mt-auto">
+          <button onClick={() => onDuplicar(eq)} className="px-5 py-3 text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl transition-colors flex items-center gap-2 mr-auto shadow-sm active:scale-95">
+            <Copy size={16} /> Duplicar
           </button>
-          <button onClick={() => onVerDetalhes(eq)} className="px-5 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-800 rounded-lg transition-colors">
+          <button onClick={() => onVerDetalhes(eq)} className="px-6 py-3 text-xs font-bold text-white bg-slate-800 border border-slate-800 hover:bg-slate-900 rounded-xl transition-colors shadow-sm active:scale-95">
             Ver detalhes
           </button>
-          <button onClick={() => onEditar(eq)} className="px-5 py-2 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-lg transition-colors flex items-center gap-1.5">
-            <Edit size={14} /> Editar
+          <button onClick={() => onEditar(eq)} className="px-6 py-3 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl transition-colors flex items-center gap-2 shadow-sm active:scale-95">
+            <Edit size={16} /> Editar
           </button>
-          <button onClick={() => onExcluir(eq.id)} className="px-5 py-2 text-xs font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 rounded-lg transition-colors flex items-center gap-1.5">
-            <Trash2 size={14} />
+          <button onClick={() => onExcluir(eq.id)} className="px-5 py-3 text-xs font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 rounded-xl transition-colors flex items-center gap-2 shadow-sm active:scale-95">
+            <Trash2 size={16} />
           </button>
         </div>
+
       </div>
     </div>
   )

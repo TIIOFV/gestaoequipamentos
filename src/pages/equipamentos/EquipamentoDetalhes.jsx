@@ -5,7 +5,8 @@ import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
 import { 
   ArrowLeft, Edit, Wrench, FileText, CheckCircle2, AlertTriangle, Factory, 
-  Image as ImageIcon, Activity, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, Loader2 
+  Image as ImageIcon, Activity, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, Loader2,
+  Network, Printer as PrinterIcon, ShieldCheck, MapPin, Hash, Barcode, CalendarDays, Clock
 } from 'lucide-react'
 
 // Importação das listas específicas
@@ -19,7 +20,6 @@ const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(indexInicial || 0)
   const [zoomVisual, setZoomVisual] = useState(1)
 
-  // Refs para manipulação direta da GPU
   const imgRef = useRef(null)
   const pan = useRef({ x: 0, y: 0 })
   const zoomLevel = useRef(1)
@@ -173,7 +173,6 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
       setTodasAsImagens(galeria);
       setImagemAtiva(galeria[0] || null);
 
-      // Pré-carrega as imagens na RAM silenciosamente
       galeria.forEach(url => { const img = new Image(); img.src = url; });
     }
   }, [equipamento]);
@@ -192,49 +191,63 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
 
   const isModuloTecnologia = ['ti', 'impressoras'].includes(moduloAtivo)
 
+  const formatarData = (dataString) => {
+    if (!dataString) return '-';
+    const data = new Date(dataString);
+    data.setMinutes(data.getMinutes() + data.getTimezoneOffset());
+    return data.toLocaleDateString('pt-BR');
+  }
+
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-300 p-4 relative">
+    // 🚀 MUDANÇA 1: w-full em vez de max-w-5xl. Agora a tela "respira" ocupando tudo.
+    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-300">
       
       {/* CABEÇALHO */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 border-b border-slate-200 pb-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
         <div className="flex-1 min-w-0 pr-4">
-          <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase tracking-tight break-words leading-tight">
+          <div className="flex items-center gap-3 mb-2.5">
+            <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border flex items-center gap-1.5 shadow-sm ${equipamento.status?.nome?.toLowerCase() === 'ativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+               <div className={`w-1.5 h-1.5 rounded-full ${equipamento.status?.nome?.toLowerCase() === 'ativo' ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+               {equipamento.status?.nome || 'Sem status'}
+            </span>
+            {equipamento.fabricante?.nome && (
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{equipamento.fabricante.nome}</span>
+            )}
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-none">
             {equipamento.nome}
           </h1>
-          <p className="text-slate-500 mt-1 font-medium text-sm">Detalhes completos do equipamento.</p>
         </div>
         
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          <button onClick={onVoltar} className="px-4 py-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all">
-            <ArrowLeft size={16} /> Voltar
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <button onClick={onVoltar} className="px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+            <ArrowLeft size={18} /> Voltar
           </button>
-          <button onClick={() => onEditar(equipamento)} className="px-4 py-2 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl flex items-center gap-2 transition-all">
-            <Edit size={16} /> Editar
+          <button onClick={() => onEditar(equipamento)} className="px-5 py-3 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+            <Edit size={18} /> Editar
           </button>
-          <button onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { action: 'novo', equipamentoId: equipamento.id } })} className="px-4 py-2 text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl flex items-center gap-2 shadow-sm hover:shadow-md transition-all">
-            <Wrench size={16} /> Registrar OS
+          <button onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { action: 'novo', equipamentoId: equipamento.id } })} className="px-5 py-3 text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95">
+            <Wrench size={18} /> Registrar OS
           </button>
         </div>
       </div>
 
-      {/* DADOS PRINCIPAIS */}
-      <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-        <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-          <FileText className="text-blue-600" size={20} /> Dados principais
-        </h3>
-
-        <div className="flex flex-col md:flex-row gap-8 mb-6">
-          <div className="w-full md:w-72 flex flex-col gap-4 shrink-0">
+      {/* 🚀 MUDANÇA 2: GRID DIVIDIDO (Esquerda: Imagens e Alertas | Direita: Informações e Histórico) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* COLUNA ESQUERDA (IMAGEM E ALERTAS) */}
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+          <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-4">
             
             {/* FOTO PRINCIPAL */}
             <div 
               onClick={() => setLightboxAberto(true)}
-              className="w-full h-64 bg-slate-100 rounded-2xl flex items-center justify-center border border-slate-200 overflow-hidden cursor-pointer group relative shadow-inner"
+              className="w-full aspect-square bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100 overflow-hidden cursor-pointer group relative shadow-inner"
             >
               {imagemAtiva ? (
                 <>
                   {!imagemPrincipalCarregada && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
+                    <div className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10">
                       <Loader2 className="w-8 h-8 text-slate-300 animate-spin" />
                     </div>
                   )}
@@ -242,96 +255,139 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
                     src={imagemAtiva} 
                     alt="Equipamento" 
                     onLoad={() => setImagemPrincipalCarregada(true)}
-                    // 🚀 AQUI ESTÁ A CORREÇÃO: Removida a transição de opacidade demorada e artificial
-                    className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${imagemPrincipalCarregada ? 'opacity-100' : 'opacity-0'}`} 
+                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-110 ${imagemPrincipalCarregada ? 'opacity-100' : 'opacity-0'}`} 
                   />
-                  <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/20 transition-colors duration-300 flex items-center justify-center z-20">
-                    <div className="bg-white text-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-4 group-hover:translate-y-0 font-bold text-xs shadow-lg">
-                      <ZoomIn size={16} /> Ampliar Foto
+                  <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/30 transition-colors duration-300 flex items-center justify-center z-20">
+                    <div className="bg-white text-slate-800 px-4 py-2 rounded-xl flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-4 group-hover:translate-y-0 font-bold text-xs shadow-lg">
+                      <ZoomIn size={16} /> Ampliar
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="text-center text-slate-400">
-                  <ImageIcon size={48} className="mx-auto mb-2 opacity-50" />
-                  <span className="text-xs font-bold uppercase tracking-widest">Sem imagem</span>
+                  <ImageIcon size={48} className="mx-auto mb-2 opacity-40" />
+                  <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Sem imagem</span>
                 </div>
               )}
             </div>
 
-            {/* MINIATURAS (Zero Delay) */}
+            {/* MINIATURAS */}
             {todasAsImagens.length > 1 && (
-              <div 
-                className="flex gap-2 overflow-x-auto pb-2 pt-1 scroll-smooth" 
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }} 
-              >
-                <style>{`div::-webkit-scrollbar { display: none; }`}</style>
+              <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar px-1">
                 {todasAsImagens.map((img, idx) => (
                   <div 
                     key={idx} 
-                    // 🚀 AQUI: Ao clicar, apenas altera o link da imagem (sem resets e loadings forçados)
                     onClick={() => setImagemAtiva(img)}
-                    className={`w-16 h-16 shrink-0 rounded-xl overflow-hidden border-2 cursor-pointer transition-all duration-200 shadow-sm ${imagemAtiva === img ? 'border-blue-600 opacity-100 ring-2 ring-blue-600/20' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                    className={`w-16 h-16 shrink-0 rounded-2xl overflow-hidden cursor-pointer transition-all duration-200 shadow-sm ${imagemAtiva === img ? 'border-2 border-indigo-500 opacity-100 ring-2 ring-indigo-500/20' : 'border-2 border-transparent opacity-50 hover:opacity-100'}`}
                   >
                     <img src={img} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>
             )}
+          </div>
 
-            {!isModuloTecnologia && (
-              <div className="flex flex-col gap-2 mt-2">
-                {equipamento.possui_etiqueta && <span className="bg-indigo-50 text-indigo-700 px-3 py-2 rounded-xl text-xs font-bold border border-indigo-100 flex items-center justify-center gap-2"><CheckCircle2 size={16}/> Possui Etiqueta</span>}
-                {equipamento.sem_patrimonio && <span className="bg-rose-50 text-rose-700 px-3 py-2 rounded-xl text-xs font-bold border border-rose-200 flex items-center justify-center gap-2"><AlertTriangle size={16}/> Sem Patrimônio</span>}
+          {/* PAINEL DE ALERTAS RÁPIDOS */}
+          <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-3">
+             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 mb-1">Status do Equipamento</h4>
+             {equipamento.sem_patrimonio && <div className="bg-rose-50 text-rose-700 p-3 rounded-xl text-xs font-bold border border-rose-200 flex items-center gap-2"><AlertTriangle size={16}/> Sem Patrimônio</div>}
+             {equipamento.possui_etiqueta ? <div className="bg-indigo-50 text-indigo-700 p-3 rounded-xl text-xs font-bold border border-indigo-100 flex items-center gap-2">🏷️ Possui Etiqueta</div> : <div className="bg-amber-50 text-amber-700 p-3 rounded-xl text-xs font-bold border border-amber-200 flex items-center gap-2">⚠️ Sem Etiqueta</div>}
+             {!isModuloTecnologia && (equipamento.possui_manual ? <div className="bg-emerald-50 text-emerald-700 p-3 rounded-xl text-xs font-bold border border-emerald-100 flex items-center gap-2">📖 Manual Físico Localizado</div> : <div className="bg-slate-50 text-slate-500 p-3 rounded-xl text-xs font-bold border border-slate-200 flex items-center gap-2">Nenhum manual físico</div>)}
+          </div>
+        </div>
+
+        {/* COLUNA DIREITA (DADOS E HISTÓRICO) */}
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+          
+          {/* PAINEL DE DADOS TÉCNICOS */}
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+            <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3">
+              <FileText className="text-slate-400" size={16} /> Informações Técnicas
+            </h3>
+
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Hash size={12}/> Série</span>
+                <span className="font-bold text-slate-800 text-sm truncate">{equipamento.numero_serie || '-'}</span>
+              </div>
+
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Barcode size={12}/> Patrimônio</span>
+                <span className="font-bold text-slate-800 text-sm truncate">{equipamento.patrimonio || '-'}</span>
+              </div>
+
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Modelo</span>
+                <span className="font-bold text-slate-800 text-sm truncate">{equipamento.modelo || '-'}</span>
+              </div>
+
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Fabricante</span>
+                <span className="font-bold text-slate-800 text-sm truncate">{equipamento.fabricante?.nome || '-'}</span>
+              </div>
+
+              {moduloAtivo === 'medicos' && (
+                <div className="flex flex-col gap-1.5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 col-span-2 lg:col-span-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-600 tracking-widest flex items-center gap-1.5"><Activity size={12}/> Reg. ANVISA</span>
+                  <span className="font-black text-emerald-800 text-sm truncate">{equipamento.registro_anvisa || 'N/A'}</span>
+                </div>
+              )}
+
+              {moduloAtivo === 'impressoras' && (
+                <div className="flex flex-col gap-1.5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100 col-span-2 lg:col-span-1">
+                  <span className="text-[10px] uppercase font-bold text-purple-600 tracking-widest flex items-center gap-1.5"><PrinterIcon size={12}/> Impressora</span>
+                  <span className="font-bold text-purple-900 text-sm truncate">{equipamento.tipo_impressora || 'Não definido'}</span>
+                </div>
+              )}
+
+              {isModuloTecnologia ? (
+                <>
+                  <div className="flex flex-col gap-1.5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 col-span-2 lg:col-span-1">
+                    <span className="text-[10px] uppercase font-bold text-blue-600 tracking-widest flex items-center gap-1.5"><Network size={12}/> IP / MAC</span>
+                    <span className="font-bold text-slate-800 text-sm truncate font-mono">{equipamento.ip_mac_address || '-'}</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 col-span-2 lg:col-span-1">
+                    <span className="text-[10px] uppercase font-bold text-blue-600 tracking-widest flex items-center gap-1.5"><ShieldCheck size={12}/> Garantia</span>
+                    <span className="font-bold text-slate-800 text-sm truncate">{formatarData(equipamento.data_garantia)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2 lg:col-span-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Factory size={12}/> Fabricação</span>
+                  <span className="font-bold text-slate-800 text-sm truncate">{formatarData(equipamento.data_fabricacao)}</span>
+                </div>
+              )}
+              
+              {/* Local e Setor ocupam o final para dar peso */}
+              <div className="flex flex-col gap-1.5 p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100 col-span-2 lg:col-span-3 xl:col-span-2">
+                <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-widest flex items-center gap-1.5"><MapPin size={12}/> Local / Setor</span>
+                <span className="font-bold text-indigo-800 text-sm truncate">
+                  {equipamento.unidade?.nome || '-'} {equipamento.setor?.nome ? `/ ${equipamento.setor?.nome}` : ''}
+                </span>
+              </div>
+            </div>
+
+            {/* OBSERVAÇÕES */}
+            {equipamento.observacoes && (
+              <div className="mt-6 pt-6 border-t border-slate-100">
+                <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 block mb-3">Observações adicionais:</span>
+                <p className="text-slate-700 bg-amber-50/50 p-5 rounded-2xl border border-amber-100/50 text-sm leading-relaxed">{equipamento.observacoes}</p>
               </div>
             )}
           </div>
 
-          {/* DADOS EM TEXTO */}
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-y-6 gap-x-10 text-sm">
-            <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1">Número de série</span><span className="font-bold text-slate-800 text-base">{equipamento.numero_serie || '-'}</span></div>
-            <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1">Patrimônio</span><span className="font-bold text-slate-800 text-base">{equipamento.patrimonio || '-'}</span></div>
-            <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1">Modelo</span><span className="font-bold text-slate-800 text-base">{equipamento.modelo || '-'}</span></div>
-            <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1">Fabricante</span><span className="font-bold text-slate-800 text-base">{equipamento.fabricante?.nome || '-'}</span></div>
-            
-            {moduloAtivo === 'medicos' && (
-              <div className="flex flex-col border-b border-emerald-50 pb-2 md:col-span-2">
-                <span className="text-emerald-600 font-bold mb-1 flex items-center gap-1.5 uppercase text-[11px] tracking-wider"><Activity size={14} /> Registro ANVISA</span>
-                <span className="font-black text-slate-800 text-lg">{equipamento.registro_anvisa || 'Não informado'}</span>
-              </div>
-            )}
-
-            {moduloAtivo === 'impressoras' && (
-               <div className="flex flex-col border-b border-slate-50 pb-2 md:col-span-2"><span className="text-purple-600 font-bold mb-1 uppercase text-[11px] tracking-wider">Tipo de Impressora</span><span className="font-black text-slate-800 text-base">{equipamento.tipo_impressora || 'Não definido'}</span></div>
-            )}
-
-            {isModuloTecnologia ? (
-              <>
-                <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-blue-600 font-bold mb-1 uppercase text-[11px] tracking-wider">IP / MAC Address</span><span className="font-bold text-slate-800 text-base">{equipamento.ip_mac_address || '-'}</span></div>
-                <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-blue-600 font-bold mb-1 uppercase text-[11px] tracking-wider">Garantia/Contrato</span><span className="font-bold text-slate-800 text-base">{equipamento.data_garantia ? new Date(equipamento.data_garantia).toLocaleDateString('pt-BR') : '-'}</span></div>
-              </>
-            ) : (
-              <div className="flex flex-col border-b border-slate-50 pb-2"><span className="text-slate-400 font-bold mb-1 flex items-center gap-1.5 uppercase text-[11px] tracking-wider"><Factory size={14}/> Data de Fabricação</span><span className="font-bold text-slate-800 text-base">{equipamento.data_fabricacao ? new Date(equipamento.data_fabricacao).toLocaleDateString('pt-BR') : 'Desconhecida'}</span></div>
-            )}
-            <div className="flex flex-col border-b border-slate-50 pb-2 md:col-span-2"><span className="text-[11px] uppercase tracking-wider font-bold text-slate-400 mb-1">Local / Setor</span><span className="font-bold text-blue-800 text-base">{equipamento.unidade?.nome || '-'} / {equipamento.setor?.nome || '-'}</span></div>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-slate-100">
-          <span className="text-[11px] uppercase tracking-wider font-bold text-slate-400 block mb-3">Observações adicionais:</span>
-          <p className="text-slate-700 bg-slate-50 p-5 rounded-xl border border-slate-200 min-h-[80px] font-medium leading-relaxed">{equipamento.observacoes || 'Nenhuma observação cadastrada.'}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6">
-        {moduloAtivo === 'impressoras' && (
-          <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-             <DetalheBilhetagem equipamento={equipamento} />
-          </div>
-        )}
-        
-        <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm">
-           <DetalheHistorico historico={historicoLocal} equipamento={equipamento} />
+          {/* BILHETAGEM (SE FOR IMPRESSORA) */}
+          {moduloAtivo === 'impressoras' && (
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+               <DetalheBilhetagem equipamento={equipamento} />
+            </div>
+          )}
+          
+          {/* HISTÓRICO DE MANUTENÇÕES */}
+          {/* Foi removido a margem top (mt-6) de dentro do DetalheHistorico original para se ajustar perfeitamente aqui */}
+          <DetalheHistorico historico={historicoLocal} equipamento={equipamento} />
+          
         </div>
       </div>
 

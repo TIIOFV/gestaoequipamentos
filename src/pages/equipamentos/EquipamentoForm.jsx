@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
-import { useAuth } from '../../contexts/AuthContext' // 🚀 IMPORTADO PARA PEGAR O USUÁRIO
-import { ArrowLeft, Factory, Activity, Clock } from 'lucide-react'
+import { useAuth } from '../../contexts/AuthContext'
+// 🚀 CORREÇÃO: Network e Loader2 adicionados à importação!
+import { ArrowLeft, Factory, Activity, Clock, MapPin, Tag, Calendar, AlignLeft, Save, AlertTriangle, ShieldCheck, Network, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import FormImagens from './components/FormImagens'
 
 export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, onVoltar, onSucesso }) {
   const inicial = formDataInicial || {};
   const { moduloAtivo } = useModulo()
-  const { profile } = useAuth() // 🚀 PERFIL DO USUÁRIO LOGADO
+  const { profile } = useAuth() 
   const [loading, setLoading] = useState(false)
   
   const [formData, setFormData] = useState({ 
@@ -112,7 +113,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         }
       }
 
-      // 🚀 ENVIO DO LOG DE AUDITORIA
       await supabase.from('logs_auditoria').insert([{
         usuario_nome: profile?.nome || 'Usuário Desconhecido',
         acao: isNovo ? 'CRIAÇÃO' : 'EDIÇÃO',
@@ -131,15 +131,25 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
   const isModuloTecnologia = ['ti', 'impressoras'].includes(moduloAtivo)
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-3xl font-bold text-slate-800">{formData.id ? 'Editar equipamento' : 'Novo equipamento'}</h1></div>
-        <button onClick={onVoltar} className="flex items-center gap-2 px-5 py-2.5 text-blue-800 font-bold bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-xl transition-colors"><ArrowLeft size={18} /> Voltar</button>
+    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
+      
+      {/* CABEÇALHO */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight">
+            {formData.id ? 'Editar Equipamento' : 'Novo Equipamento'}
+          </h1>
+          <p className="text-sm font-semibold text-slate-500 mt-1">Preencha os dados abaixo para atualizar o inventário.</p>
+        </div>
+        <button onClick={onVoltar} className="px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+          <ArrowLeft size={18} /> Cancelar e Voltar
+        </button>
       </div>
 
-      <form onSubmit={handleSalvar} className="space-y-6">
-        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-          
+      <form onSubmit={handleSalvar} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        {/* COLUNA ESQUERDA */}
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
           <FormImagens 
             formData={formData} setFormData={setFormData}
             arquivoImagem={arquivoImagem} setArquivoImagem={setArquivoImagem}
@@ -148,137 +158,209 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           />
 
           {!isModuloTecnologia && (
-            <div className="flex flex-wrap gap-8 p-5 bg-slate-50 border border-slate-200 rounded-xl">
-               <label className="flex items-center gap-3 cursor-pointer font-bold text-slate-700 select-none"><input type="checkbox" checked={formData.possui_etiqueta} onChange={e => setFormData({...formData, possui_etiqueta: e.target.checked})} className="w-5 h-5 text-blue-600 rounded" />🏷️ Possui Etiqueta</label>
-               <label className="flex items-center gap-3 cursor-pointer font-bold text-slate-700 select-none"><input type="checkbox" checked={formData.possui_manual} onChange={e => setFormData({...formData, possui_manual: e.target.checked})} className="w-5 h-5 text-blue-600 rounded" />📖 Possui Manual Físico</label>
+            <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
+              <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2 mb-2">Checklist Rápido</h4>
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${formData.possui_etiqueta ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                <input type="checkbox" checked={formData.possui_etiqueta} onChange={e => setFormData({...formData, possui_etiqueta: e.target.checked})} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                <span className={`font-bold text-sm ${formData.possui_etiqueta ? 'text-indigo-800' : 'text-slate-600'}`}>🏷️ Possui Etiqueta</span>
+              </label>
+              
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${formData.possui_manual ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                <input type="checkbox" checked={formData.possui_manual} onChange={e => setFormData({...formData, possui_manual: e.target.checked})} className="w-5 h-5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" />
+                <span className={`font-bold text-sm ${formData.possui_manual ? 'text-emerald-800' : 'text-slate-600'}`}>📖 Manual Físico no Local</span>
+              </label>
             </div>
           )}
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Nome / Descrição</label><input required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-            
+        {/* COLUNA DIREITA */}
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+          
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
+              <MapPin size={16} /> Dados Fundamentais e Localização
+            </h3>
+
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-bold text-slate-700">Número de série</label>
-                <label className="flex items-center gap-1 text-xs cursor-pointer font-bold text-slate-500 hover:text-slate-800 bg-slate-100 px-2 py-1 rounded"><input type="checkbox" checked={formData.sem_numero_serie} onChange={e => setFormData({...formData, sem_numero_serie: e.target.checked, numero_serie: e.target.checked ? 'N/A' : ''})} />Sem Nº Série</label>
-              </div>
-              <input required disabled={formData.sem_numero_serie} value={formData.numero_serie} onChange={e => setFormData({...formData, numero_serie: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed" />
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <label className="text-sm font-bold text-slate-700">Patrimônio</label>
-                <label className="flex items-center gap-1 text-xs cursor-pointer font-bold text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 rounded border border-red-100"><input type="checkbox" checked={formData.sem_patrimonio} onChange={e => setFormData({...formData, sem_patrimonio: e.target.checked, patrimonio: e.target.checked ? 'PENDENTE' : ''})} />Falta Patrimônio</label>
-              </div>
-              <input required={!formData.sem_patrimonio} disabled={formData.sem_patrimonio} value={formData.patrimonio} onChange={e => setFormData({...formData, patrimonio: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all disabled:bg-red-50/30 disabled:text-red-600 disabled:font-bold" />
+              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Nome / Descrição do Equipamento *</label>
+              <input required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-lg" placeholder="Ex: Computador Dell Optiplex 3080..." />
             </div>
 
-            {moduloAtivo === 'medicos' && (
-              <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-100 shadow-sm">
-                <label className="block text-sm font-bold text-emerald-800 mb-1 flex items-center gap-2">
-                  <Activity size={16} /> Registro ANVISA
-                </label>
-                <input 
-                  type="text" 
-                  placeholder="Ex: 80111110000"
-                  value={formData.registro_anvisa} 
-                  onChange={e => setFormData({...formData, registro_anvisa: e.target.value})} 
-                  className="w-full px-4 py-2 rounded-lg border border-emerald-200 outline-none focus:ring-2 focus:ring-emerald-500 bg-white" 
-                />
-              </div>
-            )}
-            
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Modelo</label><input value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all" /></div>
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Fabricante</label><select value={formData.fabricante_id} onChange={e => setFormData({...formData, fabricante_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais?.fabricantes || []).map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}</select></div>
-            
-            {!isModuloTecnologia && (
-              <div><label className="block text-sm font-bold text-slate-700 mb-2">Prestador (Assistência)</label><select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais.prestadores || []).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}</select></div>
-            )}
-            
-            {moduloAtivo === 'impressoras' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
-                <label className="block text-sm font-bold text-purple-900 mb-2">Tipo de Impressora</label>
-                <select required value={formData.tipo_impressora || ''} onChange={e => setFormData({...formData, tipo_impressora: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-purple-200 outline-none focus:ring-2 focus:ring-purple-500 bg-purple-50">
-                  <option value="">Selecione o tipo...</option>
-                  <option value="Monocromática">Monocromática (Apenas P&B)</option>
-                  <option value="Colorida">Colorida</option>
-                  <option value="Térmica (Etiquetas)">Térmica (Etiquetas)</option>
-                  <option value="Térmica (Pulseiras)">Térmica (Pulseiras)</option>
-                  <option value="Multifuncional">Multifuncional</option>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Alocada *</label>
+                <select required value={formData.unidade_id} onChange={e => setFormData({...formData, unidade_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                  <option value="">Selecione a unidade...</option>
+                  {(auxiliaresGlobais?.unidades || []).map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Setor *</label>
+                <select required value={formData.setor_id} onChange={e => setFormData({...formData, setor_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                  <option value="">Selecione o setor...</option>
+                  {(auxiliaresGlobais?.setores || []).map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Status do Equipamento *</label>
+                <select required value={formData.status_id || ''} onChange={e => setFormData({...formData, status_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                  <option value="">Selecione...</option>
+                  {(auxiliaresGlobais?.status || []).map(st => (<option key={st.id} value={st.id}>{st.nome}</option>))}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Tag size={16} /> Identificação e Especificações Técnicas
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Fabricante da Marca</label>
+                <select value={formData.fabricante_id} onChange={e => setFormData({...formData, fabricante_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                  <option value="">Desconhecido / Não se aplica</option>
+                  {(auxiliaresGlobais?.fabricantes || []).map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Modelo Exato</label>
+                <input value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all" placeholder="Ex: Laser MFP M428fdw" />
+              </div>
+
+              {!isModuloTecnologia && (
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Prestador (Assistência Técnica)</label>
+                  <select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+                    <option value="">Manutenção Interna / Não aplicável</option>
+                    {(auxiliaresGlobais?.prestadores || []).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
+                  </select>
+                </div>
+              )}
+
+              <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col gap-2">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Número de Série *</label>
+                  <label className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-slate-500 hover:text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 cursor-pointer shadow-sm transition-colors">
+                    <input type="checkbox" checked={formData.sem_numero_serie} onChange={e => setFormData({...formData, sem_numero_serie: e.target.checked, numero_serie: e.target.checked ? 'N/A' : ''})} />
+                    Sem N/S
+                  </label>
+                </div>
+                <input required disabled={formData.sem_numero_serie} value={formData.numero_serie} onChange={e => setFormData({...formData, numero_serie: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-mono text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70" placeholder="Digite a série" />
+              </div>
+
+              <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-100 flex flex-col gap-2">
+                <div className="flex justify-between items-center mb-1">
+                  <label className="text-[11px] font-black text-rose-700 uppercase tracking-widest">Patrimônio *</label>
+                  <label className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-rose-600 hover:text-rose-800 bg-white px-2.5 py-1 rounded-lg border border-rose-200 cursor-pointer shadow-sm transition-colors">
+                    <input type="checkbox" checked={formData.sem_patrimonio} onChange={e => setFormData({...formData, sem_patrimonio: e.target.checked, patrimonio: e.target.checked ? 'PENDENTE' : ''})} />
+                    Falta Patrimônio
+                  </label>
+                </div>
+                <input required={!formData.sem_patrimonio} disabled={formData.sem_patrimonio} value={formData.patrimonio} onChange={e => setFormData({...formData, patrimonio: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400 transition-all disabled:bg-rose-100/50 disabled:text-rose-600 disabled:border-rose-200" placeholder="Ex: 001594" />
+              </div>
+
+              {moduloAtivo === 'medicos' && (
+                <div className="md:col-span-2 bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-inner">
+                  <label className="text-[11px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                    <Activity size={14} /> Registro ANVISA
+                  </label>
+                  <input type="text" placeholder="Ex: 80111110000" value={formData.registro_anvisa} onChange={e => setFormData({...formData, registro_anvisa: e.target.value})} className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl font-bold text-emerald-900 outline-none focus:ring-2 focus:ring-emerald-500 transition-all" />
+                </div>
+              )}
+
+              {moduloAtivo === 'impressoras' && (
+                <div className="md:col-span-2 bg-purple-50/50 p-5 rounded-2xl border border-purple-100 shadow-inner">
+                  <label className="text-[11px] font-black text-purple-900 uppercase tracking-widest mb-2 block">Classificação da Impressora</label>
+                  <select required value={formData.tipo_impressora || ''} onChange={e => setFormData({...formData, tipo_impressora: e.target.value})} className="w-full px-4 py-3 bg-white border border-purple-200 rounded-xl font-bold text-purple-900 outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer">
+                    <option value="">Selecione o tipo de tecnologia...</option>
+                    <option value="Monocromática">Monocromática (Apenas P&B)</option>
+                    <option value="Colorida">Colorida</option>
+                    <option value="Térmica (Etiquetas)">Térmica (Etiquetas)</option>
+                    <option value="Térmica (Pulseiras)">Térmica (Pulseiras)</option>
+                    <option value="Multifuncional">Multifuncional (Cópia/Scanner)</option>
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
+              <Calendar size={16} /> Gestão de Ciclo de Vida e Datas
+            </h3>
+
+            {!isModuloTecnologia ? (
+              <div className="space-y-6">
+                
+                <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-2xl">
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="text-[11px] font-black text-indigo-900 uppercase tracking-widest flex items-center gap-1.5"><Factory size={14}/> Ano/Data de Fabricação</label>
+                    <label className="flex items-center gap-1.5 text-[10px] cursor-pointer font-bold uppercase tracking-widest text-slate-600 hover:text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 transition-colors shadow-sm">
+                      <input type="checkbox" checked={formData.desconhece_fabricacao} onChange={e => setFormData({...formData, desconhece_fabricacao: e.target.checked, data_fabricacao: e.target.checked ? '' : formData.data_fabricacao})} /> Desconhecida
+                    </label>
+                  </div>
+                  <input type="date" disabled={formData.desconhece_fabricacao} value={formData.data_fabricacao || ''} onChange={e => setFormData({...formData, data_fabricacao: e.target.value})} className="w-full md:w-1/2 px-4 py-3 bg-white border border-indigo-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50/50 border border-orange-100 rounded-2xl relative overflow-hidden">
+                  {!!formData.id && (
+                    <div className="absolute top-0 left-0 right-0 bg-orange-200 text-orange-900 text-[9px] font-black text-center py-1.5 uppercase tracking-widest shadow-sm">
+                      Gestão de Datas Feita Via Histórico de O.S
+                    </div>
+                  )}
+                  
+                  <div className={!!formData.id ? 'mt-4' : ''}>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2">Última Prev. / Calibração</label>
+                    <input type="date" disabled={!!formData.id} value={formData.data_ultima_calibracao || ''} onChange={e => setFormData({...formData, data_ultima_calibracao: e.target.value})} className="w-full px-4 py-3 bg-white border border-orange-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed" />
+                  </div>
+                  
+                  <div className={!!formData.id ? 'mt-4' : ''}>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2 flex items-center gap-1.5"><Clock size={12} className="text-orange-600" /> Periodicidade</label>
+                    <select value={formData.periodicidade || ''} onChange={e => setFormData({...formData, periodicidade: e.target.value})} className="w-full px-4 py-3 bg-white border border-orange-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500 transition-all cursor-pointer">
+                      <option value="">Não definida (Avulsa)</option>
+                      <option value="3 Meses">A cada 3 Meses</option>
+                      <option value="6 Meses">A cada 6 Meses</option>
+                      <option value="1 Ano">A cada 1 Ano</option>
+                      <option value="2 Anos">A cada 2 Anos</option>
+                    </select>
+                  </div>
+
+                  <div className={!!formData.id ? 'mt-4' : ''}>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2 flex items-center justify-between">Próxima Data {!formData.id && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[8px] uppercase font-black tracking-widest shadow-sm">Cria O.S Auto</span>}</label>
+                    <input type="date" disabled={!!formData.id} value={formData.data_proxima_calibracao || ''} onChange={e => setFormData({...formData, data_proxima_calibracao: e.target.value})} className="w-full px-4 py-3 bg-white border border-orange-300 rounded-xl font-black text-slate-800 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all disabled:opacity-60 disabled:cursor-not-allowed" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-blue-50/50 border border-blue-100 rounded-2xl">
+                <div>
+                  <label className="text-[11px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-1.5 mb-2"><ShieldCheck size={14}/> Vencimento Garantia / Contrato</label>
+                  <input type="date" value={formData.data_garantia || ''} onChange={e => setFormData({...formData, data_garantia: e.target.value})} className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-1.5 mb-2"><Network size={14}/> Endereço IP / MAC</label>
+                  <input type="text" placeholder="Ex: 192.168.0.15 ou AA:BB:CC:DD" value={formData.ip_mac_address || ''} onChange={e => setFormData({...formData, ip_mac_address: e.target.value})} className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
+                </div>
+              </div>
             )}
           </div>
 
-          {!isModuloTecnologia ? (
-            <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-xl">
-               <div className="flex justify-between items-center mb-3">
-                 <label className="text-sm font-bold text-indigo-900 flex items-center gap-2"><Factory size={16}/> Data de Fabricação</label>
-                 <label className="flex items-center gap-1 text-xs cursor-pointer font-bold text-rose-600 hover:text-rose-800 bg-rose-50 px-2 py-1.5 rounded border border-rose-200 transition-colors">
-                   <input type="checkbox" checked={formData.desconhece_fabricacao} onChange={e => setFormData({...formData, desconhece_fabricacao: e.target.checked, data_fabricacao: e.target.checked ? '' : formData.data_fabricacao})} className="w-3.5 h-3.5" />
-                   Desconhecida
-                 </label>
-               </div>
-               <input type="date" disabled={formData.desconhece_fabricacao} value={formData.data_fabricacao || ''} onChange={e => setFormData({...formData, data_fabricacao: e.target.value})} className="w-full md:w-1/2 px-4 py-3 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-white" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-blue-50 border border-blue-100 rounded-xl">
-              <div>
-                <label className="block text-sm font-bold text-blue-900 mb-2">Data Venc. Garantia / Contrato</label>
-                <input type="date" value={formData.data_garantia || ''} onChange={e => setFormData({...formData, data_garantia: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-blue-900 mb-2">IP / MAC Address</label>
-                <input type="text" placeholder="Ex: 192.168.0.15 ou AA:BB:CC:DD" value={formData.ip_mac_address || ''} onChange={e => setFormData({...formData, ip_mac_address: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-blue-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white" />
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-slate-100 pt-6">
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Unidade</label><select required value={formData.unidade_id} onChange={e => setFormData({...formData, unidade_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais.unidades || []).map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select></div>
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Setor</label><select required value={formData.setor_id} onChange={e => setFormData({...formData, setor_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais.setores || []).map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select></div>
-            <div><label className="block text-sm font-bold text-slate-700 mb-2">Status</label><select required value={formData.status_id || ''} onChange={e => setFormData({...formData, status_id: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 bg-white"><option value="">Selecione...</option>{(auxiliaresGlobais?.status || []).map(st => (<option key={st.id} value={st.id}>{st.nome}</option>))}</select></div>
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
+              <AlignLeft size={16} /> Observações Adicionais
+            </label>
+            <textarea rows="4" value={formData.observacoes || ''} onChange={e => setFormData({...formData, observacoes: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all resize-none shadow-inner" placeholder="Qualquer outra informação relevante para o histórico do equipamento..."></textarea>
           </div>
 
-          {!isModuloTecnologia && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50 border border-orange-100 rounded-xl relative overflow-hidden">
-               {!!formData.id && (
-                 <div className="absolute top-0 left-0 right-0 bg-orange-200 text-orange-800 text-[10px] font-bold text-center py-1 uppercase tracking-wider">
-                   As datas são geridas automaticamente pelo histórico de Chamados/OS
-                 </div>
-               )}
-               
-               <div className={!!formData.id ? 'mt-3' : ''}>
-                 <label className="block text-sm font-bold text-slate-800 mb-2">Última Prev./Calibração</label>
-                 <input type="date" disabled={!!formData.id} value={formData.data_ultima_calibracao || ''} onChange={e => setFormData({...formData, data_ultima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium disabled:opacity-60 disabled:cursor-not-allowed" />
-               </div>
-               
-               <div className={!!formData.id ? 'mt-3' : ''}>
-                 <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center gap-1.5"><Clock size={16} className="text-orange-600" /> Periodicidade</label>
-                 <select value={formData.periodicidade || ''} onChange={e => setFormData({...formData, periodicidade: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-orange-500 bg-white text-slate-700 font-medium cursor-pointer">
-                   <option value="">Não definida</option>
-                   <option value="3 Meses">A cada 3 Meses</option>
-                   <option value="6 Meses">A cada 6 Meses</option>
-                   <option value="1 Ano">A cada 1 Ano</option>
-                   <option value="2 Anos">A cada 2 Anos</option>
-                 </select>
-               </div>
-
-               <div className={!!formData.id ? 'mt-3' : ''}>
-                 <label className="block text-sm font-bold text-slate-800 mb-2 flex items-center justify-between">Próxima Prevista{!formData.id && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider shadow-sm">Gera OS Automática</span>}</label>
-                 <input type="date" disabled={!!formData.id} value={formData.data_proxima_calibracao || ''} onChange={e => setFormData({...formData, data_proxima_calibracao: e.target.value})} className="w-full px-4 py-3 rounded-xl border-2 border-orange-200 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 bg-white text-slate-700 font-bold disabled:opacity-60 disabled:cursor-not-allowed disabled:border-slate-200" />
-               </div>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-2">Observações Adicionais</label>
-            <textarea rows="4" value={formData.observacoes || ''} onChange={e => setFormData({...formData, observacoes: e.target.value})} className="w-full px-4 py-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 transition-all resize-none" placeholder="Qualquer outra informação relevante..."></textarea>
-          </div>
+          <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-70 text-lg flex items-center justify-center gap-3">
+            {loading ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
+            {loading ? 'A processar e arquivar...' : 'Gravar Informações no Sistema'}
+          </button>
+          
         </div>
-        <button type="submit" disabled={loading} className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold py-4 rounded-xl shadow-lg transition-all active:scale-95 disabled:opacity-70 text-lg">
-          {loading ? 'A processar...' : 'Salvar equipamento'}
-        </button>
       </form>
     </div>
   )
