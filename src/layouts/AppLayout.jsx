@@ -106,7 +106,7 @@ export default function AppLayout() {
         {/* ÁREA PRINCIPAL ONDE AS PÁGINAS RENDERIZAM */}
         <main className={`flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-50/50 transition-all duration-500 ${isTrocaSenhaObrigatoria ? 'blur-md pointer-events-none select-none brightness-95' : ''}`}>
           
-          <div className="p-4 md:p-6 lg:p-8 w-full max-w-[1800px] mx-auto min-h-full flex flex-col pl-safe-left pr-safe-right">
+          <div className="px-5 py-4 md:p-6 lg:p-8 w-full max-w-[1800px] mx-auto min-h-full flex flex-col pl-safe-left pr-safe-right">
             {isVerifying ? (
                <div className="flex-1 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
