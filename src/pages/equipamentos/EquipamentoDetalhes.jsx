@@ -9,13 +9,9 @@ import {
   Network, Printer as PrinterIcon, ShieldCheck, MapPin, Hash, Barcode, CalendarDays, Clock
 } from 'lucide-react'
 
-// Importação das listas específicas
 import DetalheBilhetagem from './components/DetalheBilhetagem'
 import DetalheHistorico from './components/DetalheHistorico'
 
-// ============================================================================
-// COMPONENTE ISOLADO: LIGHTBOX NÍVEL ENTERPRISE (Zero Lag, Zoom com Scroll e Física)
-// ============================================================================
 const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(indexInicial || 0)
   const [zoomVisual, setZoomVisual] = useState(1)
@@ -148,9 +144,6 @@ const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
   )
 }
 
-// ============================================================================
-// COMPONENTE PRINCIPAL DA PÁGINA DE DETALHES
-// ============================================================================
 export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar }) {
   const navigate = useNavigate()
   const { moduloAtivo } = useModulo()
@@ -199,47 +192,46 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
   }
 
   return (
-    // 🚀 MUDANÇA 1: w-full em vez de max-w-5xl. Agora a tela "respira" ocupando tudo.
     <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-300">
       
-      {/* CABEÇALHO */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-        <div className="flex-1 min-w-0 pr-4">
+      {/* CABEÇALHO COM PROTEÇÃO CONTRA ESTOURO DE TEXTO (min-w-0 e break-words) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm w-full overflow-hidden">
+        
+        {/* 🚀 AQUI ESTÁ A CORREÇÃO DA PÁGINA DE DETALHES: flex-1 e min-w-0 */}
+        <div className="flex-1 min-w-0 pr-0 md:pr-4">
           <div className="flex items-center gap-3 mb-2.5">
-            <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border flex items-center gap-1.5 shadow-sm ${equipamento.status?.nome?.toLowerCase() === 'ativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+            <span className={`shrink-0 px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border flex items-center gap-1.5 shadow-sm ${equipamento.status?.nome?.toLowerCase() === 'ativo' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                <div className={`w-1.5 h-1.5 rounded-full ${equipamento.status?.nome?.toLowerCase() === 'ativo' ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
                {equipamento.status?.nome || 'Sem status'}
             </span>
             {equipamento.fabricante?.nome && (
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">{equipamento.fabricante.nome}</span>
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest truncate">{equipamento.fabricante.nome}</span>
             )}
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-none">
+          {/* 🚀 h1 com break-words, assegurando que o texto quebra de linha sem esticar a tela */}
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-[1.1] w-full">
             {equipamento.nome}
           </h1>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <button onClick={onVoltar} className="px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+        <div className="flex flex-wrap md:flex-nowrap items-center gap-3 shrink-0 w-full md:w-auto mt-4 md:mt-0">
+          <button onClick={onVoltar} className="flex-1 md:flex-none justify-center px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
             <ArrowLeft size={18} /> Voltar
           </button>
-          <button onClick={() => onEditar(equipamento)} className="px-5 py-3 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+          <button onClick={() => onEditar(equipamento)} className="flex-1 md:flex-none justify-center px-5 py-3 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
             <Edit size={18} /> Editar
           </button>
-          <button onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { action: 'novo', equipamentoId: equipamento.id } })} className="px-5 py-3 text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95">
+          <button onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { action: 'novo', equipamentoId: equipamento.id } })} className="w-full md:w-auto justify-center px-5 py-3 text-sm font-bold text-white bg-blue-800 hover:bg-blue-900 rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95">
             <Wrench size={18} /> Registrar OS
           </button>
         </div>
       </div>
 
-      {/* 🚀 MUDANÇA 2: GRID DIVIDIDO (Esquerda: Imagens e Alertas | Direita: Informações e Histórico) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full min-w-0">
         
-        {/* COLUNA ESQUERDA (IMAGEM E ALERTAS) */}
-        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6 w-full min-w-0">
           <div className="bg-white p-4 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col gap-4">
             
-            {/* FOTO PRINCIPAL */}
             <div 
               onClick={() => setLightboxAberto(true)}
               className="w-full aspect-square bg-slate-50 rounded-3xl flex items-center justify-center border border-slate-100 overflow-hidden cursor-pointer group relative shadow-inner"
@@ -271,7 +263,6 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
               )}
             </div>
 
-            {/* MINIATURAS */}
             {todasAsImagens.length > 1 && (
               <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar px-1">
                 {todasAsImagens.map((img, idx) => (
@@ -287,7 +278,6 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
             )}
           </div>
 
-          {/* PAINEL DE ALERTAS RÁPIDOS */}
           <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col gap-3">
              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-2 mb-1">Status do Equipamento</h4>
              {equipamento.sem_patrimonio && <div className="bg-rose-50 text-rose-700 p-3 rounded-xl text-xs font-bold border border-rose-200 flex items-center gap-2"><AlertTriangle size={16}/> Sem Patrimônio</div>}
@@ -296,46 +286,44 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
           </div>
         </div>
 
-        {/* COLUNA DIREITA (DADOS E HISTÓRICO) */}
-        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6 w-full min-w-0">
           
-          {/* PAINEL DE DADOS TÉCNICOS */}
           <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
             <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3">
               <FileText className="text-slate-400" size={16} /> Informações Técnicas
             </h3>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 w-full">
               
-              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Hash size={12}/> Série</span>
                 <span className="font-bold text-slate-800 text-sm truncate">{equipamento.numero_serie || '-'}</span>
               </div>
 
-              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Barcode size={12}/> Patrimônio</span>
                 <span className="font-bold text-slate-800 text-sm truncate">{equipamento.patrimonio || '-'}</span>
               </div>
 
-              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Modelo</span>
                 <span className="font-bold text-slate-800 text-sm truncate">{equipamento.modelo || '-'}</span>
               </div>
 
-              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+              <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 min-w-0">
                 <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest">Fabricante</span>
                 <span className="font-bold text-slate-800 text-sm truncate">{equipamento.fabricante?.nome || '-'}</span>
               </div>
 
               {moduloAtivo === 'medicos' && (
-                <div className="flex flex-col gap-1.5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 col-span-2 lg:col-span-1">
+                <div className="flex flex-col gap-1.5 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100 col-span-2 lg:col-span-1 min-w-0">
                   <span className="text-[10px] uppercase font-bold text-emerald-600 tracking-widest flex items-center gap-1.5"><Activity size={12}/> Reg. ANVISA</span>
                   <span className="font-black text-emerald-800 text-sm truncate">{equipamento.registro_anvisa || 'N/A'}</span>
                 </div>
               )}
 
               {moduloAtivo === 'impressoras' && (
-                <div className="flex flex-col gap-1.5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100 col-span-2 lg:col-span-1">
+                <div className="flex flex-col gap-1.5 p-4 bg-purple-50/50 rounded-2xl border border-purple-100 col-span-2 lg:col-span-1 min-w-0">
                   <span className="text-[10px] uppercase font-bold text-purple-600 tracking-widest flex items-center gap-1.5"><PrinterIcon size={12}/> Impressora</span>
                   <span className="font-bold text-purple-900 text-sm truncate">{equipamento.tipo_impressora || 'Não definido'}</span>
                 </div>
@@ -343,24 +331,23 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
 
               {isModuloTecnologia ? (
                 <>
-                  <div className="flex flex-col gap-1.5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 col-span-2 lg:col-span-1">
+                  <div className="flex flex-col gap-1.5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 col-span-2 lg:col-span-1 min-w-0">
                     <span className="text-[10px] uppercase font-bold text-blue-600 tracking-widest flex items-center gap-1.5"><Network size={12}/> IP / MAC</span>
                     <span className="font-bold text-slate-800 text-sm truncate font-mono">{equipamento.ip_mac_address || '-'}</span>
                   </div>
-                  <div className="flex flex-col gap-1.5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 col-span-2 lg:col-span-1">
+                  <div className="flex flex-col gap-1.5 p-4 bg-blue-50/50 rounded-2xl border border-blue-100 col-span-2 lg:col-span-1 min-w-0">
                     <span className="text-[10px] uppercase font-bold text-blue-600 tracking-widest flex items-center gap-1.5"><ShieldCheck size={12}/> Garantia</span>
                     <span className="font-bold text-slate-800 text-sm truncate">{formatarData(equipamento.data_garantia)}</span>
                   </div>
                 </>
               ) : (
-                <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2 lg:col-span-1">
+                <div className="flex flex-col gap-1.5 p-4 bg-slate-50 rounded-2xl border border-slate-100 col-span-2 lg:col-span-1 min-w-0">
                   <span className="text-[10px] uppercase font-bold text-slate-400 tracking-widest flex items-center gap-1.5"><Factory size={12}/> Fabricação</span>
                   <span className="font-bold text-slate-800 text-sm truncate">{formatarData(equipamento.data_fabricacao)}</span>
                 </div>
               )}
               
-              {/* Local e Setor ocupam o final para dar peso */}
-              <div className="flex flex-col gap-1.5 p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100 col-span-2 lg:col-span-3 xl:col-span-2">
+              <div className="flex flex-col gap-1.5 p-4 bg-indigo-50/30 rounded-2xl border border-indigo-100 col-span-2 lg:col-span-3 xl:col-span-2 min-w-0">
                 <span className="text-[10px] uppercase font-bold text-indigo-400 tracking-widest flex items-center gap-1.5"><MapPin size={12}/> Local / Setor</span>
                 <span className="font-bold text-indigo-800 text-sm truncate">
                   {equipamento.unidade?.nome || '-'} {equipamento.setor?.nome ? `/ ${equipamento.setor?.nome}` : ''}
@@ -368,7 +355,6 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
               </div>
             </div>
 
-            {/* OBSERVAÇÕES */}
             {equipamento.observacoes && (
               <div className="mt-6 pt-6 border-t border-slate-100">
                 <span className="text-[10px] uppercase tracking-widest font-bold text-slate-400 block mb-3">Observações adicionais:</span>
@@ -377,15 +363,12 @@ export default function EquipamentoDetalhes({ equipamento, onVoltar, onEditar })
             )}
           </div>
 
-          {/* BILHETAGEM (SE FOR IMPRESSORA) */}
           {moduloAtivo === 'impressoras' && (
-            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm w-full min-w-0">
                <DetalheBilhetagem equipamento={equipamento} />
             </div>
           )}
           
-          {/* HISTÓRICO DE MANUTENÇÕES */}
-          {/* Foi removido a margem top (mt-6) de dentro do DetalheHistorico original para se ajustar perfeitamente aqui */}
           <DetalheHistorico historico={historicoLocal} equipamento={equipamento} />
           
         </div>

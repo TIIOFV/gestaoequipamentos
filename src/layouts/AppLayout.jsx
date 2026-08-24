@@ -74,8 +74,6 @@ export default function AppLayout() {
   }
 
   return (
-    // 🚀 PWA OPTIMIZATION: overscroll-none impede o "elástico" (pull-to-refresh) do navegador 
-    // e pb-safe-bottom impede que a barra de home do iPhone fique por cima de botões.
     <div className="flex h-screen bg-slate-50 font-sans overflow-hidden overscroll-none pb-safe-bottom">
       
       <MenuSidebar 
@@ -90,7 +88,6 @@ export default function AppLayout() {
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         
-        {/* 🚀 CABEÇALHO MOBILE PWA: pt-safe-top garante que não choca com o relógio/câmara do telemóvel */}
         <header className={`md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm transition-all duration-300 pt-safe-top sticky top-0 z-40 ${isTrocaSenhaObrigatoria ? 'hidden' : ''}`}>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-black text-xs shadow-inner">
@@ -104,9 +101,10 @@ export default function AppLayout() {
         </header>
 
         {/* ÁREA PRINCIPAL ONDE AS PÁGINAS RENDERIZAM */}
-          <main className={`flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-50/50 transition-all duration-500 ${isTrocaSenhaObrigatoria ? 'blur-md pointer-events-none select-none brightness-95' : ''}`}>
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-50/50 transition-all duration-500 ${isTrocaSenhaObrigatoria ? 'blur-md pointer-events-none select-none brightness-95' : ''}`}>
           
-          <div className="px-4 sm:px-6 py-4 md:p-6 lg:p-8 w-full max-w-[1800px] mx-auto min-h-full flex flex-col pl-safe-left pr-safe-right">
+          {/* 🚀 CORREÇÃO DEFINITIVA DE RESPIRO: px-4 sm:px-6 md:px-8 garante respiro lateral em qualquer dispositivo */}
+          <div className="w-full px-3 sm:px-6 md:px-8 py-4 md:py-8 max-w-[1800px] mx-auto min-h-full flex flex-col">
             {isVerifying ? (
                <div className="flex-1 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />

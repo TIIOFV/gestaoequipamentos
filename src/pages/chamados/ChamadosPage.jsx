@@ -20,10 +20,7 @@ export default function ChamadosPage() {
   const [loading, setLoading] = useState(true)
   const [usuarioAtual, setUsuarioAtual] = useState({ id: '', nome: 'Carregando...' })
 
-  // Gatilho para atualizar a lista em background
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-
-  // Referências para o scroll blindado
   const scrollPositionRef = useRef(0);
 
   const [modalConfirm, setModalConfirm] = useState({
@@ -34,13 +31,11 @@ export default function ChamadosPage() {
     equipamentos: [], status: [], prestadores: []
   })
 
-  // 1. RASTREADOR DE SCROLL EM TEMPO REAL 🚀
   useEffect(() => {
     const mainContent = document.querySelector('main');
     if (!mainContent) return;
 
     const handleScroll = () => {
-      // Só grava a posição se estiver ativamente a ver a lista
       if (view === 'lista') {
         scrollPositionRef.current = mainContent.scrollTop;
       }
@@ -50,7 +45,6 @@ export default function ChamadosPage() {
     return () => mainContent.removeEventListener('scroll', handleScroll);
   }, [view]);
 
-  // 2. RESTAURAÇÃO SÍNCRONA DE SCROLL (Antes da tela desenhar) 🚀
   useLayoutEffect(() => {
     const mainContent = document.querySelector('main');
     if (!mainContent) return;
@@ -62,7 +56,6 @@ export default function ChamadosPage() {
     }
   }, [view]);
 
-  // 3. BUSCA DE DADOS AO ABRIR (OU AO ATUALIZAR O GATILHO)
   useEffect(() => {
     if (!moduloAtivo) return;
     const fetchData = async () => {
@@ -149,7 +142,6 @@ export default function ChamadosPage() {
           const { error: deleteError } = await supabase.from('chamados').delete().eq('id', id);
           if (deleteError) throw deleteError;
 
-          // 🚀 ENVIO DO LOG DE AUDITORIA
           await supabase.from('logs_auditoria').insert([{
             usuario_nome: usuarioAtual?.nome || 'Usuário Desconhecido',
             acao: 'EXCLUSÃO',
@@ -159,7 +151,7 @@ export default function ChamadosPage() {
 
           toast.success('Ordem de Serviço e anexos excluídos com sucesso!')
           voltarParaLista()
-          setRefreshTrigger(prev => prev + 1); // Avisa a lista que algo mudou
+          setRefreshTrigger(prev => prev + 1); 
         } catch (error) {
           toast.error('Erro ao excluir: ' + error.message)
         } finally {
@@ -176,19 +168,19 @@ export default function ChamadosPage() {
   }
 
   const handleSalvo = () => {
-    setRefreshTrigger(prev => prev + 1); // Força os dados a ficarem novos
+    setRefreshTrigger(prev => prev + 1); 
     voltarParaLista();
   }
 
   return (
-    <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-300">
+    // 🚀 ADICIONADO w-full max-w-full overflow-x-hidden min-w-0 para blindar a raiz
+    <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-300 w-full max-w-full overflow-x-hidden min-w-0">
       <ModalConfirmacao
         isOpen={modalConfirm.isOpen} onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
         onConfirm={modalConfirm.onConfirm} titulo={modalConfirm.titulo}
         mensagem={modalConfirm.mensagem} textoConfirmar={modalConfirm.textoConfirmar}
       />
 
-      {/* MODO PERSISTENTE: O display none guarda tudo se não estivermos nela! */}
       <div style={{ display: view === 'lista' ? 'block' : 'none' }}>
         <ChamadosList 
           chamados={chamados} loading={loading} auxiliares={auxiliares} 
@@ -197,7 +189,7 @@ export default function ChamadosPage() {
       </div>
 
       {view === 'detalhes' && chamadoSelecionado && (
-        <div className="animate-in fade-in duration-300">
+        <div className="animate-in fade-in duration-300 w-full min-w-0">
           <ChamadoDetalhes 
             chamado={chamadoSelecionado} voltarParaLista={voltarParaLista} 
             iniciarEdicao={(ch) => setView('editar')} handleExcluir={handleExcluir} 
@@ -206,7 +198,7 @@ export default function ChamadosPage() {
       )}
 
       {(view === 'novo' || view === 'editar') && (
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 w-full min-w-0">
           <ChamadoForm 
             view={view} chamadoInicial={chamadoSelecionado} equipamentoIdNovo={location.state?.equipamentoId}
             auxiliares={auxiliares} usuarioAtual={usuarioAtual} moduloAtivo={moduloAtivo} 

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
 import { useAuth } from '../../contexts/AuthContext'
-// 🚀 CORREÇÃO: Network e Loader2 adicionados à importação!
 import { ArrowLeft, Factory, Activity, Clock, MapPin, Tag, Calendar, AlignLeft, Save, AlertTriangle, ShieldCheck, Network, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import FormImagens from './components/FormImagens'
@@ -131,25 +130,26 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
   const isModuloTecnologia = ['ti', 'impressoras'].includes(moduloAtivo)
 
   return (
-    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500">
+    // 🚀 ADICIONADO: min-w-0 para garantir que o formulário não estoure a tela
+    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500 min-w-0">
       
       {/* CABEÇALHO */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-        <div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm w-full overflow-hidden">
+        <div className="flex-1 min-w-0 pr-0 md:pr-4">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-[1.1]">
             {formData.id ? 'Editar Equipamento' : 'Novo Equipamento'}
           </h1>
-          <p className="text-sm font-semibold text-slate-500 mt-1">Preencha os dados abaixo para atualizar o inventário.</p>
+          <p className="text-sm font-semibold text-slate-500 mt-1 truncate">Preencha os dados abaixo para atualizar o inventário.</p>
         </div>
-        <button onClick={onVoltar} className="px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
+        <button onClick={onVoltar} className="w-full md:w-auto shrink-0 justify-center px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95 mt-4 md:mt-0">
           <ArrowLeft size={18} /> Cancelar e Voltar
         </button>
       </div>
 
-      <form onSubmit={handleSalvar} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <form onSubmit={handleSalvar} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full min-w-0">
         
         {/* COLUNA ESQUERDA */}
-        <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+        <div className="lg:col-span-4 xl:col-span-3 space-y-6 w-full min-w-0">
           <FormImagens 
             formData={formData} setFormData={setFormData}
             arquivoImagem={arquivoImagem} setArquivoImagem={setArquivoImagem}
@@ -160,49 +160,49 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           {!isModuloTecnologia && (
             <div className="bg-white p-5 rounded-[2rem] border border-slate-200 shadow-sm space-y-4">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-2 mb-2">Checklist Rápido</h4>
-              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${formData.possui_etiqueta ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
-                <input type="checkbox" checked={formData.possui_etiqueta} onChange={e => setFormData({...formData, possui_etiqueta: e.target.checked})} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
-                <span className={`font-bold text-sm ${formData.possui_etiqueta ? 'text-indigo-800' : 'text-slate-600'}`}>🏷️ Possui Etiqueta</span>
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors min-w-0 ${formData.possui_etiqueta ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                <input type="checkbox" checked={formData.possui_etiqueta} onChange={e => setFormData({...formData, possui_etiqueta: e.target.checked})} className="w-5 h-5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500 shrink-0" />
+                <span className={`font-bold text-sm truncate ${formData.possui_etiqueta ? 'text-indigo-800' : 'text-slate-600'}`}>🏷️ Possui Etiqueta</span>
               </label>
               
-              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${formData.possui_manual ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
-                <input type="checkbox" checked={formData.possui_manual} onChange={e => setFormData({...formData, possui_manual: e.target.checked})} className="w-5 h-5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500" />
-                <span className={`font-bold text-sm ${formData.possui_manual ? 'text-emerald-800' : 'text-slate-600'}`}>📖 Manual Físico no Local</span>
+              <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors min-w-0 ${formData.possui_manual ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:bg-slate-100'}`}>
+                <input type="checkbox" checked={formData.possui_manual} onChange={e => setFormData({...formData, possui_manual: e.target.checked})} className="w-5 h-5 text-emerald-600 rounded border-slate-300 focus:ring-emerald-500 shrink-0" />
+                <span className={`font-bold text-sm truncate ${formData.possui_manual ? 'text-emerald-800' : 'text-slate-600'}`}>📖 Manual Físico no Local</span>
               </label>
             </div>
           )}
         </div>
 
         {/* COLUNA DIREITA */}
-        <div className="lg:col-span-8 xl:col-span-9 space-y-6">
+        <div className="lg:col-span-8 xl:col-span-9 space-y-6 w-full min-w-0">
           
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
-            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
-              <MapPin size={16} /> Dados Fundamentais e Localização
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6 min-w-0">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 truncate">
+              <MapPin size={16} className="shrink-0" /> Dados Fundamentais e Localização
             </h3>
 
-            <div>
-              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Nome / Descrição do Equipamento *</label>
+            <div className="min-w-0">
+              <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 truncate">Nome / Descrição do Equipamento *</label>
               <input required value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all text-lg" placeholder="Ex: Computador Dell Optiplex 3080..." />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Unidade Alocada *</label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full min-w-0">
+              <div className="min-w-0">
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 truncate">Unidade Alocada *</label>
                 <select required value={formData.unidade_id} onChange={e => setFormData({...formData, unidade_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
                   <option value="">Selecione a unidade...</option>
                   {(auxiliaresGlobais?.unidades || []).map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Setor *</label>
+              <div className="min-w-0">
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 truncate">Setor *</label>
                 <select required value={formData.setor_id} onChange={e => setFormData({...formData, setor_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
                   <option value="">Selecione o setor...</option>
                   {(auxiliaresGlobais?.setores || []).map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Status do Equipamento *</label>
+              <div className="min-w-0">
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 truncate">Status do Equipamento *</label>
                 <select required value={formData.status_id || ''} onChange={e => setFormData({...formData, status_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-black text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
                   <option value="">Selecione...</option>
                   {(auxiliaresGlobais?.status || []).map(st => (<option key={st.id} value={st.id}>{st.nome}</option>))}
@@ -211,28 +211,28 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
             </div>
           </div>
 
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
-            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
-              <Tag size={16} /> Identificação e Especificações Técnicas
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6 min-w-0">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 truncate">
+              <Tag size={16} className="shrink-0" /> Identificação e Especificações Técnicas
             </h3>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Fabricante da Marca</label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full min-w-0">
+              <div className="min-w-0">
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 truncate">Fabricante da Marca</label>
                 <select value={formData.fabricante_id} onChange={e => setFormData({...formData, fabricante_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
                   <option value="">Desconhecido / Não se aplica</option>
                   {(auxiliaresGlobais?.fabricantes || []).map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                 </select>
               </div>
               
-              <div>
-                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Modelo Exato</label>
+              <div className="min-w-0">
+                <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 truncate">Modelo Exato</label>
                 <input value={formData.modelo} onChange={e => setFormData({...formData, modelo: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all" placeholder="Ex: Laser MFP M428fdw" />
               </div>
 
               {!isModuloTecnologia && (
-                <div className="md:col-span-2">
-                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2">Prestador (Assistência Técnica)</label>
+                <div className="md:col-span-2 min-w-0">
+                  <label className="block text-[11px] font-black text-slate-500 uppercase tracking-widest mb-2 truncate">Prestador (Assistência Técnica)</label>
                   <select value={formData.prestador_id} onChange={e => setFormData({...formData, prestador_id: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
                     <option value="">Manutenção Interna / Não aplicável</option>
                     {(auxiliaresGlobais?.prestadores || []).map(p => <option key={p.id} value={p.id}>{p.nome}</option>)}
@@ -240,10 +240,10 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
                 </div>
               )}
 
-              <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col gap-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Número de Série *</label>
-                  <label className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-slate-500 hover:text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 cursor-pointer shadow-sm transition-colors">
+              <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 flex flex-col gap-2 min-w-0">
+                <div className="flex justify-between items-center mb-1 gap-2">
+                  <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest truncate">Número de Série *</label>
+                  <label className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-slate-500 hover:text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 cursor-pointer shadow-sm transition-colors shrink-0">
                     <input type="checkbox" checked={formData.sem_numero_serie} onChange={e => setFormData({...formData, sem_numero_serie: e.target.checked, numero_serie: e.target.checked ? 'N/A' : ''})} />
                     Sem N/S
                   </label>
@@ -251,10 +251,10 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
                 <input required disabled={formData.sem_numero_serie} value={formData.numero_serie} onChange={e => setFormData({...formData, numero_serie: e.target.value})} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl font-mono text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70" placeholder="Digite a série" />
               </div>
 
-              <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-100 flex flex-col gap-2">
-                <div className="flex justify-between items-center mb-1">
-                  <label className="text-[11px] font-black text-rose-700 uppercase tracking-widest">Patrimônio *</label>
-                  <label className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-rose-600 hover:text-rose-800 bg-white px-2.5 py-1 rounded-lg border border-rose-200 cursor-pointer shadow-sm transition-colors">
+              <div className="bg-rose-50/30 p-4 rounded-2xl border border-rose-100 flex flex-col gap-2 min-w-0">
+                <div className="flex justify-between items-center mb-1 gap-2">
+                  <label className="text-[11px] font-black text-rose-700 uppercase tracking-widest truncate">Patrimônio *</label>
+                  <label className="flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest text-rose-600 hover:text-rose-800 bg-white px-2.5 py-1 rounded-lg border border-rose-200 cursor-pointer shadow-sm transition-colors shrink-0">
                     <input type="checkbox" checked={formData.sem_patrimonio} onChange={e => setFormData({...formData, sem_patrimonio: e.target.checked, patrimonio: e.target.checked ? 'PENDENTE' : ''})} />
                     Falta Patrimônio
                   </label>
@@ -263,17 +263,17 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
               </div>
 
               {moduloAtivo === 'medicos' && (
-                <div className="md:col-span-2 bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-inner">
-                  <label className="text-[11px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-1.5 mb-2">
-                    <Activity size={14} /> Registro ANVISA
+                <div className="md:col-span-2 bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 shadow-inner min-w-0">
+                  <label className="text-[11px] font-black text-emerald-800 uppercase tracking-widest flex items-center gap-1.5 mb-2 truncate">
+                    <Activity size={14} className="shrink-0" /> Registro ANVISA
                   </label>
                   <input type="text" placeholder="Ex: 80111110000" value={formData.registro_anvisa} onChange={e => setFormData({...formData, registro_anvisa: e.target.value})} className="w-full px-4 py-3 bg-white border border-emerald-200 rounded-xl font-bold text-emerald-900 outline-none focus:ring-2 focus:ring-emerald-500 transition-all" />
                 </div>
               )}
 
               {moduloAtivo === 'impressoras' && (
-                <div className="md:col-span-2 bg-purple-50/50 p-5 rounded-2xl border border-purple-100 shadow-inner">
-                  <label className="text-[11px] font-black text-purple-900 uppercase tracking-widest mb-2 block">Classificação da Impressora</label>
+                <div className="md:col-span-2 bg-purple-50/50 p-5 rounded-2xl border border-purple-100 shadow-inner min-w-0">
+                  <label className="text-[11px] font-black text-purple-900 uppercase tracking-widest mb-2 block truncate">Classificação da Impressora</label>
                   <select required value={formData.tipo_impressora || ''} onChange={e => setFormData({...formData, tipo_impressora: e.target.value})} className="w-full px-4 py-3 bg-white border border-purple-200 rounded-xl font-bold text-purple-900 outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer">
                     <option value="">Selecione o tipo de tecnologia...</option>
                     <option value="Monocromática">Monocromática (Apenas P&B)</option>
@@ -287,38 +287,38 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
             </div>
           </div>
 
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6">
-            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2">
-              <Calendar size={16} /> Gestão de Ciclo de Vida e Datas
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6 min-w-0">
+            <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 truncate">
+              <Calendar size={16} className="shrink-0" /> Gestão de Ciclo de Vida e Datas
             </h3>
 
             {!isModuloTecnologia ? (
               <div className="space-y-6">
                 
-                <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-2xl">
-                  <div className="flex justify-between items-center mb-3">
-                    <label className="text-[11px] font-black text-indigo-900 uppercase tracking-widest flex items-center gap-1.5"><Factory size={14}/> Ano/Data de Fabricação</label>
-                    <label className="flex items-center gap-1.5 text-[10px] cursor-pointer font-bold uppercase tracking-widest text-slate-600 hover:text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 transition-colors shadow-sm">
+                <div className="p-5 bg-indigo-50/50 border border-indigo-100 rounded-2xl min-w-0">
+                  <div className="flex justify-between items-center mb-3 gap-2">
+                    <label className="text-[11px] font-black text-indigo-900 uppercase tracking-widest flex items-center gap-1.5 truncate"><Factory size={14} className="shrink-0"/> Ano/Data de Fabricação</label>
+                    <label className="flex items-center gap-1.5 text-[10px] cursor-pointer font-bold uppercase tracking-widest text-slate-600 hover:text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-200 transition-colors shadow-sm shrink-0">
                       <input type="checkbox" checked={formData.desconhece_fabricacao} onChange={e => setFormData({...formData, desconhece_fabricacao: e.target.checked, data_fabricacao: e.target.checked ? '' : formData.data_fabricacao})} /> Desconhecida
                     </label>
                   </div>
                   <input type="date" disabled={formData.desconhece_fabricacao} value={formData.data_fabricacao || ''} onChange={e => setFormData({...formData, data_fabricacao: e.target.value})} className="w-full md:w-1/2 px-4 py-3 bg-white border border-indigo-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50/50 border border-orange-100 rounded-2xl relative overflow-hidden">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-orange-50/50 border border-orange-100 rounded-2xl relative overflow-hidden min-w-0">
                   {!!formData.id && (
-                    <div className="absolute top-0 left-0 right-0 bg-orange-200 text-orange-900 text-[9px] font-black text-center py-1.5 uppercase tracking-widest shadow-sm">
+                    <div className="absolute top-0 left-0 right-0 bg-orange-200 text-orange-900 text-[9px] font-black text-center py-1.5 uppercase tracking-widest shadow-sm truncate">
                       Gestão de Datas Feita Via Histórico de O.S
                     </div>
                   )}
                   
-                  <div className={!!formData.id ? 'mt-4' : ''}>
-                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2">Última Prev. / Calibração</label>
+                  <div className={`min-w-0 ${!!formData.id ? 'mt-4' : ''}`}>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2 truncate">Última Prev. / Calibração</label>
                     <input type="date" disabled={!!formData.id} value={formData.data_ultima_calibracao || ''} onChange={e => setFormData({...formData, data_ultima_calibracao: e.target.value})} className="w-full px-4 py-3 bg-white border border-orange-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500 transition-all disabled:opacity-60 disabled:cursor-not-allowed" />
                   </div>
                   
-                  <div className={!!formData.id ? 'mt-4' : ''}>
-                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2 flex items-center gap-1.5"><Clock size={12} className="text-orange-600" /> Periodicidade</label>
+                  <div className={`min-w-0 ${!!formData.id ? 'mt-4' : ''}`}>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2 flex items-center gap-1.5 truncate"><Clock size={12} className="text-orange-600 shrink-0" /> Periodicidade</label>
                     <select value={formData.periodicidade || ''} onChange={e => setFormData({...formData, periodicidade: e.target.value})} className="w-full px-4 py-3 bg-white border border-orange-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-orange-500 transition-all cursor-pointer">
                       <option value="">Não definida (Avulsa)</option>
                       <option value="3 Meses">A cada 3 Meses</option>
@@ -328,36 +328,39 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
                     </select>
                   </div>
 
-                  <div className={!!formData.id ? 'mt-4' : ''}>
-                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2 flex items-center justify-between">Próxima Data {!formData.id && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[8px] uppercase font-black tracking-widest shadow-sm">Cria O.S Auto</span>}</label>
+                  <div className={`min-w-0 ${!!formData.id ? 'mt-4' : ''}`}>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-orange-900 mb-2 flex items-center justify-between gap-1">
+                      <span className="truncate">Próxima Data</span>
+                      {!formData.id && <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[8px] uppercase font-black tracking-widest shadow-sm shrink-0">Cria O.S Auto</span>}
+                    </label>
                     <input type="date" disabled={!!formData.id} value={formData.data_proxima_calibracao || ''} onChange={e => setFormData({...formData, data_proxima_calibracao: e.target.value})} className="w-full px-4 py-3 bg-white border border-orange-300 rounded-xl font-black text-slate-800 outline-none focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all disabled:opacity-60 disabled:cursor-not-allowed" />
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-blue-50/50 border border-blue-100 rounded-2xl">
-                <div>
-                  <label className="text-[11px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-1.5 mb-2"><ShieldCheck size={14}/> Vencimento Garantia / Contrato</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-blue-50/50 border border-blue-100 rounded-2xl min-w-0">
+                <div className="min-w-0">
+                  <label className="text-[11px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-1.5 mb-2 truncate"><ShieldCheck size={14} className="shrink-0"/> Vencimento Garantia / Contrato</label>
                   <input type="date" value={formData.data_garantia || ''} onChange={e => setFormData({...formData, data_garantia: e.target.value})} className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
                 </div>
-                <div>
-                  <label className="text-[11px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-1.5 mb-2"><Network size={14}/> Endereço IP / MAC</label>
+                <div className="min-w-0">
+                  <label className="text-[11px] font-black text-blue-900 uppercase tracking-widest flex items-center gap-1.5 mb-2 truncate"><Network size={14} className="shrink-0"/> Endereço IP / MAC</label>
                   <input type="text" placeholder="Ex: 192.168.0.15 ou AA:BB:CC:DD" value={formData.ip_mac_address || ''} onChange={e => setFormData({...formData, ip_mac_address: e.target.value})} className="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl font-mono font-bold text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all" />
                 </div>
               </div>
             )}
           </div>
 
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4">
-              <AlignLeft size={16} /> Observações Adicionais
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm min-w-0">
+            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-2 mb-4 truncate">
+              <AlignLeft size={16} className="shrink-0"/> Observações Adicionais
             </label>
             <textarea rows="4" value={formData.observacoes || ''} onChange={e => setFormData({...formData, observacoes: e.target.value})} className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-2xl font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all resize-none shadow-inner" placeholder="Qualquer outra informação relevante para o histórico do equipamento..."></textarea>
           </div>
 
           <button type="submit" disabled={loading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest py-5 rounded-2xl shadow-xl shadow-indigo-600/30 transition-all active:scale-95 disabled:opacity-70 text-lg flex items-center justify-center gap-3">
-            {loading ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
-            {loading ? 'A processar e arquivar...' : 'Gravar Informações no Sistema'}
+            {loading ? <Loader2 size={24} className="animate-spin shrink-0" /> : <Save size={24} className="shrink-0" />}
+            <span className="truncate">{loading ? 'A processar e arquivar...' : 'Gravar Informações no Sistema'}</span>
           </button>
           
         </div>

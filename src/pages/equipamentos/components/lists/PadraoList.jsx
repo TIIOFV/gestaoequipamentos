@@ -9,10 +9,8 @@ import Paginacao from '../../../../components/Paginacao'
 import toast from 'react-hot-toast'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-// Recebe o refreshTrigger do pai
 export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecionado, refreshTrigger }) {
   const { profile } = useAuth()
-  
   const location = useLocation()
   const navigate = useNavigate()
   
@@ -36,7 +34,6 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
     setPaginaAtual(1);
   }, [busca, filtroUnidade, filtroSetor, filtroStatus]);
 
-  // 🚀 NOVO: Rastreia a mudança de página e força o scroll suave para o topo
   useEffect(() => {
     const mainContent = document.querySelector('main');
     if (mainContent) {
@@ -46,19 +43,18 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
 
   const getHeaderInfo = () => {
     switch (moduloAtivo) {
-      case 'ti': return { icone: <MonitorDot className="text-indigo-600" size={28} />, titulo: 'Equipamentos de TI' }
-      case 'infra': return { icone: <Settings className="text-slate-600" size={28} />, titulo: 'Infraestrutura' }
-      case 'manutencao': return { icone: <Wrench className="text-amber-600" size={28} />, titulo: 'Manutenção Predial' }
-      default: return { icone: <Settings className="text-slate-600" size={28} />, titulo: 'Equipamentos' }
+      case 'ti': return { icone: <MonitorDot className="text-indigo-600" size={32} />, titulo: 'Equipamentos de TI' }
+      case 'infra': return { icone: <Settings className="text-slate-600" size={32} />, titulo: 'Infraestrutura' }
+      case 'manutencao': return { icone: <Wrench className="text-amber-600" size={32} />, titulo: 'Manutenção Predial' }
+      default: return { icone: <Settings className="text-slate-600" size={32} />, titulo: 'Equipamentos' }
     }
   }
 
   const { icone, titulo } = getHeaderInfo()
 
-  // Atualiza os dados na montagem, ao mudar o módulo e sempre que o Formulário salvar algo
   useEffect(() => {
     carregarDados()
-  }, [moduloAtivo, refreshTrigger]) // 🚀 NOVO: refreshTrigger adicionado
+  }, [moduloAtivo, refreshTrigger]) 
 
   useEffect(() => {
     if (!loading && equipamentos.length > 0 && location.state?.openDetailsId) {
@@ -160,7 +156,7 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <div className="space-y-6 w-full">
       <ModalConfirmacao 
         isOpen={modalConfirm.isOpen} 
         onClose={() => setModalConfirm({ isOpen: false, idParaExcluir: null })}
@@ -170,50 +166,53 @@ export default function PadraoList({ moduloAtivo, setView, setEquipamentoSelecio
         textoConfirmar="Excluir Tudo"
       />
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* 🚀 CABEÇALHO ENTERPRISE */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center gap-3">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 flex items-center gap-3 tracking-tight uppercase">
             {icone} {titulo}
           </h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Gestão e inventário do parque tecnológico.</p>
+          <p className="text-sm md:text-base font-semibold text-slate-500 mt-1">Gestão e inventário do parque tecnológico.</p>
         </div>
-        <button onClick={() => setView('novo')} className="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0">
+        <button onClick={() => setView('novo')} className="w-full md:w-auto bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-slate-800/20 transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0">
           <Plus size={20} /> Novo Equipamento
         </button>
       </div>
 
-      <div className="bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+      {/* 🚀 BARRA DE PESQUISA E FILTROS ATUALIZADA */}
+      <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-5">
         <div className="relative w-full">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
           <input 
             type="text" 
             placeholder="Buscar por nome, N/S ou patrimônio..." 
             value={busca} 
             onChange={(e) => setBusca(e.target.value)} 
-            className="w-full pl-11 md:pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all" 
+            className="w-full pl-12 pr-5 py-4 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 font-medium transition-all shadow-inner" 
           />
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar min-w-0 w-full">
-          <span className="text-xs font-bold text-slate-400 mr-1 flex items-center gap-1 shrink-0">
+        {/* 🚀 SCROLL INVISÍVEL NOS FILTROS */}
+        <div className="flex gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] min-w-0 w-full items-center">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mr-2 flex items-center gap-1.5 shrink-0">
             <Filter size={14}/> Filtros:
           </span>
-          <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todas as unidades</option>{unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>
-          <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os setores</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select>
-          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 shrink-0"><option value="">Todos os status</option>{statusLista.map(st => <option key={st.id} value={st.nome}>{st.nome}</option>)}</select>
+          <select value={filtroUnidade} onChange={(e) => setFiltroUnidade(e.target.value)} className="flex-1 min-w-[140px] px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700 cursor-pointer shrink-0"><option value="">Todas as unidades</option>{unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}</select>
+          <select value={filtroSetor} onChange={(e) => setFiltroSetor(e.target.value)} className="flex-1 min-w-[140px] px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700 cursor-pointer shrink-0"><option value="">Todos os setores</option>{setores.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</select>
+          <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="flex-1 min-w-[140px] px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold text-slate-700 cursor-pointer shrink-0"><option value="">Todos os status</option>{statusLista.map(st => <option key={st.id} value={st.nome}>{st.nome}</option>)}</select>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 min-w-0 w-full">
         {loading ? (
           [1, 2, 3].map(i => (
-            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
-              <div className="space-y-2 w-full sm:w-1/2"><Skeleton className="h-6 w-1/2" /><Skeleton className="h-4 w-3/4" /></div>
+            <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
+              <div className="space-y-3 w-full sm:w-1/2"><Skeleton className="h-6 w-1/2" /><Skeleton className="h-4 w-3/4" /></div>
               <Skeleton className="h-10 w-28 rounded-xl shrink-0" />
             </div>
           ))
         ) : dadosFiltrados.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 font-medium bg-white rounded-2xl border border-slate-200 shadow-sm">Nenhum equipamento encontrado.</div>
+          <div className="text-center py-16 text-slate-500 font-bold bg-white rounded-[2rem] border border-slate-200 shadow-sm">Nenhum equipamento encontrado.</div>
         ) : (
           <>
             {dadosFiltrados

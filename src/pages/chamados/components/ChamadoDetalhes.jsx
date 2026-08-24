@@ -8,9 +8,6 @@ import {
   User, Printer, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, ExternalLink 
 } from 'lucide-react'
 
-// ============================================================================
-// COMPONENTE: LIGHTBOX 
-// ============================================================================
 const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(indexInicial || 0)
   const [zoomVisual, setZoomVisual] = useState(1)
@@ -143,9 +140,6 @@ const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
   )
 }
 
-// ============================================================================
-// COMPONENTE PRINCIPAL (OS DETALHES)
-// ============================================================================
 export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdicao, handleExcluir }) {
   const navigate = useNavigate() 
   const { moduloAtivo } = useModulo() 
@@ -169,92 +163,78 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
   }
 
   return (
-    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-300 print:p-0 print:bg-white relative">
+    <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-300 print:p-0 print:bg-white relative min-w-0">
       
-      {/* 🚀 CORREÇÃO 1: CSS de impressão blindado. Força uma coluna (flex-col) e garante as cores de fundo */}
       <style>{`
         @media print {
           @page { margin: 10mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background-color: white !important; }
           body * { visibility: hidden !important; }
           .print-container, .print-container * { visibility: visible !important; }
-          
-          /* Remove a sobreposição do grid convertendo a página de impressão em uma coluna única flexível */
-          .print-container { 
-            position: absolute !important; 
-            left: 0 !important; 
-            top: 0 !important; 
-            width: 100% !important; 
-            margin: 0 !important; 
-            padding: 0 !important; 
-            display: flex !important; 
-            flex-direction: column !important; 
-            gap: 20px !important; 
-          }
-          
+          .print-container { position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 0 !important; display: flex !important; flex-direction: column !important; gap: 20px !important; }
           .no-print { display: none !important; }
           .print-break-inside-avoid { break-inside: avoid; }
         }
       `}</style>
 
-      {/* CABEÇALHO (Oculto na Impressão) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
-        <div className="flex-1 min-w-0 pr-4">
-          <div className="flex items-center gap-3 mb-2.5">
-            <span className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border flex items-center gap-1.5 shadow-sm ${chamado.tipo_intervencao === 'Preventiva' ? 'bg-green-50 text-green-700 border-green-200' : chamado.tipo_intervencao === 'Calibração' ? 'bg-blue-50 text-blue-700 border-blue-200' : chamado.tipo_intervencao === 'Qualificação' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+      {/* CABEÇALHO */}
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print w-full min-w-0">
+        <div className="flex-1 min-w-0 pr-0 xl:pr-4">
+          <div className="flex items-center gap-3 mb-2.5 min-w-0">
+            <span className={`shrink-0 px-3 py-1 rounded-lg text-[10px] font-black tracking-widest uppercase border flex items-center gap-1.5 shadow-sm ${chamado.tipo_intervencao === 'Preventiva' ? 'bg-green-50 text-green-700 border-green-200' : chamado.tipo_intervencao === 'Calibração' ? 'bg-blue-50 text-blue-700 border-blue-200' : chamado.tipo_intervencao === 'Qualificação' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                <div className={`w-1.5 h-1.5 rounded-full ${chamado.tipo_intervencao === 'Preventiva' ? 'bg-green-500' : chamado.tipo_intervencao === 'Calibração' ? 'bg-blue-500' : chamado.tipo_intervencao === 'Qualificação' ? 'bg-purple-500' : 'bg-red-500'}`}></div>
                {chamado.tipo_intervencao || 'Corretiva'}
             </span>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">OS #{chamado.id}</span>
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest truncate max-w-full">OS #{chamado.id}</span>
           </div>
-          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-none">
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-[1.1] w-full">
             Ordem de Serviço Técnica
           </h1>
         </div>
         
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <button onClick={voltarParaLista} className="px-5 py-3 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
-            <ArrowLeft size={18} /> Voltar
-          </button>
-          <button onClick={handleImprimir} className="px-5 py-3 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
-            <Printer size={18} /> Imprimir OS
-          </button>
-          <button onClick={() => iniciarEdicao(chamado)} className="px-5 py-3 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
-            <Edit size={18} /> Editar
-          </button>
-          <button onClick={() => handleExcluir(chamado.id)} className="px-5 py-3 text-sm font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95">
-            <Trash2 size={18} /> Excluir
-          </button>
+        {/* BOTÕES NO MOBILE (Organizados lado a lado) */}
+        <div className="flex flex-col sm:flex-row flex-wrap items-center gap-3 shrink-0 w-full xl:w-auto mt-2 xl:mt-0 min-w-0">
+          <div className="flex gap-3 w-full sm:w-auto min-w-0">
+            <button onClick={voltarParaLista} className="flex-1 sm:flex-none justify-center px-4 py-3.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95 min-w-0">
+              <ArrowLeft size={18} className="shrink-0" /> <span className="truncate">Voltar</span>
+            </button>
+            <button onClick={handleImprimir} className="flex-1 sm:flex-none justify-center px-4 py-3.5 text-sm font-bold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95 min-w-0">
+              <Printer size={18} className="shrink-0" /> <span className="truncate">Imprimir</span>
+            </button>
+          </div>
+          <div className="flex gap-3 w-full sm:w-auto min-w-0">
+            <button onClick={() => iniciarEdicao(chamado)} className="flex-1 sm:flex-none justify-center px-4 py-3.5 text-sm font-bold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95 min-w-0">
+              <Edit size={18} className="shrink-0" /> <span className="truncate">Editar</span>
+            </button>
+            <button onClick={() => handleExcluir(chamado.id)} className="flex-1 sm:flex-none justify-center px-4 py-3.5 text-sm font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:text-red-700 hover:border-red-200 rounded-xl flex items-center gap-2 transition-all shadow-sm active:scale-95 min-w-0">
+              <Trash2 size={18} className="shrink-0" /> <span className="truncate">Excluir</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 🚀 O recipiente principal da impressão ("print-container") */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start print-container">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start print-container w-full min-w-0">
         
-        {/* === IMPRESSÃO ONLY CABEÇALHO === */}
         <div className="hidden print:block w-full border-b-2 border-slate-800 pb-4 mb-2">
            <h2 className="text-2xl font-black text-slate-900 uppercase">Ordem de Serviço Técnica</h2>
            <p className="text-slate-500 font-bold mt-1">OS #{chamado.id || 'N/A'} - Emitida em {new Date().toLocaleDateString('pt-BR')}</p>
         </div>
 
-        {/* ===============================================================
-            COLUNA ESQUERDA (8 COLUNAS)
-            =============================================================== */}
-        <div className="lg:col-span-8 space-y-6 print:w-full">
+        <div className="lg:col-span-8 space-y-6 print:w-full min-w-0">
           
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4 print-break-inside-avoid">
-            <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3 print:border-slate-800">
-              <FileText className="text-slate-400 no-print" size={16} /> Relato / Descrição Técnica
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4 print-break-inside-avoid min-w-0">
+            <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3 print:border-slate-800 truncate">
+              <FileText className="text-slate-400 no-print shrink-0" size={16} /> Relato / Descrição Técnica
             </h3>
-            <p className="text-slate-700 text-sm md:text-base bg-amber-50/50 p-6 rounded-2xl border border-amber-100/50 min-h-[200px] whitespace-pre-wrap leading-relaxed shadow-inner print:shadow-none print:border-slate-300 print:bg-white font-medium">
+            <p className="text-slate-700 text-sm md:text-base bg-amber-50/50 p-6 rounded-2xl border border-amber-100/50 min-h-[200px] whitespace-pre-wrap leading-relaxed shadow-inner print:shadow-none print:border-slate-300 print:bg-white font-medium break-words max-w-full">
               {chamado.descricao || 'Nenhum detalhe técnico foi inserido.'}
             </p>
           </div>
 
           {(imagens.length > 0 || documentos.length > 0) && (
-            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print">
-              <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3">
-                <Paperclip className="text-slate-400" size={16} /> Documentos e Anexos
+            <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm no-print min-w-0 w-full">
+              <h3 className="text-[11px] font-black text-slate-400 mb-6 flex items-center gap-2 uppercase tracking-widest border-b border-slate-100 pb-3 truncate">
+                <Paperclip className="text-slate-400 shrink-0" size={16} /> Documentos e Anexos
               </h3>
               
               {imagens.length > 0 && (
@@ -292,7 +272,7 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
                         className="group relative flex flex-col items-center justify-center p-4 border border-slate-200 rounded-2xl bg-rose-50/30 hover:bg-rose-50 hover:border-rose-300 transition-all text-center h-32 md:h-40 shadow-sm"
                       >
                         <FileText size={48} className="text-rose-500 mb-4 group-hover:-translate-y-2 transition-transform duration-300 drop-shadow-sm" />
-                        <span className="text-xs font-bold text-slate-700 bg-white px-3 py-1 rounded-lg shadow-sm border border-slate-100 group-hover:border-rose-200 transition-colors">Abrir PDF</span>
+                        <span className="text-xs font-bold text-slate-700 bg-white px-3 py-1 rounded-lg shadow-sm border border-slate-100 group-hover:border-rose-200 transition-colors truncate w-full">Abrir PDF</span>
                       </a>
                     ))}
                   </div>
@@ -302,24 +282,19 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
           )}
         </div>
 
-        {/* ===============================================================
-            COLUNA DIREITA (4 COLUNAS)
-            =============================================================== */}
-        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6 print:static print:w-full">
+        <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6 print:static print:w-full min-w-0">
           
-          {/* Card: Status Visual */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 print:text-black">Status Atual da OS</p>
-            <div className={`flex items-center gap-4 p-5 rounded-2xl border print:border-slate-300 print:text-black print:bg-white shadow-inner ${chamado.status?.nome === 'Concluído' ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800' : chamado.status?.nome === 'Aberto' ? 'bg-amber-50/80 border-amber-200 text-amber-800' : 'bg-blue-50/80 border-blue-200 text-blue-800'}`}>
-              {chamado.status?.nome === 'Concluído' ? <CheckCircle2 size={32} className="no-print" /> : chamado.status?.nome === 'Aberto' ? <Clock size={32} className="no-print" /> : <AlertCircle size={32} className="no-print" />}
-              <span className="text-xl md:text-2xl font-black uppercase tracking-tight">{chamado.status?.nome || 'Sem Status'}</span>
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4 min-w-0">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 print:text-black truncate">Status Atual da OS</p>
+            <div className={`flex items-center gap-4 p-5 rounded-2xl border print:border-slate-300 print:text-black print:bg-white shadow-inner min-w-0 ${chamado.status?.nome === 'Concluído' ? 'bg-emerald-50/80 border-emerald-200 text-emerald-800' : chamado.status?.nome === 'Aberto' ? 'bg-amber-50/80 border-amber-200 text-amber-800' : 'bg-blue-50/80 border-blue-200 text-blue-800'}`}>
+              {chamado.status?.nome === 'Concluído' ? <CheckCircle2 size={32} className="no-print shrink-0" /> : chamado.status?.nome === 'Aberto' ? <Clock size={32} className="no-print shrink-0" /> : <AlertCircle size={32} className="no-print shrink-0" />}
+              <span className="text-xl md:text-2xl font-black uppercase tracking-tight truncate">{chamado.status?.nome || 'Sem Status'}</span>
             </div>
           </div>
 
-          {/* 🚀 CORREÇÃO 2: Limitador min-w-0 e truncate adicionado para o texto não explodir o bloco */}
           <div 
             onClick={irParaEquipamento}
-            className={`bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-4 print:border-slate-800 print:shadow-none print:p-4 group transition-all relative ${chamado.equipamento_id ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md hover:bg-indigo-50/30' : ''}`}
+            className={`bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-4 print:border-slate-800 print:shadow-none print:p-4 group transition-all relative min-w-0 ${chamado.equipamento_id ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md hover:bg-indigo-50/30' : ''}`}
           >
             {chamado.equipamento_id && (
               <div className="absolute top-5 right-5 text-slate-300 group-hover:text-indigo-500 transition-colors no-print">
@@ -329,60 +304,57 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
             <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center shrink-0 border border-indigo-100 no-print group-hover:bg-indigo-600 group-hover:text-white transition-colors shadow-inner"><Monitor size={24} /></div>
             
             <div className="flex-1 min-w-0 pr-6 print:pr-0">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors">Equipamento Vinculado</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-500 transition-colors truncate">Equipamento Vinculado</p>
               <h3 className="text-base font-black text-slate-800 leading-tight tracking-tight uppercase group-hover:text-indigo-900 transition-colors truncate w-full block">{chamado.equipamento?.nome || 'Excluído'}</h3>
-              <p className="text-xs font-bold text-slate-500 mt-1 flex items-center gap-1 truncate w-full"><Hash size={12} className="shrink-0"/> Patrimônio: {chamado.equipamento?.patrimonio || 'S/N'}</p>
+              <p className="text-xs font-bold text-slate-500 mt-1 flex items-center gap-1 truncate w-full"><Hash size={12} className="shrink-0"/> Patrimônio: <span className="truncate">{chamado.equipamento?.patrimonio || 'S/N'}</span></p>
             </div>
           </div>
 
-          {/* Card: Cronograma e Datas */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 print:text-black border-b border-slate-100 pb-2 print:border-slate-800">Cronograma da Intervenção</p>
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4 min-w-0">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 print:text-black border-b border-slate-100 pb-2 print:border-slate-800 truncate">Cronograma da Intervenção</p>
             
             <div className="relative space-y-6">
               <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-slate-100 no-print"></div>
 
-              <div className="flex items-start gap-4 relative z-10">
+              <div className="flex items-start gap-4 relative z-10 min-w-0">
                 <div className="w-12 h-12 rounded-2xl bg-white border-2 border-slate-200 flex items-center justify-center text-slate-400 shrink-0 no-print shadow-sm"><Ticket size={20}/></div>
-                <div className="pt-1"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 print:text-black">Data de Abertura</p><p className="text-sm font-bold text-slate-800">{chamado.data_abertura ? new Date(chamado.data_abertura).toLocaleString('pt-BR') : '-'}</p></div>
+                <div className="pt-1 min-w-0"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 print:text-black truncate">Data de Abertura</p><p className="text-sm font-bold text-slate-800 truncate">{chamado.data_abertura ? new Date(chamado.data_abertura).toLocaleString('pt-BR') : '-'}</p></div>
               </div>
               
-              <div className="flex items-start gap-4 relative z-10">
+              <div className="flex items-start gap-4 relative z-10 min-w-0">
                 <div className="w-12 h-12 rounded-2xl bg-white border-2 border-blue-200 flex items-center justify-center text-blue-500 shrink-0 no-print shadow-sm"><Calendar size={20}/></div>
-                <div className="pt-1"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 print:text-black">Previsão Agendada</p><p className="text-sm font-bold text-slate-800">{chamado.data_prevista ? new Date(chamado.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não agendado'}</p></div>
+                <div className="pt-1 min-w-0"><p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 print:text-black truncate">Previsão Agendada</p><p className="text-sm font-bold text-slate-800 truncate">{chamado.data_prevista ? new Date(chamado.data_prevista).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : 'Não agendado'}</p></div>
               </div>
 
               {chamado.data_conclusao && (
-                <div className="flex items-start gap-4 relative z-10">
+                <div className="flex items-start gap-4 relative z-10 min-w-0">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-500 border-2 border-emerald-500 flex items-center justify-center text-white shrink-0 no-print shadow-md"><CheckCircle2 size={20}/></div>
-                  <div className="pt-1"><p className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-widest mb-0.5 print:text-black">Data de Conclusão</p><p className="text-sm font-black text-emerald-800 print:text-black">{new Date(chamado.data_conclusao).toLocaleString('pt-BR')}</p></div>
+                  <div className="pt-1 min-w-0"><p className="text-[10px] font-bold text-emerald-600/70 uppercase tracking-widest mb-0.5 print:text-black truncate">Data de Conclusão</p><p className="text-sm font-black text-emerald-800 print:text-black truncate">{new Date(chamado.data_conclusao).toLocaleString('pt-BR')}</p></div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Card: Responsáveis */}
-          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 print:text-black border-b border-slate-100 pb-2 print:border-slate-800">Execução & Responsáveis</p>
+          <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm print:border-slate-800 print:shadow-none print:p-4 min-w-0">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6 print:text-black border-b border-slate-100 pb-2 print:border-slate-800 truncate">Execução & Responsáveis</p>
             <div className="space-y-5">
-              <div className="flex flex-col gap-1 border-b border-slate-50 pb-4 print:border-slate-300">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black"><Building size={12} className="no-print"/> Fornecedor / Prestador</span>
-                <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0">{chamado.prestador?.nome || 'Manutenção Interna'}</span>
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-4 print:border-slate-300 min-w-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black truncate"><Building size={12} className="no-print shrink-0"/> Fornecedor / Prestador</span>
+                <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0 truncate max-w-full">{chamado.prestador?.nome || 'Manutenção Interna'}</span>
               </div>
-              <div className="flex flex-col gap-1 border-b border-slate-50 pb-4 print:border-slate-300">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black"><Hash size={12} className="no-print"/> Protocolo Externo (OS)</span>
-                <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0">{chamado.protocolo_externo || 'S/ Protocolo'}</span>
+              <div className="flex flex-col gap-1 border-b border-slate-50 pb-4 print:border-slate-300 min-w-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black truncate"><Hash size={12} className="no-print shrink-0"/> Protocolo Externo (OS)</span>
+                <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0 truncate max-w-full">{chamado.protocolo_externo || 'S/ Protocolo'}</span>
               </div>
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black"><User size={12} className="no-print"/> Solicitante / Criador</span>
-                <span className="text-sm font-bold text-slate-800 mt-1">{chamado.aberto_por?.nome || '-'}</span>
+              <div className="flex flex-col gap-1 min-w-0">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black truncate"><User size={12} className="no-print shrink-0"/> Solicitante / Criador</span>
+                <span className="text-sm font-bold text-slate-800 mt-1 truncate max-w-full">{chamado.aberto_por?.nome || '-'}</span>
               </div>
             </div>
           </div>
 
         </div>
 
-        {/* === IMPRESSÃO ONLY RODAPÉ === */}
         <div className="hidden print:flex w-full justify-between items-end mt-16 pt-8">
            <div className="w-64 border-t-2 border-slate-800 text-center pt-2 font-bold text-xs uppercase tracking-wider">Assinatura do Técnico</div>
            <div className="w-64 border-t-2 border-slate-800 text-center pt-2 font-bold text-xs uppercase tracking-wider">Visto do Solicitante / Fiscal</div>
@@ -391,13 +363,8 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
       </div>
 
       {lightboxAberto && (
-        <GaleriaLightbox 
-          imagens={imagens} 
-          indexInicial={imagens.indexOf(imagemAtiva)} 
-          onClose={() => setLightboxAberto(false)} 
-        />
+         <GaleriaLightbox imagens={imagens} indexInicial={imagens.indexOf(imagemAtiva)} onClose={() => setLightboxAberto(false)} />
       )}
-
     </div>
   )
 }
