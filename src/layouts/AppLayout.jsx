@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext'
 import { useModulo } from '../contexts/ModuloContext'
 import ModalAlterarSenha from '../components/ModalAlterarSenha'
 
-// O NOSSO NOVO COMPONENTE DE MENU
 import MenuSidebar from './components/MenuSidebar' 
 
 export default function AppLayout() {
@@ -19,7 +18,6 @@ export default function AppLayout() {
   const [isVerifying, setIsVerifying] = useState(true)
   const [modalSenhaAberto, setModalSenhaAberto] = useState(false)
 
-  // REGRAS DE SEGURANÇA E ACESSO
   const hasFullAccess = profile?.perfil === 'administrador' || profile?.perfil === 'analista'
   const isAgendaRoute = location.pathname.includes('/agenda')
   const isTrocaSenhaObrigatoria = profile?.precisa_trocar_senha === true
@@ -30,7 +28,6 @@ export default function AppLayout() {
       handleLogout();
       return;
     }
-
     if (profile !== undefined && profile !== null) {
       setIsVerifying(false)
     }
@@ -38,15 +35,12 @@ export default function AppLayout() {
     return () => clearTimeout(timer)
   }, [profile])
 
-  // 1. TRAVA DE SEGURANÇA CONTRA O "/null/":
-  // Se terminou de verificar e não encontrou módulo ativo, volta para a seleção
   useEffect(() => {
     if (!isVerifying && !moduloAtivo && !isTrocaSenhaObrigatoria) {
       navigate('/modulos', { replace: true })
     }
   }, [isVerifying, moduloAtivo, isTrocaSenhaObrigatoria, navigate])
 
-  // 2. REDIRECIONAMENTO POR PERFIL:
   useEffect(() => {
     if (!isVerifying && !hasFullAccess && !isAgendaRoute && !isTrocaSenhaObrigatoria && moduloAtivo) {
       navigate(`/${moduloAtivo}/agenda`, { replace: true })
@@ -68,7 +62,6 @@ export default function AppLayout() {
     }
   }
 
-  // TELA DE CARREGAMENTO INICIAL
   if (!moduloAtivo && !isTrocaSenhaObrigatoria) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-slate-50">
@@ -81,9 +74,10 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
+    // 🚀 PWA OPTIMIZATION: overscroll-none impede o "elástico" (pull-to-refresh) do navegador 
+    // e pb-safe-bottom impede que a barra de home do iPhone fique por cima de botões.
+    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden overscroll-none pb-safe-bottom">
       
-      {/* MENU LATERAL */}
       <MenuSidebar 
         profile={profile}
         hasFullAccess={hasFullAccess}
@@ -96,8 +90,8 @@ export default function AppLayout() {
 
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden relative">
         
-        {/* CABEÇALHO MOBILE (Corrigido erro do Tailwind "rounded md") */}
-        <header className={`md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm transition-all duration-300 ${isTrocaSenhaObrigatoria ? 'hidden' : ''}`}>
+        {/* 🚀 CABEÇALHO MOBILE PWA: pt-safe-top garante que não choca com o relógio/câmara do telemóvel */}
+        <header className={`md:hidden flex items-center justify-between bg-white border-b border-slate-200 px-4 h-16 shrink-0 shadow-sm transition-all duration-300 pt-safe-top sticky top-0 z-40 ${isTrocaSenhaObrigatoria ? 'hidden' : ''}`}>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-indigo-600 text-white rounded-lg flex items-center justify-center font-black text-xs shadow-inner">
               IO
@@ -110,10 +104,9 @@ export default function AppLayout() {
         </header>
 
         {/* ÁREA PRINCIPAL ONDE AS PÁGINAS RENDERIZAM */}
-        <main className={`flex-1 overflow-x-hidden overflow-y-auto bg-slate-50/50 transition-all duration-500 ${isTrocaSenhaObrigatoria ? 'blur-md pointer-events-none select-none brightness-95' : ''}`}>
+        <main className={`flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain bg-slate-50/50 transition-all duration-500 ${isTrocaSenhaObrigatoria ? 'blur-md pointer-events-none select-none brightness-95' : ''}`}>
           
-          {/* 🚀 A MÁGICA ACONTECE AQUI: w-full e max-w-[1800px] para esticar nas telas grandes! */}
-          <div className="p-4 md:p-6 lg:p-8 w-full max-w-[1800px] mx-auto min-h-full flex flex-col">
+          <div className="p-4 md:p-6 lg:p-8 w-full max-w-[1800px] mx-auto min-h-full flex flex-col pl-safe-left pr-safe-right">
             {isVerifying ? (
                <div className="flex-1 flex flex-col items-center justify-center gap-4 animate-in fade-in duration-300">
                  <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
@@ -126,14 +119,12 @@ export default function AppLayout() {
                  </span>
                </div>
             ) : (
-              // 🚀 Todas as páginas (Dashboard, Bilhetagem, Releases) caem aqui dentro!
               <Outlet />
             )}
           </div>
         </main>
       </div>
       
-      {/* MODAL DE SENHA */}
       {(modalSenhaAberto || isTrocaSenhaObrigatoria) && (
         <ModalAlterarSenha 
           isOpen={true} 

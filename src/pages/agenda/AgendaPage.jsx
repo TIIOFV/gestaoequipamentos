@@ -5,7 +5,6 @@ import { useModulo } from '../../contexts/ModuloContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { Calendar as CalendarIcon, Plus } from 'lucide-react'
 
-// Importação dos seus novos componentes limpos
 import AgendaKpis from './components/AgendaKpis'
 import AgendaCalendario from './components/AgendaCalendario'
 import { ModalDiaAgenda, ModalListaAnual } from './components/AgendaModals'
@@ -52,7 +51,6 @@ export default function AgendaPage() {
   }
 
   const calcularEstatisticasAnuais = (anoFoco) => {
-    // CORREÇÃO: Utilizando String YYYY-MM-DD para evitar bugs de fuso horário
     const hojeLocal = new Date();
     const hojeStr = `${hojeLocal.getFullYear()}-${String(hojeLocal.getMonth() + 1).padStart(2, '0')}-${String(hojeLocal.getDate()).padStart(2, '0')}`;
 
@@ -61,7 +59,6 @@ export default function AgendaPage() {
     chamadosAgenda.forEach(ch => {
       if (filtroResponsavel !== 'Todos' && ch.aberto_por_id !== filtroResponsavel) return
 
-      // Pega apenas a data em formato texto '2026-07-07'
       const dataStr = ch.data_prevista ? ch.data_prevista.split('T')[0] : (ch.data_abertura ? ch.data_abertura.split('T')[0] : null)
       if (!dataStr) return
       
@@ -73,7 +70,6 @@ export default function AgendaPage() {
         if (ch.status?.nome === 'Concluído') {
           listasTemp.realizados.push(ch)
         } else {
-          // Comparação limpa e segura de Strings: '2026-05-14' < '2026-07-07'
           if (dataStr < hojeStr) {
             listasTemp.atrasados.push(ch)
           } else {
@@ -139,28 +135,28 @@ export default function AgendaPage() {
     : []
 
   return (
-    <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-500">
+    // 🚀 OTIMIZAÇÃO: w-full e space-y-6
+    <div className="w-full space-y-6 animate-in fade-in duration-500 pb-10">
       
-      {/* HEADER PRINCIPAL */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 md:mb-8">
+      {/* 🚀 HEADER PRINCIPAL PADRONIZADO */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-[#1e293b] flex items-center gap-3">
-            <CalendarIcon className="text-blue-600" /> Agenda Técnica
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 flex items-center gap-3 tracking-tight uppercase">
+            <CalendarIcon className="text-blue-600" size={32} /> Agenda Técnica
           </h1>
-          <p className="text-sm md:text-base text-slate-500 mt-1">Acompanhamento e planejamento do cronograma.</p>
+          <p className="text-sm font-semibold text-slate-500 mt-1">Acompanhamento e planeamento do cronograma anual.</p>
         </div>
 
         {canEdit && (
           <button 
             onClick={() => navigate(`/${moduloAtivo}/chamados`, { state: { action: 'novo' } })}
-            className="w-full md:w-auto bg-blue-800 hover:bg-blue-900 text-white font-bold py-3 px-6 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
+            className="w-full md:w-auto bg-blue-800 hover:bg-blue-900 text-white font-bold py-3.5 px-6 rounded-2xl shadow-lg shadow-blue-800/20 transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0"
           >
             <Plus size={20} /> Agendar Manutenção
           </button>
         )}
       </div>
 
-      {/* COMPONENTES IMPORTADOS */}
       <AgendaKpis 
         ano={ano} 
         estatisticasAno={estatisticasAno} 
@@ -176,7 +172,6 @@ export default function AgendaPage() {
         responsaveis={responsaveis}
       />
 
-      {/* MODAIS IMPORTADOS */}
       <ModalDiaAgenda 
         diaSelecionado={diaSelecionado} setDiaSelecionado={setDiaSelecionado}
         eventosDoDiaSelecionado={eventosDoDiaSelecionado} getCorEvento={getCorEvento}

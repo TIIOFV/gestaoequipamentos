@@ -1,7 +1,10 @@
 import { useState } from 'react'
-import { Settings } from 'lucide-react'
+import { Settings, Users, Factory, Wrench, Building2, LayoutGrid, ActivitySquare } from 'lucide-react'
 import TabUsuarios from './components/TabUsuarios'
 import TabAuxiliares from './components/TabAuxiliares'
+
+// 🚀 IMPORTAMOS A NOSSA PEÇA DE LEGO
+import Tabs from '../../components/ui/Tabs' 
 
 const MODULOS_DISPONIVEIS = [
   { id: 'medicos', nome: 'Equipamentos Médicos', cor: 'emerald' },
@@ -11,58 +14,58 @@ const MODULOS_DISPONIVEIS = [
   { id: 'impressoras', nome: 'Impressoras & Copiadoras', cor: 'purple' }
 ]
 
-const abas = [
-  { id: 'usuarios', nome: 'Usuários', tabela: 'perfis' },
-  { id: 'fabricantes', nome: 'Fabricantes', tabela: 'fabricantes' },
-  { id: 'prestadores', nome: 'Prestadores', tabela: 'prestadores' },
-  { id: 'unidades', nome: 'Unidades', tabela: 'unidades' },
-  { id: 'setores', nome: 'Setores', tabela: 'setores' },
-  { id: 'status_equipmento', nome: 'Status do Equipamento', tabela: 'status_equipamento' },
+// Transformamos o array para usar 'label' (Padrão de UI) e adicionamos ícones opcionais!
+const abasGlobais = [
+  { id: 'usuarios', label: 'Usuários', icon: <Users size={16}/>, tabela: 'perfis' },
+  { id: 'fabricantes', label: 'Fabricantes', icon: <Factory size={16}/>, tabela: 'fabricantes' },
+  { id: 'prestadores', label: 'Prestadores', icon: <Wrench size={16}/>, tabela: 'prestadores' },
+  { id: 'unidades', label: 'Unidades', icon: <Building2 size={16}/>, tabela: 'unidades' },
+  { id: 'setores', label: 'Setores', icon: <LayoutGrid size={16}/>, tabela: 'setores' },
+  { id: 'status_equipmento', label: 'Status da OS', icon: <ActivitySquare size={16}/>, tabela: 'status_equipamento' },
 ]
 
 export default function ConfiguracoesPage() {
   const [abaAtiva, setAbaAtiva] = useState('usuarios')
-  const abaSelecionada = abas.find(a => a.id === abaAtiva)
+  const abaSelecionada = abasGlobais.find(a => a.id === abaAtiva)
 
   return (
-    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 font-sans relative pb-10">
+    // 🚀 OTIMIZAÇÃO: w-full e space-y-6 para acompanhar o padrão gigante da tela
+    <div className="w-full space-y-6 animate-in fade-in duration-500 pb-10">
       
-      <div className="mb-2 md:mb-0">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-800 flex items-center">
-          <Settings className="w-6 h-6 md:w-8 md:h-8 mr-3 text-blue-600" />
-          Configurações Gerais
-        </h1>
-        <p className="text-sm md:text-base text-slate-500 mt-1">Gerencie os cadastros auxiliares e acessos (Acesso exclusivo da Administração).</p>
+      {/* CABEÇALHO ENTERPRISE (Igual ao dos Chamados) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-black text-slate-800 flex items-center gap-3 tracking-tight uppercase">
+            <Settings className="text-indigo-600" size={32} />
+            Configurações
+          </h1>
+          <p className="text-sm font-semibold text-slate-500 mt-1">
+            Gestão global de acessos e tabelas auxiliares do sistema.
+          </p>
+        </div>
       </div>
 
-      <div className="flex space-x-2 border-b border-slate-200 overflow-x-auto pb-px custom-scrollbar w-full">
-        {abas.map((aba) => (
-          <button
-            key={aba.id}
-            onClick={() => setAbaAtiva(aba.id)}
-            className={`px-3 md:px-4 py-2.5 text-xs md:text-sm font-medium whitespace-nowrap transition-colors border-b-2 ${
-              abaAtiva === aba.id
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            {aba.nome}
-          </button>
-        ))}
-      </div>
+      {/* 🚀 A MÁGICA: Uma única linha resolve toda a navegação mobile! */}
+      <Tabs 
+        tabs={abasGlobais} 
+        activeTab={abaAtiva} 
+        onChange={setAbaAtiva} 
+      />
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 md:p-6">
+      {/* CONTEÚDO DA ABA (Cartão expandido e limpo) */}
+      <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-6 md:p-8">
         {abaAtiva === 'usuarios' ? (
           <TabUsuarios modulosDisponiveis={MODULOS_DISPONIVEIS} />
         ) : (
           <TabAuxiliares 
             abaAtiva={abaAtiva} 
             tabelaAtual={abaSelecionada.tabela} 
-            nomeAba={abaSelecionada.nome}
+            nomeAba={abaSelecionada.label}
             modulosDisponiveis={MODULOS_DISPONIVEIS} 
           />
         )}
       </div>
+      
     </div>
   )
 }
