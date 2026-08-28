@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
+import { useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import ModalConfirmacao from '../../components/ModalConfirmacao'
 
@@ -12,9 +13,9 @@ import ChamadoForm from './components/ChamadoForm'
 export default function ChamadosPage() {
   const location = useLocation()
   const { moduloAtivo } = useModulo() 
+  const queryClient = useQueryClient()
   
   const [view, setView] = useState('lista')
-  const [chamados, setChamados] = useState([])
   const [chamadoSelecionado, setChamadoSelecionado] = useState(null)
   
   const [loading, setLoading] = useState(true)
@@ -62,11 +63,23 @@ export default function ChamadosPage() {
       setLoading(true);
       await identificarUsuario();
       await carregarAuxiliares();
-      await buscarChamados();
       
       if (location.state?.action === 'novo') {
         setView('novo');
         window.history.replaceState({}, document.title);
+      } else if (location.state?.openDetailsId) {
+        // Se viermos com um ID específico, buscamos esse chamado para abrir os detalhes
+        const { data } = await supabase
+          .from('chamados')
+          .select(`*, equipamento:equipamento_id(nome, patrimonio, numero_serie), status:status_id(nome), prestador:prestador_id(nome), aberto_por:aberto_por_id(nome)`)
+          .eq('id', location.state.openDetailsId)
+          .single();
+          
+        if (data) {
+          setChamadoSelecionado(data);
+          setView('detalhes');
+          window.history.replaceState({}, document.title);
+        }
       }
       setLoading(false);
     };
@@ -83,31 +96,11 @@ export default function ChamadosPage() {
 
   const carregarAuxiliares = async () => {
     const [eq, st, pr] = await Promise.all([
-      supabase.from('equipamentos').select('id, nome, patrimonio').eq('modulo', moduloAtivo).order('nome'),
+      supabase.from('equipamentos').select('id, nome, patrimonio, numero_serie').eq('modulo', moduloAtivo).order('nome'),
       supabase.from('status_chamado').select('*').order('nome'),
       supabase.from('prestadores').select('*').contains('modulo', [moduloAtivo]).order('nome')
     ])
     setAuxiliares({ equipamentos: eq.data || [], status: st.data || [], prestadores: pr.data || [] })
-  }
-
-  const buscarChamados = async () => {
-    const { data, error } = await supabase
-      .from('chamados')
-      .select(`*, equipamento:equipamento_id(nome, patrimonio), status:status_id(nome), prestador:prestador_id(nome), aberto_por:aberto_por_id(nome)`)
-      .eq('modulo', moduloAtivo) 
-      .order('created_at', { ascending: false })
-
-    if (!error) {
-      setChamados(data || [])
-      if (location.state?.openDetailsId && data) {
-        const chTarget = data.find(c => String(c.id) === String(location.state.openDetailsId));
-        if (chTarget) {
-          setChamadoSelecionado(chTarget);
-          setView('detalhes');
-          window.history.replaceState({}, document.title);
-        }
-      }
-    }
   }
 
   const handleExcluir = (id) => {
@@ -150,12 +143,15 @@ export default function ChamadosPage() {
           }]);
 
           toast.success('Ordem de Serviço e anexos excluídos com sucesso!')
+          // 🚀 Invalida o cache global para recarregar a lista no background
+          queryClient.invalidateQueries({ queryKey: ['chamados', moduloAtivo] })
           voltarParaLista()
           setRefreshTrigger(prev => prev + 1); 
         } catch (error) {
           toast.error('Erro ao excluir: ' + error.message)
         } finally {
           setLoading(false)
+          setModalConfirm({ ...modalConfirm, isOpen: false })
         }
       }
     });
@@ -168,12 +164,13 @@ export default function ChamadosPage() {
   }
 
   const handleSalvo = () => {
+    // 🚀 Invalida o cache para mostrar a nova O.S imediatamente
+    queryClient.invalidateQueries({ queryKey: ['chamados', moduloAtivo] })
     setRefreshTrigger(prev => prev + 1); 
     voltarParaLista();
   }
 
   return (
-    // 🚀 ADICIONADO w-full max-w-full overflow-x-hidden min-w-0 para blindar a raiz
     <div className="relative min-h-full font-sans pb-10 animate-in fade-in duration-300 w-full max-w-full overflow-x-hidden min-w-0">
       <ModalConfirmacao
         isOpen={modalConfirm.isOpen} onClose={() => setModalConfirm({ ...modalConfirm, isOpen: false })}
@@ -183,7 +180,7 @@ export default function ChamadosPage() {
 
       <div style={{ display: view === 'lista' ? 'block' : 'none' }}>
         <ChamadosList 
-          chamados={chamados} loading={loading} auxiliares={auxiliares} 
+          auxiliares={auxiliares} 
           setView={setView} setChamadoSelecionado={setChamadoSelecionado} 
         />
       </div>

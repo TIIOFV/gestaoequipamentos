@@ -24,7 +24,13 @@ export default function EquipamentoCard({
       {/* 📷 ÁREA DA IMAGEM */}
       <div className="w-full xl:w-80 h-64 xl:h-auto bg-slate-50 rounded-3xl flex items-center justify-center shrink-0 relative overflow-hidden border border-slate-100 shadow-inner">
         {eq.imagem_url ? (
-          <img src={eq.imagem_url} alt={eq.nome} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
+          <img 
+            src={eq.imagem_url} 
+            alt={eq.nome} 
+            loading="lazy" 
+            decoding="async" 
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+          />
         ) : (
           <div className="flex flex-col items-center text-slate-300 bg-slate-100/50 w-full h-full justify-center">
             <ImageIcon size={56} className="mb-3 opacity-40" />

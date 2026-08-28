@@ -1,4 +1,7 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
+import { supabase } from '../../../lib/supabase'
+import { useModulo } from '../../../contexts/ModuloContext'
 import { Plus, Search, Filter, Clock, Calendar, Wrench, Paperclip, FileText, CheckCircle2, AlertTriangle, Monitor, ChevronRight, Ticket } from 'lucide-react'
 import { Skeleton } from '../../../components/ui/Skeleton'
 import Paginacao from '../../../components/Paginacao'
@@ -10,7 +13,78 @@ const formatDataSegura = (dataString) => {
   return `${dia}/${mes}/${ano}`;
 }
 
-export default function ChamadosList({ chamados, loading, auxiliares, setView, setChamadoSelecionado }) {
+// 🚀 BUSCA NO SERVIDOR CORRIGIDA COM PESQUISA CRUZADA INTELIGENTE
+const buscarChamadosPaginados = async ({ pagina, busca, tipo, status, prestador, periodo, modulo }) => {
+  const ITENS_POR_PAGINA = 15;
+  const from = (pagina - 1) * ITENS_POR_PAGINA;
+  const to = from + ITENS_POR_PAGINA - 1;
+
+  let query = supabase
+    .from('chamados')
+    .select(`
+      id, descricao, protocolo_externo, tipo_intervencao, data_abertura, data_prevista, data_conclusao, anexos, created_at, status_id,
+      equipamento:equipamento_id(nome, patrimonio, numero_serie), 
+      status:status_id(nome), 
+      prestador:prestador_id(nome), 
+      aberto_por:aberto_por_id(nome)
+    `, { count: 'exact' })
+    .eq('modulo', modulo)
+    .order('created_at', { ascending: false });
+
+  // 🚀 PESQUISA CRUZADA: Busca na OS e no Equipamento (N/S, Patrimônio, Nome)
+  if (busca) {
+    // 1. Encontra equipamentos que dão match com a busca
+    const { data: eqsMatch } = await supabase
+      .from('equipamentos')
+      .select('id')
+      .eq('modulo', modulo)
+      .or(`nome.ilike.%${busca}%,patrimonio.ilike.%${busca}%,numero_serie.ilike.%${busca}%`);
+      
+    const eqIds = eqsMatch?.map(e => e.id) || [];
+
+    // 2. Filtra as OS pelo texto OU se pertencerem aos equipamentos encontrados acima
+    if (eqIds.length > 0) {
+      query = query.or(`descricao.ilike.%${busca}%,protocolo_externo.ilike.%${busca}%,equipamento_id.in.(${eqIds.join(',')})`);
+    } else {
+      query = query.or(`descricao.ilike.%${busca}%,protocolo_externo.ilike.%${busca}%`);
+    }
+  }
+
+  // Restantes Filtros
+  if (tipo) query = query.eq('tipo_intervencao', tipo);
+  if (status) query = query.eq('status_id', status);
+  if (prestador) query = query.eq('prestador_id', prestador);
+
+  if (periodo !== '') {
+    const hoje = new Date();
+    const hojeStr = hoje.toISOString().split('T')[0];
+    
+    if (periodo === 'atrasados') {
+      query = query.neq('status.nome', 'Concluído').lt('data_prevista', hojeStr);
+    } else if (periodo === 'hoje') {
+      query = query.gte('created_at', `${hojeStr}T00:00:00`).lte('created_at', `${hojeStr}T23:59:59`);
+    } else if (periodo === 'semana') {
+      const umaSemanaAtras = new Date();
+      umaSemanaAtras.setDate(umaSemanaAtras.getDate() - 7);
+      query = query.gte('created_at', umaSemanaAtras.toISOString());
+    } else if (periodo === 'mes') {
+      const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      query = query.gte('created_at', inicioMes.toISOString());
+    }
+  }
+
+  // Paginação exata
+  query = query.range(from, to);
+
+  const { data, count, error } = await query;
+  if (error) throw error;
+
+  return { itens: data || [], total: count || 0 };
+}
+
+export default function ChamadosList({ auxiliares, setView, setChamadoSelecionado }) {
+  const { moduloAtivo } = useModulo()
+  
   const [busca, setBusca] = useState('')
   const [filtroTipo, setFiltroTipo] = useState('')
   const [filtroStatus, setFiltroStatus] = useState('')
@@ -20,9 +94,22 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
   const [paginaAtual, setPaginaAtual] = useState(1);
   const ITENS_POR_PAGINA = 15;
 
+  const { 
+    data: dadosTabela = { itens: [], total: 0 }, 
+    isPending: loading,
+    isFetching
+  } = useQuery({
+    queryKey: ['chamados', moduloAtivo, paginaAtual, busca, filtroTipo, filtroStatus, filtroPrestador, filtroPeriodo],
+    queryFn: () => buscarChamadosPaginados({ 
+      pagina: paginaAtual, busca, tipo: filtroTipo, status: filtroStatus, 
+      prestador: filtroPrestador, periodo: filtroPeriodo, modulo: moduloAtivo 
+    }),
+    placeholderData: keepPreviousData
+  })
+
   useEffect(() => {
     setPaginaAtual(1); 
-  }, [busca, filtroTipo, filtroStatus, filtroPrestador, filtroPeriodo]);
+  }, [busca, filtroTipo, filtroStatus, filtroPrestador, filtroPeriodo, moduloAtivo]);
 
   useEffect(() => {
     const mainContent = document.querySelector('main');
@@ -32,42 +119,6 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
   }, [paginaAtual]);
 
   const isPDF = (url) => url?.toLowerCase().includes('.pdf')
-
-  const chamadosFiltrados = useMemo(() => {
-    return chamados.filter(ch => {
-      const term = busca.toLowerCase()
-      const matchBusca = (ch.equipamento?.nome || '').toLowerCase().includes(term) || 
-                         (ch.protocolo_externo || '').toLowerCase().includes(term) || 
-                         (ch.descricao || '').toLowerCase().includes(term)
-
-      const matchTipo = filtroTipo === '' || ch.tipo_intervencao === filtroTipo
-      const matchStatus = filtroStatus === '' || ch.status_id === filtroStatus
-      const matchPrestador = filtroPrestador === '' || ch.prestador_id === filtroPrestador
-      
-      let matchPeriodo = true;
-      if (filtroPeriodo !== '') {
-        const hoje = new Date();
-        const hojeStr = hoje.toISOString().split('T')[0];
-        
-        if (filtroPeriodo === 'atrasados') {
-          matchPeriodo = ch.status?.nome !== 'Concluído' && ch.data_prevista && ch.data_prevista < hojeStr;
-        } else {
-          const dataRef = ch.data_abertura ? new Date(ch.data_abertura) : new Date(ch.created_at);
-          if (filtroPeriodo === 'hoje') {
-            matchPeriodo = dataRef.toISOString().split('T')[0] === hojeStr;
-          } else if (filtroPeriodo === 'semana') {
-            const umaSemanaAtras = new Date();
-            umaSemanaAtras.setDate(umaSemanaAtras.getDate() - 7);
-            matchPeriodo = dataRef >= umaSemanaAtras;
-          } else if (filtroPeriodo === 'mes') {
-            matchPeriodo = dataRef.getMonth() === hoje.getMonth() && dataRef.getFullYear() === hoje.getFullYear();
-          }
-        }
-      }
-      
-      return matchBusca && matchTipo && matchStatus && matchPrestador && matchPeriodo
-    })
-  }, [chamados, busca, filtroTipo, filtroStatus, filtroPrestador, filtroPeriodo]);
 
   return (
     <div className="w-full space-y-6 min-w-0">
@@ -84,10 +135,12 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
         </button>
       </div>
 
-      <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-5 min-w-0 w-full">
+      <div className="bg-white p-5 md:p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-5 min-w-0 w-full relative">
+        {isFetching && <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-100 overflow-hidden rounded-t-[2rem]"><div className="w-1/3 h-full bg-indigo-500 animate-[pulse_1s_ease-in-out_infinite] rounded-t-[2rem]"></div></div>}
+
         <div className="relative w-full min-w-0">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input type="text" placeholder="Buscar por equipamento, protocolo externo ou palavra-chave..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-12 pr-5 py-4 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium transition-all shadow-inner" />
+          <input type="text" placeholder="Buscar por equipamento, N/S, patrimônio, protocolo ou palavra-chave..." value={busca} onChange={(e) => setBusca(e.target.value)} className="w-full pl-12 pr-5 py-4 text-sm md:text-base bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-500 font-medium transition-all shadow-inner" />
         </div>
 
         <div className="flex gap-3 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] min-w-0 w-full items-center pt-2 border-t border-slate-100">
@@ -135,16 +188,14 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
               <Skeleton className="h-10 w-full xl:w-48 rounded-xl shrink-0" />
             </div>
           ))
-        ) : chamadosFiltrados.length === 0 ? (
+        ) : dadosTabela.itens.length === 0 ? (
           <div className="text-center py-16 text-slate-400 bg-slate-50 rounded-[2rem] border border-slate-200 border-dashed flex flex-col items-center">
             <Ticket size={48} className="mb-4 opacity-50 text-slate-300" />
             <span className="font-bold text-lg">Nenhuma OS encontrada para estes filtros.</span>
           </div>
         ) : (
           <>
-            {chamadosFiltrados
-              .slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA)
-              .map((ch) => {
+            {dadosTabela.itens.map((ch) => {
                 const temPDF = ch.anexos && ch.anexos.some(a => isPDF(a));
                 const qtdAnexos = ch.anexos ? ch.anexos.length : 0;
                 
@@ -240,7 +291,7 @@ export default function ChamadosList({ chamados, loading, auxiliares, setView, s
             
             <Paginacao 
               paginaAtual={paginaAtual} 
-              totalItens={chamadosFiltrados.length} 
+              totalItens={dadosTabela.total} 
               itensPorPagina={ITENS_POR_PAGINA} 
               setPaginaAtual={setPaginaAtual} 
             />

@@ -1,10 +1,22 @@
 import { Suspense, lazy } from 'react'
-import InstallPrompt from './components/InstallPrompt'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './contexts/AuthContext'
 import { ModuloProvider } from './contexts/ModuloContext'
 import ProtectedRoute from './routes/ProtectedRoute'
+
+// Configuração do Cache Global de Alta Performance
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutos: transição instantânea sem telas de loading repetidas
+      gcTime: 1000 * 60 * 30,    // 30 minutos retido na memória RAM do navegador
+      refetchOnWindowFocus: false, // Evita requisições desnecessárias ao trocar de janela
+      retry: 1,
+    },
+  },
+})
 
 // Componente de carregamento para o Suspense
 const Loading = () => (
@@ -29,51 +41,52 @@ const LogsAuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'))
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ModuloProvider>
-        <BrowserRouter>
-          <Toaster 
-            position="top-right" 
-            toastOptions={{
-              duration: 4000,
-              style: {
-                borderRadius: '12px',
-                fontWeight: '600',
-                fontSize: '14px',
-              },
-            }} 
-            containerStyle={{ zIndex: 999999 }}
-          />
-          
-          <Suspense fallback={<Loading />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              
-              <Route element={<ProtectedRoute />}>
-                <Route path="/modulos" element={<ModulosPage />} />
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <ModuloProvider>
+          <BrowserRouter>
+            <Toaster 
+              position="top-right" 
+              toastOptions={{
+                duration: 4000,
+                style: {
+                  borderRadius: '12px',
+                  fontWeight: '600',
+                  fontSize: '14px',
+                },
+              }} 
+              containerStyle={{ zIndex: 999999 }}
+            />
+            
+            <Suspense fallback={<Loading />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
                 
-                {/* 🚀 CORREÇÃO: A rota releases agora está DENTRO do AppLayout! */}
-                <Route path="/:moduloId" element={<AppLayout />}>
-                  <Route index element={<Navigate to="dashboard" replace />} />
-                  <Route path="dashboard" element={<DashboardPage />} />
-                  <Route path="equipamentos" element={<EquipamentosPage />} />
-                  <Route path="configuracoes" element={<ConfiguracoesPage />} />
-                  <Route path="agenda" element={<AgendaPage />} />
-                  <Route path="relatorios" element={<RelatoriosPage />} />
-                  <Route path="chamados" element={<ChamadosPage />} />
-                  <Route path="bilhetagem" element={<BilhetagemPage />} />
-                  <Route path="releases" element={<ReleasesPage />} />
-                  <Route path="logs" element={<LogsAuditoriaPage />} />
-                </Route>
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/modulos" element={<ModulosPage />} />
+                  
+                  <Route path="/:moduloId" element={<AppLayout />}>
+                    <Route index element={<Navigate to="dashboard" replace />} />
+                    <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="equipamentos" element={<EquipamentosPage />} />
+                    <Route path="configuracoes" element={<ConfiguracoesPage />} />
+                    <Route path="agenda" element={<AgendaPage />} />
+                    <Route path="relatorios" element={<RelatoriosPage />} />
+                    <Route path="chamados" element={<ChamadosPage />} />
+                    <Route path="bilhetagem" element={<BilhetagemPage />} />
+                    <Route path="releases" element={<ReleasesPage />} />
+                    <Route path="logs" element={<LogsAuditoriaPage />} />
+                  </Route>
 
-                <Route path="/" element={<Navigate to="/modulos" replace />} />
-              </Route>
-              
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
-      </ModuloProvider>
-    </AuthProvider>
+                  <Route path="/" element={<Navigate to="/modulos" replace />} />
+                </Route>
+                
+                <Route path="*" element={<Navigate to="/login" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </ModuloProvider>
+      </AuthProvider>
+    </QueryClientProvider>
   )
 }
