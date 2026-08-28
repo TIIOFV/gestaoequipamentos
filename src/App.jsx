@@ -1,18 +1,33 @@
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { QueryClient } from '@tanstack/react-query'
+import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client'
+import { get, set, del } from 'idb-keyval'
 import { AuthProvider } from './contexts/AuthContext'
 import { ModuloProvider } from './contexts/ModuloContext'
 import ProtectedRoute from './routes/ProtectedRoute'
 
-// Configuração do Cache Global de Alta Performance
+// 🚀 CRIAÇÃO DO MOTOR DE PERSISTÊNCIA (IndexedDB)
+const idbPersister = {
+  persistClient: async (client) => {
+    await set('iofv-offline-cache', client)
+  },
+  restoreClient: async () => {
+    return await get('iofv-offline-cache')
+  },
+  removeClient: async () => {
+    await del('iofv-offline-cache')
+  }
+}
+
+// 🚀 Configuração do Cache Global Otimizado para PWA Offline
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutos: transição instantânea sem telas de loading repetidas
-      gcTime: 1000 * 60 * 30,    // 30 minutos retido na memória RAM do navegador
-      refetchOnWindowFocus: false, // Evita requisições desnecessárias ao trocar de janela
+      staleTime: 1000 * 60 * 5, // 5 minutos sem recarregar ecrãs
+      gcTime: 1000 * 60 * 60 * 24, // 24 HORAS no disco do telemóvel (Permite uso offline no dia seguinte)
+      refetchOnWindowFocus: false, 
       retry: 1,
     },
   },
@@ -20,8 +35,8 @@ const queryClient = new QueryClient({
 
 // Componente de carregamento para o Suspense
 const Loading = () => (
-  <div className="flex h-screen w-full items-center justify-center bg-slate-50 text-slate-500 font-medium">
-    Carregando sistema...
+  <div className="flex h-[100dvh] w-full items-center justify-center bg-slate-50 text-slate-500 font-medium">
+    A carregar o seu ambiente...
   </div>
 )
 
@@ -41,7 +56,8 @@ const LogsAuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'))
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    // 🚀 Provedor de Persistência Offline
+    <PersistQueryClientProvider client={queryClient} persistOptions={{ persister: idbPersister }}>
       <AuthProvider>
         <ModuloProvider>
           <BrowserRouter>
@@ -87,6 +103,6 @@ export default function App() {
           </BrowserRouter>
         </ModuloProvider>
       </AuthProvider>
-    </QueryClientProvider>
+    </PersistQueryClientProvider>
   )
 }

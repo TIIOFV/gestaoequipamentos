@@ -46,16 +46,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-4 font-sans relative overflow-hidden">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-4 sm:p-6 font-sans relative overflow-hidden">
       
       {/* BACKGROUND GLOW EFFECTS */}
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/15 blur-[120px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-indigo-600/15 blur-[120px] rounded-full pointer-events-none"></div>
 
-      <div className="max-w-md w-full bg-white/95 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl border border-white/20 p-8 md:p-10 relative z-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl border border-white/20 p-6 sm:p-10 relative z-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
         <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-400"></div>
 
-        <div className="text-center mb-8 mt-2">
+        <div className="text-center mb-6 sm:mb-8 mt-2">
           <div className="w-16 h-16 bg-gradient-to-tr from-blue-700 to-blue-600 rounded-2xl flex items-center justify-center text-white mx-auto mb-4 shadow-lg shadow-blue-600/30 ring-4 ring-blue-50">
             <Activity size={32} className="animate-pulse" />
           </div>
@@ -69,7 +69,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-3.5">
+          <div className="space-y-3">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                 <Mail size={18} />
@@ -79,7 +79,7 @@ export default function LoginPage() {
                 placeholder="E-mail corporativo"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-50/80 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all outline-none text-slate-800 text-sm font-medium placeholder:text-slate-400"
+                className="w-full pl-11 pr-4 py-4 sm:py-3.5 bg-slate-50/80 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all outline-none text-slate-800 text-sm font-medium placeholder:text-slate-400"
                 required
               />
             </div>
@@ -93,7 +93,7 @@ export default function LoginPage() {
                 placeholder="Sua senha de acesso"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 bg-slate-50/80 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all outline-none text-slate-800 text-sm font-medium placeholder:text-slate-400"
+                className="w-full pl-11 pr-4 py-4 sm:py-3.5 bg-slate-50/80 rounded-xl border border-slate-200 focus:bg-white focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-all outline-none text-slate-800 text-sm font-medium placeholder:text-slate-400"
                 required
               />
             </div>
@@ -109,10 +109,10 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-800 hover:to-blue-950 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2 disabled:opacity-70 text-sm"
+            className="w-full min-h-[56px] bg-gradient-to-r from-blue-700 to-blue-900 hover:from-blue-800 hover:to-blue-950 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-900/30 flex items-center justify-center gap-2 transition-all active:scale-95 mt-2 disabled:opacity-70 text-sm"
           >
             {loading ? (
-              <><Loader2 size={18} className="animate-spin" /> Autenticando cofre...</>
+              <><Loader2 size={18} className="animate-spin" /> A validar credenciais...</>
             ) : (
               <><LogIn size={18}/> Entrar no Painel</>
             )}
@@ -120,9 +120,9 @@ export default function LoginPage() {
         </form>
       </div>
 
-      <div className="mt-8 flex flex-col items-center opacity-70 hover:opacity-100 transition-opacity relative z-10">
-        <div className="flex items-center gap-2 text-slate-300 text-[10px] font-bold tracking-[0.2em] uppercase">
-          <ShieldCheck size={14} className="text-blue-400" />
+      <div className="mt-8 flex flex-col items-center opacity-70 hover:opacity-100 transition-opacity relative z-10 pb-4">
+        <div className="flex items-center gap-2 text-slate-300 text-[10px] font-bold tracking-[0.2em] uppercase text-center">
+          <ShieldCheck size={14} className="text-blue-400 shrink-0" />
           Desenvolvido por Pedro Oliveira • {VERSAO_SISTEMA}
         </div>
       </div>

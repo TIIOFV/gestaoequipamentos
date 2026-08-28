@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useModulo } from '../../contexts/ModuloContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { ArrowLeft, Factory, Activity, Clock, MapPin, Tag, Calendar, AlignLeft, Save, AlertTriangle, ShieldCheck, Network, Loader2 } from 'lucide-react'
+import { ArrowLeft, Factory, Activity, Clock, MapPin, Tag, Calendar, AlignLeft, Save, ShieldCheck, Network, Loader2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import imageCompression from 'browser-image-compression'
 import FormImagens from './components/FormImagens'
 
 export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, onVoltar, onSucesso }) {
@@ -26,14 +27,27 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
     e.preventDefault()
     if (!formData) return;
     setLoading(true)
+    
     try {
       let urlImagemFinal = formData.imagem_url
+      
       if (arquivoImagem) {
-        toast.loading('Fazendo upload da imagem principal...', { id: 'salvar-eq' });
-        const extensao = arquivoImagem.name.split('.').pop()
+        toast.loading('A comprimir e enviar fotografia...', { id: 'salvar-eq' });
+        
+        // 🚀 COMPRESSÃO DE IMAGEM NO NAVEGADOR
+        const options = {
+          maxSizeMB: 0.2, // Máximo 200KB
+          maxWidthOrHeight: 1920,
+          useWebWorker: true
+        }
+        
+        const compressedFile = await imageCompression(arquivoImagem, options)
+        const extensao = compressedFile.name.split('.').pop()
         const nomeArquivo = `${Date.now()}-${Math.random().toString(36).substring(2)}.${extensao}`
-        const { error: uploadError } = await supabase.storage.from('equipamentos').upload(nomeArquivo, arquivoImagem)
+        
+        const { error: uploadError } = await supabase.storage.from('equipamentos').upload(nomeArquivo, compressedFile)
         if (uploadError) throw uploadError
+        
         urlImagemFinal = supabase.storage.from('equipamentos').getPublicUrl(nomeArquivo).data.publicUrl
       }
 
@@ -54,12 +68,9 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
         tipo_impressora: formData.tipo_impressora || null
       }
       
-      delete payload.desconhece_fabricacao;
-      delete payload.fabricante; 
-      delete payload.prestador;  
-      delete payload.unidade;    
-      delete payload.setor;      
-      delete payload.status;     
+      delete payload.desconhece_fabricacao; delete payload.fabricante; 
+      delete payload.prestador; delete payload.unidade;    
+      delete payload.setor; delete payload.status;     
       
       const isNovo = !payload.id;
       if (isNovo) delete payload.id;
@@ -121,19 +132,20 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           : `Editou os dados do equipamento: ${payload.nome} (Patrimônio: ${payload.patrimonio || 'S/N'}).`
       }]);
       
-      toast.success(isNovo ? 'Equipamento cadastrado!' : 'Equipamento atualizado!', { id: 'salvar-eq' });
+      toast.success(isNovo ? 'Equipamento salvo!' : 'Equipamento atualizado!', { id: 'salvar-eq' });
       onSucesso()
-    } catch (error) { toast.error('Erro ao salvar: ' + error.message, { id: 'salvar-eq' }); } 
-    finally { setLoading(false) }
+    } catch (error) { 
+      toast.error('Erro ao salvar: ' + error.message, { id: 'salvar-eq' }); 
+    } finally { 
+      setLoading(false) 
+    }
   }
 
   const isModuloTecnologia = ['ti', 'impressoras'].includes(moduloAtivo)
 
   return (
-    // 🚀 ADICIONADO: min-w-0 para garantir que o formulário não estoure a tela
     <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500 min-w-0">
       
-      {/* CABEÇALHO */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm w-full overflow-hidden">
         <div className="flex-1 min-w-0 pr-0 md:pr-4">
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-[1.1]">
@@ -148,7 +160,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
 
       <form onSubmit={handleSalvar} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full min-w-0">
         
-        {/* COLUNA ESQUERDA */}
         <div className="lg:col-span-4 xl:col-span-3 space-y-6 w-full min-w-0">
           <FormImagens 
             formData={formData} setFormData={setFormData}
@@ -173,7 +184,6 @@ export default function EquipamentoForm({ formDataInicial, auxiliaresGlobais, on
           )}
         </div>
 
-        {/* COLUNA DIREITA */}
         <div className="lg:col-span-8 xl:col-span-9 space-y-6 w-full min-w-0">
           
           <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm space-y-6 min-w-0">
