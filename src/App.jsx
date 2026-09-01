@@ -53,6 +53,8 @@ const ConfiguracoesPage = lazy(() => import('./pages/configuracoes/Configuracoes
 const BilhetagemPage = lazy(() => import('./pages/impressoras/BilhetagemPage'))
 const ReleasesPage = lazy(() => import('./pages/releases/ReleasesPage'))
 const LogsAuditoriaPage = lazy(() => import('./pages/auditoria/AuditoriaPage'))
+const PortalSuportePage = lazy(() => import('./pages/portal/PortalSuportePage'))
+const TriagemPage = lazy(() => import('./pages/suporte/TriagemPage'))
 
 export default function App() {
   return (
@@ -92,6 +94,8 @@ export default function App() {
                     <Route path="bilhetagem" element={<BilhetagemPage />} />
                     <Route path="releases" element={<ReleasesPage />} />
                     <Route path="logs" element={<LogsAuditoriaPage />} />
+                    <Route path="suporte" element={<PortalSuportePage />} />
+                    <Route path="triagem" element={<TriagemPage />} />
                   </Route>
 
                   <Route path="/" element={<Navigate to="/modulos" replace />} />

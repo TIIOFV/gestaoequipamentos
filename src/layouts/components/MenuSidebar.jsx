@@ -8,7 +8,7 @@ import {
   Settings, LogOut, Bell, X, Key, Droplet, Rocket,
   ChevronLeft, ChevronRight, AlertCircle, Clock, ShieldAlert, Tag,
   ChevronsUpDown, Stethoscope, BatteryCharging, Printer, 
-  ShieldCheck // 🚀 ÍCONE DE SEGURANÇA IMPORTADO AQUI
+  ShieldCheck, Inbox
 } from 'lucide-react'
 
 const NOMES_MODULOS = {
@@ -90,7 +90,7 @@ export default function MenuSidebar({
   useEffect(() => {
     if (!moduloAtivo) return;
 
-    if (profile && !profile.esta_bloqueado && !isTrocaSenhaObrigatoria) {
+    if (profile && hasFullAccess && !profile.esta_bloqueado && !isTrocaSenhaObrigatoria) {
       buscarAlertas()
       
       let timeoutId;
@@ -110,7 +110,7 @@ export default function MenuSidebar({
         supabase.removeChannel(canalNotificacoes); 
       };
     }
-  }, [profile, isTrocaSenhaObrigatoria, moduloAtivo, buscarAlertas])
+  }, [profile, isTrocaSenhaObrigatoria, moduloAtivo, buscarAlertas, hasFullAccess])
 
   const toggleCategoria = (key) => setAbertas(prev => ({ ...prev, [key]: !prev[key] }))
   const handleTrocarModulo = () => { limparModulo(); navigate('/modulos'); }
@@ -191,8 +191,9 @@ export default function MenuSidebar({
   const menuItems = [
     { path: `/${moduloAtivo}/dashboard`, name: 'Dashboard', icon: LayoutDashboard, roles: ['administrador', 'analista'] },
     { path: `/${moduloAtivo}/equipamentos`, name: 'Equipamentos', icon: Monitor, roles: ['administrador', 'analista'] },
-    { path: `/${moduloAtivo}/chamados`, name: 'Chamados', icon: Wrench, roles: ['administrador', 'analista'] },
-    { path: `/${moduloAtivo}/agenda`, name: 'Agenda', icon: CalendarDays, roles: ['administrador', 'analista', 'visualizador'] },
+    { path: `/${moduloAtivo}/chamados`, name: 'Central de O.S.', icon: Wrench, roles: ['administrador', 'analista'] },
+    { path: `/${moduloAtivo}/agenda`, name: 'Agenda', icon: CalendarDays, roles: ['administrador', 'analista', 'usuario'] },
+    { path: `/${moduloAtivo}/suporte`, name: 'Meu Suporte', icon: AlertCircle, roles: ['usuario'] },
     { path: `/${moduloAtivo}/relatorios`, name: 'Relatórios', icon: FileText, roles: ['administrador', 'analista'] },
   ]
 
@@ -200,7 +201,7 @@ export default function MenuSidebar({
     <>
       {isMobileMenuOpen && (
         <div 
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 md:hidden transition-opacity duration-300"
+          className="fixed inset-0 bg-slate-900/70 z-40 md:hidden transition-opacity duration-300"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
@@ -213,7 +214,6 @@ export default function MenuSidebar({
         ${isRetraido ? 'md:w-20' : 'md:w-64'}
       `}>
         
-        {/* CABEÇALHO / LOGO */}
         <div className="h-20 flex items-center justify-between px-4 bg-white border-b border-slate-100 shrink-0 relative z-10">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-700 to-blue-900 text-white rounded-xl flex items-center justify-center font-black text-lg shadow-md shadow-blue-900/20 shrink-0">
@@ -239,7 +239,6 @@ export default function MenuSidebar({
           </button>
         </div>
 
-        {/* ÁREA DE SCROLL UNIFICADA */}
         <div className="flex-1 overflow-y-auto flex flex-col 
           [&::-webkit-scrollbar]:w-1.5 
           [&::-webkit-scrollbar-track]:bg-transparent 
@@ -247,7 +246,6 @@ export default function MenuSidebar({
           [&::-webkit-scrollbar-thumb]:rounded-full 
           hover:[&::-webkit-scrollbar-thumb]:bg-slate-300 transition-colors"
         >
-          {/* SELETOR DE AMBIENTE */}
           <div className={`px-4 py-4 space-y-4 bg-white border-b border-slate-100 shrink-0 ${isRetraido ? 'flex flex-col items-center' : ''}`}>
             <div 
               onClick={handleTrocarModulo} 
@@ -279,42 +277,41 @@ export default function MenuSidebar({
             )}
           </div>
 
-          {/* PENDÊNCIAS */}
-          <div className={`px-3 py-3 shrink-0 relative ${isRetraido ? 'flex justify-center' : ''}`}>
-            <button 
-              onClick={handleNotifToggle} 
-              title={isRetraido ? "Central de Pendências" : ""}
-              className={`flex items-center ${isRetraido ? 'justify-center w-10 h-10 p-0' : 'justify-between w-full p-2.5'} bg-white border ${alertas.length > 0 && !isRetraido ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200'} rounded-xl hover:border-slate-300 hover:shadow-sm transition-all group relative`}
-            >
-              <div className="flex items-center text-xs font-bold text-slate-700 group-hover:text-slate-900 transition-colors">
-                <Bell className={`w-4 h-4 transition-transform group-hover:scale-110 ${alertas.length > 0 ? 'text-rose-500' : 'text-slate-400'} ${!isRetraido && 'mr-2'}`} />
-                {!isRetraido && "Pendências"}
-              </div>
-              {alertas.length > 0 && (
-                <span className={`${isRetraido ? 'absolute -top-1 -right-1 flex h-3 w-3' : 'bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm shadow-rose-500/30'}`}>
-                  {isRetraido ? (
-                    <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
-                    </>
-                  ) : (
-                    alertas.length > 99 ? '99+' : alertas.length
-                  )}
-                </span>
+          {hasFullAccess && (
+            <div className={`px-3 py-3 shrink-0 relative ${isRetraido ? 'flex justify-center' : ''}`}>
+              <button 
+                onClick={handleNotifToggle} 
+                title={isRetraido ? "Central de Pendências" : ""}
+                className={`flex items-center ${isRetraido ? 'justify-center w-10 h-10 p-0' : 'justify-between w-full p-2.5'} bg-white border ${alertas.length > 0 && !isRetraido ? 'border-rose-200 bg-rose-50/30' : 'border-slate-200'} rounded-xl hover:border-slate-300 hover:shadow-sm transition-all group relative`}
+              >
+                <div className="flex items-center text-xs font-bold text-slate-700 group-hover:text-slate-900 transition-colors">
+                  <Bell className={`w-4 h-4 transition-transform group-hover:scale-110 ${alertas.length > 0 ? 'text-rose-500' : 'text-slate-400'} ${!isRetraido && 'mr-2'}`} />
+                  {!isRetraido && "Pendências"}
+                </div>
+                {alertas.length > 0 && (
+                  <span className={`${isRetraido ? 'absolute -top-1 -right-1 flex h-3 w-3' : 'bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm shadow-rose-500/30'}`}>
+                    {isRetraido ? (
+                      <>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                      </>
+                    ) : (
+                      alertas.length > 99 ? '99+' : alertas.length
+                    )}
+                  </span>
+                )}
+              </button>
+
+              {!isRetraido && showNotif && (
+                <div className="mt-2 transition-all">
+                  {listaNotificacoes}
+                </div>
               )}
-            </button>
+            </div>
+          )}
 
-            {/* MODO ACORDEÃO: Exibido apenas se o menu NÃO estiver retraído */}
-            {!isRetraido && showNotif && (
-              <div className="mt-2 transition-all">
-                {listaNotificacoes}
-              </div>
-            )}
-          </div>
-
-          {/* NAVEGAÇÃO PRINCIPAL */}
-          <nav className="flex-1 px-3 pb-4 space-y-1.5">
-            {menuItems.filter(item => (!hasFullAccess ? item.path.includes('/agenda') : item.roles.includes(profile?.perfil))).map((item) => {
+          <nav className="flex-1 px-3 pb-4 space-y-1.5 pt-2">
+            {menuItems.filter(item => item.roles.includes(profile?.perfil)).map((item) => {
               const Icon = item.icon
               const active = isActive(item.path)
               return (
@@ -351,50 +348,62 @@ export default function MenuSidebar({
               </Link>
             )}
 
-            {hasFullAccess && (
-              <div className={`pt-4 mt-4 border-t border-slate-200/60 space-y-1.5 ${isRetraido ? 'flex flex-col items-center' : ''}`}>
-                
-                {/* 🚀 ÁREA RESTRITA DOS ADMINISTRADORES */}
-                {profile?.perfil === 'administrador' && (
-                  <>
-                    <Link 
-                      to={`/${moduloAtivo}/configuracoes`} 
-                      title={isRetraido ? "Configurações" : ""}
-                      onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/configuracoes`)} 
-                      className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/configuracoes') ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
-                    >
-                      <Settings className={`w-4 h-4 transition-transform duration-200 group-hover:rotate-90 ${isActive('/configuracoes') ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-800'} ${!isRetraido && 'mr-3'}`} /> 
-                      {!isRetraido && <span className="whitespace-nowrap">Configurações</span>}
-                    </Link>
-
-                    {/* 🚀 NOVO: Link de Auditoria / Logs */}
-                    <Link 
-                      to={`/${moduloAtivo}/logs`} 
-                      title={isRetraido ? "Auditoria do Sistema" : ""}
-                      onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/logs`)} 
-                      className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/logs') ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
-                    >
-                      <ShieldCheck className={`w-4 h-4 transition-transform duration-200 group-hover:scale-110 ${isActive('/logs') ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-800'} ${!isRetraido && 'mr-3'}`} /> 
-                      {!isRetraido && <span className="whitespace-nowrap">Auditoria (Logs)</span>}
-                    </Link>
-                  </>
-                )}
-                
+            <div className={`pt-4 mt-4 border-t border-slate-200/60 space-y-1.5 ${isRetraido ? 'flex flex-col items-center' : ''}`}>
+              
+              {/* Triagem (Help Desk) reposicionada logo acima de Configurações */}
+              {(profile?.perfil === 'administrador' || profile?.perfil === 'analista') && (
                 <Link 
-                  to={`/${moduloAtivo}/releases`} 
-                  title={isRetraido ? "Notas de Atualização" : ""}
-                  onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/releases`)} 
-                  className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/releases') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-indigo-700 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
+                  to={`/${moduloAtivo}/triagem`} 
+                  title={isRetraido ? "Triagem (Help Desk)" : ""}
+                  onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/triagem`)} 
+                  className={`group flex items-center ${isRetraido ? 'justify-center p-3' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${
+                    isActive('/triagem') 
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-md shadow-blue-900/20' 
+                      : 'text-slate-600 hover:bg-white hover:text-blue-700 hover:shadow-sm border border-transparent hover:border-slate-200'
+                  }`}
                 >
-                  <Rocket className={`w-4 h-4 transition-transform duration-200 group-hover:-translate-y-1 group-hover:translate-x-1 ${isActive('/releases') ? 'text-indigo-200' : 'text-slate-400 group-hover:text-indigo-600'} ${!isRetraido && 'mr-3'}`} /> 
-                  {!isRetraido && <span className="whitespace-nowrap">Notas de Atualização</span>}
+                  <Inbox className={`w-4 h-4 transition-transform duration-200 group-hover:scale-110 ${isActive('/triagem') ? 'text-blue-100' : 'text-slate-400 group-hover:text-blue-600'} ${!isRetraido && 'mr-3'}`} /> 
+                  {!isRetraido && <span className="whitespace-nowrap">Triagem (Help Desk)</span>}
                 </Link>
-              </div>
-            )}
+              )}
+
+              {profile?.perfil === 'administrador' && (
+                <>
+                  <Link 
+                    to={`/${moduloAtivo}/configuracoes`} 
+                    title={isRetraido ? "Configurações" : ""}
+                    onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/configuracoes`)} 
+                    className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/configuracoes') ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
+                  >
+                    <Settings className={`w-4 h-4 transition-transform duration-200 group-hover:rotate-90 ${isActive('/configuracoes') ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-800'} ${!isRetraido && 'mr-3'}`} /> 
+                    {!isRetraido && <span className="whitespace-nowrap">Configurações</span>}
+                  </Link>
+
+                  <Link 
+                    to={`/${moduloAtivo}/logs`} 
+                    title={isRetraido ? "Auditoria do Sistema" : ""}
+                    onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/logs`)} 
+                    className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/logs') ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-slate-800 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
+                  >
+                    <ShieldCheck className={`w-4 h-4 transition-transform duration-200 group-hover:scale-110 ${isActive('/logs') ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-800'} ${!isRetraido && 'mr-3'}`} /> 
+                    {!isRetraido && <span className="whitespace-nowrap">Auditoria (Logs)</span>}
+                  </Link>
+                </>
+              )}
+              
+              <Link 
+                to={`/${moduloAtivo}/releases`} 
+                title={isRetraido ? "Notas de Atualização" : ""}
+                onClick={(e) => handleMainMenuClick(e, `/${moduloAtivo}/releases`)} 
+                className={`group flex items-center ${isRetraido ? 'justify-center p-3 w-10 h-10' : 'px-4 py-3'} rounded-xl text-xs font-bold transition-all duration-200 ${isActive('/releases') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-500 hover:bg-white hover:text-indigo-700 hover:shadow-sm border border-transparent hover:border-slate-200'}`}
+              >
+                <Rocket className={`w-4 h-4 transition-transform duration-200 group-hover:-translate-y-1 group-hover:translate-x-1 ${isActive('/releases') ? 'text-indigo-200' : 'text-slate-400 group-hover:text-indigo-600'} ${!isRetraido && 'mr-3'}`} /> 
+                {!isRetraido && <span className="whitespace-nowrap">Notas de Atualização</span>}
+              </Link>
+            </div>
           </nav>
         </div> 
 
-        {/* RODAPÉ DO MENU */}
         <div className={`p-4 bg-white border-t border-slate-100 shrink-0 relative z-10 ${isRetraido ? 'flex flex-col gap-2' : 'space-y-2'}`}>
           <div className={`flex ${isRetraido ? 'flex-col' : ''} gap-2`}>
             <button 
@@ -421,8 +430,7 @@ export default function MenuSidebar({
           )}
         </div>
 
-        {/* MODO FLUTUANTE (POPOVER) */}
-        {isRetraido && showNotif && (
+        {hasFullAccess && isRetraido && showNotif && (
           <div className="absolute left-[90px] top-[140px] w-80 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 z-[100] p-4 flex flex-col max-h-[70vh]">
             <div className="flex items-center justify-between mb-4 shrink-0">
               <div className="flex items-center gap-2">

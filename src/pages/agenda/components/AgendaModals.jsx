@@ -4,7 +4,7 @@ export function ModalDiaAgenda({ diaSelecionado, setDiaSelecionado, eventosDoDia
   if (!diaSelecionado) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+    <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-[9999] p-4">
       <div className="bg-slate-50 rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col animate-in zoom-in duration-200 overflow-hidden border border-slate-200">
         
         <div className="bg-white px-6 py-6 md:px-8 border-b border-slate-200 flex justify-between items-center shrink-0">
@@ -110,7 +110,7 @@ export function ModalListaAnual({ modalListaAnual, setModalListaAnual, navigate,
   if (!modalListaAnual.aberto) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+    <div className="fixed inset-0 bg-slate-900/70 flex items-center justify-center z-[9999] p-4">
       <div className="bg-slate-50 rounded-[2rem] shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col animate-in zoom-in duration-150 border border-slate-200 overflow-hidden">
         
         <div className={`p-6 md:p-8 border-b border-slate-200 flex justify-between items-center shrink-0 bg-white`}>
@@ -136,7 +136,6 @@ export function ModalListaAnual({ modalListaAnual, setModalListaAnual, navigate,
           </button>
         </div>
 
-        {/* 🚀 OTIMIZAÇÃO: Barra de rolagem invisível estilo App Nativo */}
         <div className="p-4 md:p-6 overflow-y-auto flex-1 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           {modalListaAnual.lista.map(os => {
             const dataShow = os.data_prevista 

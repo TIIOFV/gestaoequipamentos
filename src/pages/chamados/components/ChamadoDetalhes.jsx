@@ -8,6 +8,12 @@ import {
   User, Printer, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight, ExternalLink 
 } from 'lucide-react'
 
+// 🚀 OTIMIZAÇÃO: Função de formatação para 5 dígitos
+const formatarNumeroOS = (numero) => {
+  if (!numero) return '00000';
+  return String(numero).padStart(5, '0');
+}
+
 const GaleriaLightbox = ({ imagens, indexInicial, onClose }) => {
   const [currentIndex, setCurrentIndex] = useState(indexInicial || 0)
   const [zoomVisual, setZoomVisual] = useState(1)
@@ -185,7 +191,10 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
                <div className={`w-1.5 h-1.5 rounded-full ${chamado.tipo_intervencao === 'Preventiva' ? 'bg-green-500' : chamado.tipo_intervencao === 'Calibração' ? 'bg-blue-500' : chamado.tipo_intervencao === 'Qualificação' ? 'bg-purple-500' : 'bg-red-500'}`}></div>
                {chamado.tipo_intervencao || 'Corretiva'}
             </span>
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest truncate max-w-full">OS #{chamado.id}</span>
+            {/* 🚀 AQUI APARECE A O.S. DE 5 DÍGITOS DESTACADA */}
+            <span className="text-[11px] font-black text-indigo-700 uppercase tracking-widest bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-lg shrink-0">
+              OS #{formatarNumeroOS(chamado.numero_os)}
+            </span>
           </div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 uppercase tracking-tight break-words leading-[1.1] w-full">
             Ordem de Serviço Técnica
@@ -217,7 +226,7 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
         
         <div className="hidden print:block w-full border-b-2 border-slate-800 pb-4 mb-2">
            <h2 className="text-2xl font-black text-slate-900 uppercase">Ordem de Serviço Técnica</h2>
-           <p className="text-slate-500 font-bold mt-1">OS #{chamado.id || 'N/A'} - Emitida em {new Date().toLocaleDateString('pt-BR')}</p>
+           <p className="text-slate-500 font-bold mt-1">OS #{formatarNumeroOS(chamado.numero_os)} - Emitida em {new Date().toLocaleDateString('pt-BR')}</p>
         </div>
 
         <div className="lg:col-span-8 space-y-6 print:w-full min-w-0">
@@ -346,9 +355,10 @@ export default function ChamadoDetalhes({ chamado, voltarParaLista, iniciarEdica
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black truncate"><Hash size={12} className="no-print shrink-0"/> Protocolo Externo (OS)</span>
                 <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0 truncate max-w-full">{chamado.protocolo_externo || 'S/ Protocolo'}</span>
               </div>
+              {/* 🚀 DESTAQUE DO TÉCNICO RESPONSÁVEL */}
               <div className="flex flex-col gap-1 min-w-0">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black truncate"><User size={12} className="no-print shrink-0"/> Solicitante / Criador</span>
-                <span className="text-sm font-bold text-slate-800 mt-1 truncate max-w-full">{chamado.aberto_por?.nome || '-'}</span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5 print:text-black truncate"><User size={12} className="no-print shrink-0"/> Técnico Responsável</span>
+                <span className="text-sm font-bold text-slate-800 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100 inline-block w-fit mt-1 print:bg-white print:border-none print:px-0 print:py-0 truncate max-w-full">{chamado.aberto_por?.nome || 'Técnico N/D'}</span>
               </div>
             </div>
           </div>

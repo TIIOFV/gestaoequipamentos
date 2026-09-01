@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { Settings, Users, Factory, Wrench, Building2, LayoutGrid, ActivitySquare } from 'lucide-react'
+import { Settings, Users, Factory, Wrench, Building2, LayoutGrid, ActivitySquare, Clock } from 'lucide-react'
 import TabUsuarios from './components/TabUsuarios'
 import TabAuxiliares from './components/TabAuxiliares'
+import TabSLA from './components/TabSLA' // 🚀 NOVO COMPONENTE
 
-// 🚀 IMPORTAMOS A NOSSA PEÇA DE LEGO
 import Tabs from '../../components/ui/Tabs' 
 
 const MODULOS_DISPONIVEIS = [
@@ -14,9 +14,9 @@ const MODULOS_DISPONIVEIS = [
   { id: 'impressoras', nome: 'Impressoras & Copiadoras', cor: 'purple' }
 ]
 
-// Transformamos o array para usar 'label' (Padrão de UI) e adicionamos ícones opcionais!
 const abasGlobais = [
   { id: 'usuarios', label: 'Usuários', icon: <Users size={16}/>, tabela: 'perfis' },
+  { id: 'slas', label: 'Níveis de SLA', icon: <Clock size={16}/>, tabela: 'slas' }, // 🚀 NOVA ABA
   { id: 'fabricantes', label: 'Fabricantes', icon: <Factory size={16}/>, tabela: 'fabricantes' },
   { id: 'prestadores', label: 'Prestadores', icon: <Wrench size={16}/>, tabela: 'prestadores' },
   { id: 'unidades', label: 'Unidades', icon: <Building2 size={16}/>, tabela: 'unidades' },
@@ -29,10 +29,8 @@ export default function ConfiguracoesPage() {
   const abaSelecionada = abasGlobais.find(a => a.id === abaAtiva)
 
   return (
-    // 🚀 OTIMIZAÇÃO: w-full e space-y-6 para acompanhar o padrão gigante da tela
     <div className="w-full space-y-6 animate-in fade-in duration-500 pb-10">
       
-      {/* CABEÇALHO ENTERPRISE (Igual ao dos Chamados) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-3xl md:text-4xl font-black text-slate-800 flex items-center gap-3 tracking-tight uppercase">
@@ -45,17 +43,17 @@ export default function ConfiguracoesPage() {
         </div>
       </div>
 
-      {/* 🚀 A MÁGICA: Uma única linha resolve toda a navegação mobile! */}
       <Tabs 
         tabs={abasGlobais} 
         activeTab={abaAtiva} 
         onChange={setAbaAtiva} 
       />
 
-      {/* CONTEÚDO DA ABA (Cartão expandido e limpo) */}
       <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm p-6 md:p-8">
         {abaAtiva === 'usuarios' ? (
           <TabUsuarios modulosDisponiveis={MODULOS_DISPONIVEIS} />
+        ) : abaAtiva === 'slas' ? (
+          <TabSLA /> // 🚀 RENDERIZA O GESTOR DE SLAS
         ) : (
           <TabAuxiliares 
             abaAtiva={abaAtiva} 

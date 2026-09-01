@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { supabase } from '../../../lib/supabase'
 import { useModulo } from '../../../contexts/ModuloContext'
-import { Plus, Search, Filter, Clock, Calendar, Wrench, Paperclip, FileText, CheckCircle2, AlertTriangle, Monitor, ChevronRight, Ticket } from 'lucide-react'
+import { Plus, Search, Filter, Clock, Calendar, Wrench, Paperclip, FileText, CheckCircle2, AlertTriangle, Monitor, ChevronRight, Ticket, User } from 'lucide-react'
 import { Skeleton } from '../../../components/ui/Skeleton'
 import Paginacao from '../../../components/Paginacao'
 
@@ -13,7 +13,11 @@ const formatDataSegura = (dataString) => {
   return `${dia}/${mes}/${ano}`;
 }
 
-// 🚀 BUSCA NO SERVIDOR CORRIGIDA COM PESQUISA CRUZADA INTELIGENTE
+const formatarNumeroOS = (numero) => {
+  if (!numero) return '00000';
+  return String(numero).padStart(5, '0');
+}
+
 const buscarChamadosPaginados = async ({ pagina, busca, tipo, status, prestador, periodo, modulo }) => {
   const ITENS_POR_PAGINA = 15;
   const from = (pagina - 1) * ITENS_POR_PAGINA;
@@ -22,18 +26,16 @@ const buscarChamadosPaginados = async ({ pagina, busca, tipo, status, prestador,
   let query = supabase
     .from('chamados')
     .select(`
-      id, descricao, protocolo_externo, tipo_intervencao, data_abertura, data_prevista, data_conclusao, anexos, created_at, status_id,
+      id, numero_os, descricao, protocolo_externo, tipo_intervencao, data_abertura, data_prevista, data_conclusao, anexos, created_at, status_id,
       equipamento:equipamento_id(nome, patrimonio, numero_serie), 
       status:status_id(nome), 
       prestador:prestador_id(nome), 
       aberto_por:aberto_por_id(nome)
     `, { count: 'exact' })
     .eq('modulo', modulo)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
 
-  // 🚀 PESQUISA CRUZADA: Busca na OS e no Equipamento (N/S, Patrimônio, Nome)
   if (busca) {
-    // 1. Encontra equipamentos que dão match com a busca
     const { data: eqsMatch } = await supabase
       .from('equipamentos')
       .select('id')
@@ -42,7 +44,6 @@ const buscarChamadosPaginados = async ({ pagina, busca, tipo, status, prestador,
       
     const eqIds = eqsMatch?.map(e => e.id) || [];
 
-    // 2. Filtra as OS pelo texto OU se pertencerem aos equipamentos encontrados acima
     if (eqIds.length > 0) {
       query = query.or(`descricao.ilike.%${busca}%,protocolo_externo.ilike.%${busca}%,equipamento_id.in.(${eqIds.join(',')})`);
     } else {
@@ -50,7 +51,6 @@ const buscarChamadosPaginados = async ({ pagina, busca, tipo, status, prestador,
     }
   }
 
-  // Restantes Filtros
   if (tipo) query = query.eq('tipo_intervencao', tipo);
   if (status) query = query.eq('status_id', status);
   if (prestador) query = query.eq('prestador_id', prestador);
@@ -73,7 +73,6 @@ const buscarChamadosPaginados = async ({ pagina, busca, tipo, status, prestador,
     }
   }
 
-  // Paginação exata
   query = query.range(from, to);
 
   const { data, count, error } = await query;
@@ -235,8 +234,8 @@ export default function ChamadosList({ auxiliares, setView, setChamadoSelecionad
                           {ch.tipo_intervencao || 'Corretiva'}
                         </span>
                         
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 border border-slate-200 px-2 py-1 rounded-lg shrink-0">
-                          OS #{ch.id}
+                        <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg shrink-0">
+                          OS #{formatarNumeroOS(ch.numero_os)}
                         </span>
                         
                         {ch.status?.nome && (
@@ -274,8 +273,12 @@ export default function ChamadosList({ auxiliares, setView, setChamadoSelecionad
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between w-full xl:w-auto xl:justify-end gap-4 text-xs font-bold text-slate-400 min-w-0">
-                        <span className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 truncate">
+                      <div className="flex items-center justify-between w-full xl:w-auto xl:justify-end gap-3 text-[11px] font-bold text-slate-500 min-w-0">
+                        <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 truncate shadow-sm">
+                          <User size={12} className="text-slate-400 shrink-0" /> <span className="truncate">{ch.aberto_por?.nome || 'Técnico N/D'}</span>
+                        </span>
+
+                        <span className="flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100 truncate shadow-sm">
                           <Wrench size={12} className="text-slate-400 shrink-0" /> <span className="truncate">{ch.prestador?.nome || 'Manutenção Interna'}</span>
                         </span>
                         
