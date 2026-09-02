@@ -28,11 +28,21 @@ export default function ModalNovoChamado({ isOpen, onClose, onSuccess, equipamen
 
   const processarArquivos = async (filesArray) => {
     if (!filesArray || filesArray.length === 0) return
+    
+    // 🚀 BLOQUEIO DE SEGURANÇA: Validar lote de ficheiros
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+    const validFiles = filesArray.filter(file => allowedTypes.includes(file.type))
+    
+    if (validFiles.length !== filesArray.length) {
+      toast.error('Alguns formatos não são permitidos. Envie apenas JPG, PNG ou PDF.')
+      if (validFiles.length === 0) return
+    }
+
     setSalvando(true)
     toast.loading('A carregar ficheiro(s)...', { id: 'upload-suporte' })
     try {
       const novasUrls = []
-      for (const file of filesArray) {
+      for (const file of validFiles) {
         const fileExt = file.name.split('.').pop()
         const fileName = `suporte_${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`
         const { error: uploadError } = await supabase.storage.from('equipamentos').upload(fileName, file)
@@ -140,8 +150,8 @@ export default function ModalNovoChamado({ isOpen, onClose, onSuccess, equipamen
             >
               <p className="text-xs font-bold text-slate-600 mb-4 text-center">Tire uma foto na hora ou escolha da galeria</p>
               
-              <input type="file" id="uploadCameraModal" accept="image/*" capture="environment" onChange={(e) => processarArquivos(Array.from(e.target.files))} disabled={salvando} className="hidden" />
-              <input type="file" id="uploadFicheiroModal" multiple accept="image/*,application/pdf" onChange={(e) => processarArquivos(Array.from(e.target.files))} disabled={salvando} className="hidden" />
+              <input type="file" id="uploadCameraModal" accept="image/png, image/jpeg, image/jpg" capture="environment" onChange={(e) => processarArquivos(Array.from(e.target.files))} disabled={salvando} className="hidden" />
+              <input type="file" id="uploadFicheiroModal" multiple accept="image/png, image/jpeg, image/jpg, application/pdf" onChange={(e) => processarArquivos(Array.from(e.target.files))} disabled={salvando} className="hidden" />
               
               <div className="flex flex-wrap items-center justify-center gap-3">
                 <label htmlFor="uploadCameraModal" className="flex items-center gap-2 bg-slate-800 text-white px-5 py-3 rounded-xl text-xs font-bold cursor-pointer hover:bg-slate-700 transition-all shadow-sm active:scale-95">

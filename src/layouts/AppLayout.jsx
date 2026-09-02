@@ -22,7 +22,6 @@ export default function AppLayout() {
   const isLimitedRoute = location.pathname.includes('/agenda') || location.pathname.includes('/suporte') || location.pathname.includes('/releases')
   const isTrocaSenhaObrigatoria = profile?.precisa_trocar_senha === true
 
-  // Gerencia o estado inicial de verificação do perfil
   useEffect(() => {
     if (profile?.esta_bloqueado) {
       alert("Seu acesso foi suspenso temporariamente pelo Administrador.");
@@ -36,14 +35,10 @@ export default function AppLayout() {
     return () => clearTimeout(timer)
   }, [profile])
 
-  // 🚀 CORREÇÃO DO LOOP: Unificamos e blindamos as regras de redirecionamento 
-  // para que não entrem em conflito umas com as outras.
   useEffect(() => {
     if (isVerifying) return;
-
     if (isTrocaSenhaObrigatoria) return;
 
-    // 1. Se não houver módulo ativo, vai para a seleção de módulos
     if (!moduloAtivo) {
       if (location.pathname !== '/modulos') {
         navigate('/modulos', { replace: true })
@@ -51,7 +46,6 @@ export default function AppLayout() {
       return;
     }
 
-    // 2. Se o utilizador não tiver acesso total e estiver numa rota proibida, redireciona com segurança
     if (!hasFullAccess && !isLimitedRoute) {
       const rotaDesejada = `/${moduloAtivo}/suporte`;
       if (location.pathname !== rotaDesejada) {
@@ -110,6 +104,7 @@ export default function AppLayout() {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* 🚀 O SINO VOLTOU PARA O TOPO (ONDE FICA MELHOR) */}
             <NotificacoesBell />
             <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors active:scale-95">
               <Menu size={24} />

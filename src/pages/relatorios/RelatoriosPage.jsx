@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useModulo } from '../../contexts/ModuloContext'
-import { FileText, Printer, PackageSearch, Wrench, Droplet } from 'lucide-react'
+import { FileText, Printer, PackageSearch, Wrench, Droplet, BarChart3 } from 'lucide-react'
 
 import RelatorioInventario from './components/RelatorioInventario'
 import RelatorioOS from './components/RelatorioOS'
 import RelatorioBilhetagem from './components/RelatorioBilhetagem'
+import RelatorioBI from './components/RelatorioBI' // 🚀 Importação do novo BI
 
 export default function RelatoriosPage() {
   const { moduloAtivo } = useModulo()
@@ -28,6 +29,7 @@ export default function RelatoriosPage() {
   return (
     <div className="w-full space-y-6 animate-in fade-in duration-500 pb-10">
 
+      {/* 🚀 CSS ORIGINAL DE PRODUÇÃO RESTAURADO */}
       <style>{`
         @media print {
           .no-print, nav, aside, header, sidebar, button, [role="navigation"] { display: none !important; }
@@ -42,6 +44,9 @@ export default function RelatoriosPage() {
           thead { display: table-header-group !important; }
           tr { page-break-inside: avoid !important; }
           td, th { word-wrap: break-word !important; white-space: pre-wrap !important; font-size: 10pt !important; }
+          
+          /* Adição única para garantir que os gráficos do BI apareçam na impressão */
+          .recharts-responsive-container { width: 100% !important; height: 250px !important; }
         }
       `}</style>
 
@@ -63,7 +68,7 @@ export default function RelatoriosPage() {
         </button>
       </div>
 
-      {/* 🚀 NAVEGAÇÃO DE ABAS MOBILE-FRIENDLY (Scroll Horizontal Invisível) */}
+      {/* 🚀 NAVEGAÇÃO DE ABAS MOBILE-FRIENDLY */}
       <div className="no-print w-full overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         <div className="flex gap-2 p-1.5 bg-slate-200/60 rounded-2xl w-fit shadow-inner border border-slate-200/60">
           <button
@@ -74,6 +79,7 @@ export default function RelatoriosPage() {
           >
             <PackageSearch size={18} /> Parque de Equipamentos
           </button>
+          
           <button
             onClick={() => setAbaAtiva('os')}
             className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
@@ -81,6 +87,16 @@ export default function RelatoriosPage() {
             }`}
           >
             <Wrench size={18} /> Ordens de Serviço (OS)
+          </button>
+
+          {/* 🚀 NOVA ABA DE INDICADORES & BI */}
+          <button
+            onClick={() => setAbaAtiva('bi')}
+            className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+              abaAtiva === 'bi' ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-300/50'
+            }`}
+          >
+            <BarChart3 size={18} /> Indicadores & BI
           </button>
 
           {moduloAtivo === 'impressoras' && (
@@ -96,8 +112,10 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
+      {/* 🚀 RENDERIZAÇÃO CONDICIONAL DAS ABAS */}
       {abaAtiva === 'inventario' && <RelatorioInventario moduloAtivo={moduloAtivo} nomeAmbiente={nomeAmbiente} setBloquearImpressao={setBloquearImpressao} />}
       {abaAtiva === 'os' && <RelatorioOS moduloAtivo={moduloAtivo} nomeAmbiente={nomeAmbiente} setBloquearImpressao={setBloquearImpressao} />}
+      {abaAtiva === 'bi' && <RelatorioBI moduloAtivo={moduloAtivo} />}
       {abaAtiva === 'bilhetagem' && <RelatorioBilhetagem moduloAtivo={moduloAtivo} nomeAmbiente={nomeAmbiente} setBloquearImpressao={setBloquearImpressao} />}
 
     </div>

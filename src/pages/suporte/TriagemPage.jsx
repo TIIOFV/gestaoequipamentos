@@ -5,7 +5,7 @@ import { Inbox, Search, CheckCircle2, Ticket, PauseCircle, Layers, AlertCircle, 
 import toast from 'react-hot-toast'
 import CartaoKanban from './components/CartaoKanban'
 import ModalTriagem from './components/ModalTriagem'
-import NotificacoesBell from '../../components/NotificacoesBell'
+import { enviarNotificacao } from '../../utils/notificacoes'
 
 const COLUNAS_KANBAN = [
   { id: 'Enviado', titulo: 'Fila / Entrada', icone: Inbox, corBg: 'bg-slate-100', corHeader: 'bg-slate-200', corTexto: 'text-slate-700' },
@@ -57,8 +57,8 @@ const ColunaTriagem = ({ coluna, chamadosFiltrados, setChamadoSelecionado, handl
 
   return (
     <div onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }} onDrop={(e) => handleDrop(e, coluna.id)} 
-         className={`flex-1 flex flex-col h-full rounded-[2rem] border border-slate-200 overflow-hidden ${coluna.corBg} transition-colors
-         ${isTvMode ? 'min-w-[320px] max-w-[450px]' : 'min-w-[260px] max-w-[320px]'}`}>
+         className={`flex-1 flex flex-col h-full rounded-[2rem] border border-slate-200 overflow-hidden ${coluna.corBg} transition-colors snap-center
+         ${isTvMode ? 'min-w-[320px] max-w-[450px]' : 'min-w-[280px] max-w-[340px]'}`}>
       <div className={`p-4 ${coluna.corHeader} flex items-center justify-between shrink-0`}>
         <div className={`flex items-center gap-2 font-black uppercase tracking-widest text-xs ${coluna.corTexto}`}>
           <Icone size={16} /> {coluna.titulo}
@@ -139,7 +139,7 @@ export default function TriagemPage() {
 
       const { data } = await supabase
         .from('solicitacoes_suporte')
-        .select(`*, equipamento:equipamentos(id, nome, patrimonio, modulo), solicitante:perfis!solicitante_id(nome), tecnico:perfis!tecnico_responsavel_id(nome), sla:slas(id, nome, cor, tempo_resolucao_horas)`)
+        .select(`*, equipamento:equipamentos(id, nome, patrimonio, modulo), solicitante:perfis!solicitante_id(nome, setor, ramal), tecnico:perfis!tecnico_responsavel_id(nome), sla:slas(id, nome, cor, tempo_resolucao_horas)`)
         .in('equipamento_id', idsEquips)
         .order('created_at', { ascending: false });
 
@@ -152,7 +152,8 @@ export default function TriagemPage() {
           ultimoIdConhecidoRef.current = idMaisRecente;
         }
         primeiraCargaRef.current = false;
-        setChamados(data);
+        
+        setChamados(prev => JSON.stringify(prev) === JSON.stringify(data) ? prev : data);
       }
     } catch (err) {
       console.error(err);
@@ -163,10 +164,12 @@ export default function TriagemPage() {
 
   useEffect(() => { if (filaSelecionada) buscarChamadosInstantaneo(false); }, [filaSelecionada, buscarChamadosInstantaneo])
 
-  // 🚀 POLLING OTIMIZADO: Só atualiza pesadamente a cada 5s SE A ABA ESTIVER ABERTA
   useEffect(() => {
+    const onFocus = () => buscarChamadosInstantaneo(true);
+    window.addEventListener('focus', onFocus);
+    
     const intervalo = setInterval(() => {
-      if (document.hidden) return; // 🛑 Impede que o navegador "pisque" quando você está noutra aba
+      if (document.hidden) return;
       buscarChamadosInstantaneo(true);
     }, 5000);
 
@@ -179,6 +182,7 @@ export default function TriagemPage() {
 
     return () => { 
       clearInterval(intervalo);
+      window.removeEventListener('focus', onFocus);
       supabase.removeChannel(channel); 
     };
   }, [buscarChamadosInstantaneo]);
@@ -217,9 +221,29 @@ export default function TriagemPage() {
     const payloadUpdate = { status: novoStatus, justificativa: justificativa };
     if (tecnicoIdAtribuido !== undefined) payloadUpdate.tecnico_responsavel_id = tecnicoIdAtribuido;
 
+    // 🚀 ADICIONE ISTO: Se arrastar o card para os Encerrados, regista a hora
+    if (['Resolvido', 'Encerrado', 'Concluído'].includes(novoStatus)) {
+      payloadUpdate.data_resolucao = new Date().toISOString()
+    }
+
     setChamados(prev => prev.map(c => c.id === id ? { ...c, ...payloadUpdate, tecnico: tecnicoIdAtribuido === profile.id ? { nome: profile.nome } : c.tecnico } : c));
     const { error } = await supabase.from('solicitacoes_suporte').update(payloadUpdate).eq('id', id);
-    if (error) { toast.error('Erro ao mover.'); buscarChamadosInstantaneo(false); }
+    if (error) { 
+      toast.error('Erro ao mover.'); 
+      buscarChamadosInstantaneo(false); 
+    } else {
+      // 🚀 NOTIFICAR O CLIENTE DA MUDANÇA DE STATUS NO KANBAN
+      const chamadoMovido = chamados.find(c => c.id === id);
+      if (chamadoMovido && chamadoMovido.solicitante_id) {
+        const numTicket = chamadoMovido.numero_ticket ? `#${String(chamadoMovido.numero_ticket).padStart(5, '0')}` : '#00001';
+        await enviarNotificacao(
+          chamadoMovido.solicitante_id, 
+          'Atualização no Chamado', 
+          `O seu chamado ${numTicket} avançou para o status: ${novoStatus}.`, 
+          id
+        );
+      }
+    }
     setModalAcao({ aberto: false, tipo: '', chamadoId: null, novoStatus: '' }); setJustificativaDrop('');
   }
 
@@ -313,7 +337,6 @@ export default function TriagemPage() {
             <h1 className="text-2xl lg:text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tight uppercase"><Ticket className="text-indigo-600" size={32} /> Central de Triagem</h1>
           </div>
           <div className="flex items-center gap-3 shrink-0">
-            <NotificacoesBell />
             <button onClick={abrirModoMonitor} className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2"><Maximize2 size={16} /> Modo TV</button>
             <div className="flex items-center gap-2 bg-indigo-50/50 p-2 rounded-2xl border border-indigo-100 shrink-0">
               <Layers size={18} className="text-indigo-600 ml-2" />
@@ -340,8 +363,8 @@ export default function TriagemPage() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0 pb-4 custom-scrollbar">
-        <div className="flex gap-6 h-full min-w-[1350px] items-start">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0 pb-4 custom-scrollbar snap-x snap-mandatory overscroll-x-contain">
+        <div className="flex gap-6 h-full min-w-[1450px] items-start px-2 md:px-0">
           {COLUNAS_KANBAN.map(coluna => <ColunaTriagem key={coluna.id} coluna={coluna} chamadosFiltrados={chamadosFiltrados} setChamadoSelecionado={setChamadoSelecionado} handleDrop={handleDrop} isTvMode={false} />)}
         </div>
       </div>

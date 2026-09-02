@@ -27,6 +27,9 @@ const obterClasseCorSla = (corId) => {
   return mapa[corId] || 'bg-amber-500'
 }
 
+// 🚀 DETETA SE É TELEMÓVEL PARA DESATIVAR O DRAG E LIBERTAR O SWIPE (SCROLL HORIZONTAL)
+const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
 export default function CartaoKanban({ ticket, onOpen }) {
   const dataFormatada = formatarDataCompleta(ticket.created_at)
   
@@ -44,15 +47,16 @@ export default function CartaoKanban({ ticket, onOpen }) {
 
   return (
     <div 
-      draggable
+      draggable={!isTouchDevice} // 🚀 SE FOR TOUCH, DESATIVA O ARRASTO DO CARTÃO!
       onDragStart={(e) => {
+        if(isTouchDevice) return;
         e.dataTransfer.setData('text/plain', ticket.id)
         e.dataTransfer.effectAllowed = 'move'
         setTimeout(() => { e.target.style.opacity = '0.4' }, 0)
       }}
       onDragEnd={(e) => { e.target.style.opacity = '1' }}
       onClick={() => onOpen(ticket)}
-      className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-grab active:cursor-grabbing group relative select-none"
+      className={`bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all group relative select-none ${!isTouchDevice ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}`}
     >
       <div className="flex justify-between items-start mb-2 gap-2">
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -116,10 +120,13 @@ export default function CartaoKanban({ ticket, onOpen }) {
 
       <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-[10px]">
         <div className="flex items-center gap-1.5 font-bold text-slate-500 truncate pr-2">
-          <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-black shrink-0">
+          <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-black shrink-0">
             {ticket.solicitante?.nome?.charAt(0) || 'U'}
           </div>
-          <span className="truncate">{ticket.solicitante?.nome || 'Utilizador'}</span>
+          <div className="flex flex-col truncate min-w-0">
+            <span className="truncate leading-tight">{ticket.solicitante?.nome || 'Utilizador'}</span>
+            {ticket.solicitante?.setor && <span className="text-[8px] text-slate-400 uppercase truncate">{ticket.solicitante.setor}</span>}
+          </div>
         </div>
 
         <div className="flex items-center gap-1 bg-indigo-50/80 text-indigo-700 px-2 py-1 rounded-lg border border-indigo-100 font-bold shrink-0">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
-import { KeyRound, UserX, UserCheck, LayoutGrid, Trash2, UserPlus, ShieldAlert } from 'lucide-react'
+import { KeyRound, UserX, UserCheck, LayoutGrid, Trash2, UserPlus, ShieldAlert, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import ModalConfirmacao from '../../../components/ModalConfirmacao'
 
@@ -57,8 +57,8 @@ export default function TabUsuarios({ modulosDisponiveis }) {
         dados: { 
           ...novoUsuario, 
           modulos: modulosParaSalvar,
-          setor: novoUsuario.setor.trim() || null,
-          ramal: novoUsuario.ramal.trim() || null
+          setor: novoUsuario.setor?.trim() || null,
+          ramal: novoUsuario.ramal?.trim() || null
         } 
       }
     })
@@ -79,8 +79,8 @@ export default function TabUsuarios({ modulosDisponiveis }) {
     
     const payload = { 
       modulos_acesso: modalAcessos.modulos,
-      setor: modalAcessos.setor.trim() || null,
-      ramal: modalAcessos.ramal.trim() || null
+      setor: modalAcessos.setor?.trim() || null,
+      ramal: modalAcessos.ramal?.trim() || null
     }
 
     const { error } = await supabase.from('perfis').update(payload).eq('id', modalAcessos.userId);
@@ -172,10 +172,8 @@ export default function TabUsuarios({ modulosDisponiveis }) {
               <option value="usuario">Usuário Comum</option>
             </select>
 
-            {/* Input livre para Setor */}
             <input type="text" placeholder="Setor / Departamento (Ex: Recepção, TI)" value={novoUsuario.setor} onChange={e => setNovoUsuario({...novoUsuario, setor: e.target.value})} className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
 
-            {/* Input para Ramal */}
             <input type="text" placeholder="Ramal (Ex: 4102)" value={novoUsuario.ramal} onChange={e => setNovoUsuario({...novoUsuario, ramal: e.target.value})} className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-xl font-medium text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500 transition-all" />
           </div>
 
@@ -222,8 +220,8 @@ export default function TabUsuarios({ modulosDisponiveis }) {
                 </span>
                 <span className="text-xs font-medium text-slate-500 truncate block">{user.email}</span>
                 
-                {/* Exibe Setor e Ramal de forma elegante */}
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {/* 🚀 EXIBIÇÃO DE SETOR, RAMAL E ÚLTIMO LOGIN */}
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                   {user.setor && (
                     <span className="px-2 py-0.5 rounded-md border border-indigo-100 bg-indigo-50 text-[9px] font-bold text-indigo-700 uppercase tracking-wider">
                       Setor: {user.setor}
@@ -234,6 +232,14 @@ export default function TabUsuarios({ modulosDisponiveis }) {
                       Ramal: {user.ramal}
                     </span>
                   )}
+                </div>
+                
+                {/* AQUI ESTÁ O NOVO CAMPO: ÚLTIMO ACESSO */}
+                <div className="flex items-center gap-1 mt-2 text-[10px] font-bold text-slate-400">
+                  <Clock size={12} />
+                  {user.ultimo_acesso 
+                    ? `Último acesso: ${new Date(user.ultimo_acesso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute:'2-digit' })}` 
+                    : 'Nunca acessou'}
                 </div>
               </div>
             </div>
@@ -280,7 +286,7 @@ export default function TabUsuarios({ modulosDisponiveis }) {
             <input type="password" placeholder="Nova senha (mín. 6 carac.)" value={modalSenha.novaSenha} onChange={(e) => setModalSenha({...modalSenha, novaSenha: e.target.value})} className="w-full mb-6 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 transition-all" autoFocus />
             
             <div className="flex gap-3">
-              <button onClick={() => setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' })} className="flex-1 px-4 py-3.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+              <button type="button" onClick={() => setModalSenha({ aberto: false, userId: '', email: '', novaSenha: '' })} className="flex-1 px-4 py-3.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
               <button onClick={handleForcarTrocaSenha} disabled={loading || modalSenha.novaSenha.length < 6} className="flex-1 px-4 py-3.5 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl disabled:opacity-50 transition-colors shadow-md active:scale-95">Salvar</button>
             </div>
           </div>
@@ -294,7 +300,6 @@ export default function TabUsuarios({ modulosDisponiveis }) {
             <h3 className="text-xl font-black text-slate-800 mb-1 tracking-tight">Acessos & Dados</h3>
             <p className="text-sm font-medium text-slate-500 mb-6 leading-relaxed">Configurar restrições e informações para <strong className="text-slate-800">{modalAcessos.nome}</strong></p>
             
-            {/* Inputs de Setor e Ramal no Modal de Edição */}
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Setor / Departamento</label>
@@ -318,7 +323,7 @@ export default function TabUsuarios({ modulosDisponiveis }) {
             </div>
             
             <div className="flex gap-3">
-              <button onClick={() => setModalAcessos({ aberto: false, userId: '', nome: '', modulos: [], setor: '', ramal: '' })} className="flex-1 px-4 py-3.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
+              <button type="button" onClick={() => setModalAcessos({ aberto: false, userId: '', nome: '', modulos: [], setor: '', ramal: '' })} className="flex-1 px-4 py-3.5 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">Cancelar</button>
               <button onClick={handleSalvarEdicaoModulos} disabled={loading} className="flex-1 px-4 py-3.5 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl disabled:opacity-50 transition-colors shadow-md active:scale-95">Salvar</button>
             </div>
           </div>

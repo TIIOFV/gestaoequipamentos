@@ -3,6 +3,13 @@ import { ArrowLeft, Paperclip, FileText, X, UploadCloud, Monitor, Clock, Calenda
 import { supabase } from '../../../lib/supabase'
 import toast from 'react-hot-toast'
 
+// 🚀 BLINDAGEM 1: Extrai o ID seja ele string pura, número, ou um objeto aninhado
+const extrairIdStr = (campo) => {
+  if (campo === null || campo === undefined) return '';
+  if (typeof campo === 'object') return String(campo.id || campo.value || '');
+  return String(campo);
+};
+
 const converteParaInputLocal = (dataIsoUTC) => {
   if (!dataIsoUTC) return '';
   const d = new Date(dataIsoUTC);
@@ -32,17 +39,33 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
 
   useEffect(() => {
     if (view === 'editar' && chamadoInicial) {
+      
+      // 🚀 BLINDAGEM 2: Recuperação Profunda. Se a query do Supabase não trouxe o ID, cruza o nome com a lista de auxiliares.
+      const recuperarId = (campoId, campoObjeto, listaAuxiliar) => {
+        let id = extrairIdStr(campoId) || extrairIdStr(campoObjeto);
+        if (!id && campoObjeto?.nome && Array.isArray(listaAuxiliar)) {
+          const encontrado = listaAuxiliar.find(item => item.nome === campoObjeto.nome);
+          if (encontrado) id = encontrado.id;
+        }
+        return id || '';
+      };
+
       setFormData({
-        id: chamadoInicial.id, equipamento_id: chamadoInicial.equipamento_id || '', tipo_intervencao: chamadoInicial.tipo_intervencao || 'Corretiva',
-        status_id: chamadoInicial.status_id || '', prestador_id: chamadoInicial.prestador_id || '', protocolo_externo: chamadoInicial.protocolo_externo || '',
+        id: chamadoInicial.id,
+        equipamento_id: recuperarId(chamadoInicial.equipamento_id, chamadoInicial.equipamento, auxiliares?.equipamentos),
+        tipo_intervencao: chamadoInicial.tipo_intervencao || 'Corretiva',
+        status_id: recuperarId(chamadoInicial.status_id, chamadoInicial.status, auxiliares?.status),
+        prestador_id: recuperarId(chamadoInicial.prestador_id, chamadoInicial.prestador, auxiliares?.prestadores),
+        protocolo_externo: chamadoInicial.protocolo_externo || '',
         descricao: chamadoInicial.descricao || '', 
         data_abertura: chamadoInicial.data_abertura ? converteParaInputLocal(chamadoInicial.data_abertura) : converteParaInputLocal(new Date().toISOString()),
-        data_prevista: chamadoInicial.data_prevista || '', 
+        data_prevista: chamadoInicial.data_prevista ? chamadoInicial.data_prevista.split('T')[0] : '', 
         data_conclusao_manual: chamadoInicial.data_conclusao ? chamadoInicial.data_conclusao.split('T')[0] : '', 
-        aberto_por_id: chamadoInicial.aberto_por_id || usuarioAtual?.id, anexos: chamadoInicial.anexos || []
+        aberto_por_id: extrairIdStr(chamadoInicial.aberto_por_id) || extrairIdStr(chamadoInicial.aberto_por) || usuarioAtual?.id || '', 
+        anexos: chamadoInicial.anexos || []
       })
     }
-  }, [view, chamadoInicial, usuarioAtual])
+  }, [view, chamadoInicial, usuarioAtual, auxiliares])
 
   const isPDF = (url) => url?.toLowerCase().includes('.pdf')
 
@@ -89,7 +112,7 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
     e.preventDefault()
     setLoading(true)
     
-    const statusSelecionado = auxiliares.status.find(s => s.id === formData.status_id)
+    const statusSelecionado = auxiliares.status.find(s => String(s.id) === String(formData.status_id))
     const isConcluido = statusSelecionado?.nome === 'Concluído'
 
     const payload = { 
@@ -156,7 +179,7 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
         }
       }
       
-      const equipamentoNome = auxiliares.equipamentos.find(e => e.id === payload.equipamento_id)?.nome || 'Equipamento Desconhecido';
+      const equipamentoNome = auxiliares.equipamentos.find(e => String(e.id) === String(payload.equipamento_id))?.nome || 'Equipamento Desconhecido';
       
       await supabase.from('logs_auditoria').insert([{
         usuario_nome: usuarioAtual?.nome || 'Usuário Desconhecido',
@@ -172,7 +195,7 @@ export default function ChamadoForm({ view, chamadoInicial, equipamentoIdNovo, a
     }
   }
 
-  const mostrarDataConclusao = auxiliares.status.find(s => s.id === formData.status_id)?.nome === 'Concluído'
+  const mostrarDataConclusao = auxiliares.status.find(s => String(s.id) === String(formData.status_id))?.nome === 'Concluído'
 
   return (
     <div className="w-full mx-auto space-y-6 animate-in slide-in-from-bottom-4 fade-in duration-500 min-w-0">

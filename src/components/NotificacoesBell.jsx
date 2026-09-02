@@ -32,7 +32,6 @@ export default function NotificacoesBell() {
         osc.start(ctx.currentTime + start);
         osc.stop(ctx.currentTime + start + duration);
       };
-
       playTone(880, 0, 0.15); 
     } catch (e) {
       console.error("Erro no áudio:", e);
@@ -51,11 +50,9 @@ export default function NotificacoesBell() {
       
     if (data) {
       const unreadAtual = data.filter(n => !n.lida).length;
-      
       if (tocarSom && unreadAtual > unreadAnterior.current) {
         tocarSomPessoal();
       }
-      
       unreadAnterior.current = unreadAtual;
       setNotificacoes(data);
     }
@@ -70,7 +67,7 @@ export default function NotificacoesBell() {
       buscarNotificacoes(true);
     }, 10000);
 
-    // 🚀 ORDEM CORRIGIDA: As chamadas `.on(...)` vêm ANTES do `.subscribe()`
+    // 🚀 ORDEM CORRIGIDA: .on() ANTES de .subscribe() para evitar o erro do Supabase
     const canalNotifId = `sino-${profile.id}-${Date.now()}`
     const channelNotif = supabase
       .channel(canalNotifId)

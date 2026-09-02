@@ -22,8 +22,11 @@ export default function TabAuxiliares({ abaAtiva, tabelaAtual, nomeAba, modulosD
   const [modalConfirm, setModalConfirm] = useState({ isOpen: false, idExcluir: null })
 
   useEffect(() => {
+    // 🚀 LIMPEZA IMEDIATA: Força a exibição dos Skeletons e apaga a lista da aba anterior
+    setDados([]) 
     setEditandoId(null)
     setModuloVinculo(modulosDisponiveis.map(m => m.id))
+    
     buscarDados()
     if (abaAtiva === 'setores') buscarUnidades()
   }, [abaAtiva])
@@ -203,21 +206,21 @@ export default function TabAuxiliares({ abaAtiva, tabelaAtual, nomeAba, modulosD
             <div className="flex flex-row sm:flex-col lg:flex-row gap-2.5 w-full md:w-auto shrink-0 mt-2 md:mt-0">
               {editandoId === item.id ? (
                 <>
-                  <button onClick={() => salvarEdicao(item.id)} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md active:scale-95">
+                  <button type="button" onClick={() => salvarEdicao(item.id)} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-md active:scale-95">
                     <Save size={18} /> Salvar
                   </button>
-                  <button onClick={() => setEditandoId(null)} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                  <button type="button" onClick={() => setEditandoId(null)} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
                     <X size={18} /> Cancelar
                   </button>
                 </>
               ) : (
                 <>
-                  <button onClick={() => { setEditandoId(item.id); setTextoEdicao(item.nome); setModuloVinculoEdicao(item.modulo || []); if(abaAtiva === 'setores') setUnidadeEdicao(item.unidade_id); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl transition-colors">
+                  <button type="button" onClick={() => { setEditandoId(item.id); setTextoEdicao(item.nome); setModuloVinculoEdicao(item.modulo || []); if(abaAtiva === 'setores') setUnidadeEdicao(item.unidade_id); }} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 rounded-xl transition-colors">
                     <Edit2 size={16} /> Editar
                   </button>
-                  <button onClick={() => setModalConfirm({ isOpen: true, idExcluir: item.id })} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 rounded-xl transition-colors shadow-sm">
+                  <button type="button" onClick={() => setModalConfirm({ isOpen: true, idExcluir: item.id })} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-3 text-sm font-bold text-red-600 bg-white border border-slate-200 hover:bg-red-50 hover:border-red-200 rounded-xl transition-colors shadow-sm">
                     <Trash2 size={16} className="md:hidden lg:block"/> <span className="md:hidden lg:block">Excluir</span>
-                    <Trash2 size={18} className="hidden md:block lg:hidden"/> {/* Apenas ícone no modo tablet estreito */}
+                    <Trash2 size={18} className="hidden md:block lg:hidden"/>
                   </button>
                 </>
               )}

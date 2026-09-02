@@ -16,6 +16,20 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // 1. EXTRAIR O TOKEN DO UTILIZADOR QUE FEZ A REQUISIÇÃO
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) throw new Error('Autenticação ausente.')
+    const token = authHeader.replace('Bearer ', '')
+
+    // 2. VERIFICAR A IDENTIDADE E SE É ADMINISTRADOR
+    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token)
+    if (userError || !user) throw new Error('Sessão inválida ou expirada.')
+
+    const { data: perfilData } = await supabaseAdmin.from('perfis').select('perfil').eq('id', user.id).single()
+    if (perfilData?.perfil !== 'administrador') {
+      throw new Error('Acesso Negado: Apenas administradores podem executar esta ação.')
+    }
+
     const { acao, dados } = await req.json()
     let result = null;
 
@@ -28,7 +42,8 @@ serve(async (req: Request) => {
       const { error: profileError } = await supabaseAdmin.from('perfis').insert([{
         user_id: data.user.id, email: dados.email, nome: dados.nome, 
         perfil: dados.perfil, cargo: dados.perfil === 'administrador' ? 'Administrador' : 'Analista',
-        esta_bloqueado: false, modulos_acesso: dados.modulos
+        esta_bloqueado: false, modulos_acesso: dados.modulos,
+        setor: dados.setor, ramal: dados.ramal
       }])
       if (profileError) throw profileError
       result = { sucesso: true, user: data }
@@ -48,7 +63,6 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
     
   } catch (error) {
-    // Tratamento de erro sem usar 'any' (Padrão Sênior)
     const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro desconhecido';
     return new Response(JSON.stringify({ error: errorMessage }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
   }

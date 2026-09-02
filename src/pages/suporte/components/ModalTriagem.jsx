@@ -59,8 +59,11 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
     const { data } = await supabase.from('solicitacoes_mensagens').select('*, autor:perfis(nome, perfil)').eq('solicitacao_id', chamado.id).order('created_at', { ascending: true })
     
     if (data) {
-      setMensagens(data); 
-      rolarParaFinal();
+      setMensagens(prev => {
+        if(JSON.stringify(prev) === JSON.stringify(data)) return prev;
+        setTimeout(rolarParaFinal, 100);
+        return data;
+      });
 
       const naoLidas = data.filter(m => m.autor_id !== profile.id && !m.lida_em);
       if (naoLidas.length > 0) {
@@ -99,6 +102,15 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
   const enviarMensagemComAnexo = async (e) => {
     e.preventDefault()
     if (!novaMensagem.trim() && !arquivoAnexo) return
+    
+    if (arquivoAnexo) {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+      if (!allowedTypes.includes(arquivoAnexo.type)) {
+        toast.error('Formato não permitido. Envie apenas JPG, PNG ou PDF.')
+        return
+      }
+    }
+
     setEnviando(true)
     let urlAnexo = null
     try {
@@ -116,15 +128,17 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
       if (!error && data) { 
         setMensagens(prev => [...prev, data]); setNovaMensagem(''); setArquivoAnexo(null); rolarParaFinal() 
         
-        // 🚀 OBRIGA a notificação a ser disparada (se falhar, o utilitário avisa-o na tela)
         const numTicket = chamado.numero_ticket ? `#${String(chamado.numero_ticket).padStart(5, '0')}` : '#00001';
-        await enviarNotificacao(
-          chamado.solicitante_id, 
-          'Nova Mensagem da Equipa', 
-          `A equipa técnica respondeu ao chamado ${numTicket}.`, 
-          chamado.id
-        );
-        
+        const destinatarioId = profile.id === chamado.solicitante_id ? chamado.tecnico_responsavel_id : chamado.solicitante_id;
+
+        if (destinatarioId) {
+          await enviarNotificacao(
+            destinatarioId, 
+            'Nova Mensagem no Chamado', 
+            `Há uma nova mensagem no ticket ${numTicket}.`, 
+            chamado.id
+          );
+        }
       } else { 
         toast.error('Erro ao enviar mensagem.') 
       }
@@ -140,17 +154,25 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
     const payload = { status: novoStatus }
     if (justificativaExtra) payload.justificativa = justificativaExtra
     
+    // 🚀 ADICIONE ISTO: Se o status for de encerramento, carimba a data exata
+    if (['Resolvido', 'Encerrado', 'Concluído'].includes(novoStatus)) {
+      payload.data_resolucao = new Date().toISOString()
+    }
+    
     const { error } = await supabase.from('solicitacoes_suporte').update(payload).eq('id', chamado.id)
     if (!error) { 
       toast.success(`Status alterado para: ${novoStatus}`)
       
-      const numTicket = chamado.numero_ticket ? `#${String(chamado.numero_ticket).padStart(5, '0')}` : '#00001'
-      await enviarNotificacao(
-        chamado.solicitante_id, 
-        'Atualização no Chamado', 
-        `O seu chamado ${numTicket} foi alterado para o status: ${novoStatus}.`, 
-        chamado.id
-      );
+      // 🚀 GARANTIA DE DISPARO DA NOTIFICAÇÃO AO ALTERAR STATUS NO MODAL
+      if (chamado.solicitante_id) {
+        const numTicket = chamado.numero_ticket ? `#${String(chamado.numero_ticket).padStart(5, '0')}` : '#00001';
+        await enviarNotificacao(
+          chamado.solicitante_id, 
+          'Atualização no Chamado', 
+          `O seu chamado ${numTicket} foi alterado para o status: ${novoStatus}.`, 
+          chamado.id
+        );
+      }
       
       onAtualizar(); 
       onClose() 
@@ -166,13 +188,15 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
     if (!error) { 
       toast.success('Chamado assumido!') 
       
-      const numTicket = chamado.numero_ticket ? `#${String(chamado.numero_ticket).padStart(5, '0')}` : '#00001'
-      await enviarNotificacao(
-        chamado.solicitante_id, 
-        'Atendimento Iniciado', 
-        `O seu chamado ${numTicket} foi assumido por um técnico.`, 
-        chamado.id
-      );
+      if (chamado.solicitante_id) {
+        const numTicket = chamado.numero_ticket ? `#${String(chamado.numero_ticket).padStart(5, '0')}` : '#00001'
+        await enviarNotificacao(
+          chamado.solicitante_id, 
+          'Atendimento Iniciado', 
+          `O seu chamado ${numTicket} foi assumido por um técnico.`, 
+          chamado.id
+        );
+      }
       
       onAtualizar() 
     } else { 
@@ -321,9 +345,25 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Solicitante</p>
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white p-2 rounded-xl border border-slate-200 truncate h-10">
-                    <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-600 shrink-0 font-bold">{chamado.solicitante?.nome?.charAt(0) || 'U'}</div>
-                    <span className="truncate pr-1">{chamado.solicitante?.nome || 'Utilizador'}</span>
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white p-2 rounded-xl border border-slate-200 truncate">
+                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-600 shrink-0 font-black">
+                      {chamado.solicitante?.nome?.charAt(0) || 'U'}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate pr-1">{chamado.solicitante?.nome || 'Utilizador'}</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {chamado.solicitante?.setor && (
+                          <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wider border border-slate-200 truncate">
+                            {chamado.solicitante.setor}
+                          </span>
+                        )}
+                        {chamado.solicitante?.ramal && (
+                          <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-wider border border-slate-200">
+                            Ramal: {chamado.solicitante.ramal}
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -332,8 +372,8 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
                     {!isFinalizado && <button onClick={() => { setTecnicoSelecionadoId(chamado.tecnico_responsavel_id || ''); setMostrarCampoTecnico(!mostrarCampoTecnico) }} className="text-[10px] font-bold text-indigo-600 hover:underline">{mostrarCampoTecnico ? 'X' : 'Alterar'}</button>}
                   </div>
                   {!mostrarCampoTecnico ? (
-                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white p-2 rounded-xl border border-slate-200 truncate h-10">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white shrink-0 font-bold ${chamado.tecnico?.nome ? 'bg-indigo-600' : 'bg-slate-300'}`}>{chamado.tecnico?.nome?.charAt(0) || '?'}</div>
+                    <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white p-2 rounded-xl border border-slate-200 truncate h-full min-h-[46px]">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white shrink-0 font-black ${chamado.tecnico?.nome ? 'bg-indigo-600' : 'bg-slate-300'}`}>{chamado.tecnico?.nome?.charAt(0) || '?'}</div>
                       <span className="truncate pr-1">{chamado.tecnico?.nome || 'Pendente'}</span>
                     </div>
                   ) : (
@@ -451,7 +491,8 @@ export default function ModalTriagem({ isOpen, onClose, chamado, onAtualizar }) 
               )}
               <form onSubmit={enviarMensagemComAnexo} className="flex gap-2">
                 <label className="p-3 bg-white border border-slate-200 hover:border-indigo-400 text-slate-500 rounded-xl cursor-pointer transition-colors flex items-center justify-center shrink-0 shadow-sm">
-                  <Paperclip size={16} /><input type="file" onChange={e => setArquivoAnexo(e.target.files?.[0] || null)} className="hidden" />
+                  <Paperclip size={16} />
+                  <input type="file" accept="image/png, image/jpeg, image/jpg, application/pdf" onChange={e => setArquivoAnexo(e.target.files?.[0] || null)} className="hidden" />
                 </label>
                 <input type="text" placeholder="Responda ao utilizador aqui..." value={novaMensagem} onChange={e => setNovaMensagem(e.target.value)} disabled={isFinalizado} className="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl font-medium text-slate-800 text-xs outline-none focus:ring-2 focus:ring-indigo-500 transition-all disabled:opacity-50 shadow-sm" />
                 <button type="submit" disabled={enviando || (!novaMensagem.trim() && !arquivoAnexo) || isFinalizado} className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 flex items-center justify-center">
